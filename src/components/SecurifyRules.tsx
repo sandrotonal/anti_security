@@ -10,9 +10,71 @@ interface Rule {
   remedy: string;
 }
 
+const remediationPlans: Record<string, { steps: string[]; command?: string }> = {
+  'sec-001': {
+    steps: [
+      'revoke the access key id on your AWS IAM Dashboard immediately.',
+      'generate temporary credentials using AWS STS for active development.',
+      'audit AWS CloudTrail logs to inspect unauthorized API activities.'
+    ],
+    command: 'aws iam deactivate-user-access-key --access-key-id AKIA...'
+  },
+  'sec-002': {
+    steps: [
+      'invalidate the secret key paired with this user in AWS console.',
+      'delete any active temporary AWS CLI sessions immediately.',
+      'migrate credentials management to AWS Secrets Manager.'
+    ]
+  },
+  'sec-003': {
+    steps: [
+      'navigate to your Supabase Dashboard -> Settings -> API.',
+      'locate the service_role key section and click "Roll key".',
+      'update your server-side environment configurations with the newly generated JWT token.'
+    ]
+  },
+  'sec-004': {
+    steps: [
+      'open Stripe Dashboard -> Developers -> API Keys.',
+      'locate the compromised key and click "Revoke Key".',
+      'update your project with a new secret key, and ensure you use test keys (sk_test_...) during local development.'
+    ]
+  },
+  'sec-005': {
+    steps: [
+      'visit GitHub settings -> Developer settings -> Personal access tokens.',
+      'find the compromised token and click "Revoke" or "Delete".',
+      'purge the key from your local git history using BFG Repo-Cleaner or git-filter-repo.'
+    ],
+    command: 'git filter-repo --path path_to_file --invert-paths'
+  },
+  'sec-006': {
+    steps: [
+      'go to Google Cloud Console -> Credentials.',
+      'select the API key and click "Restrict Key".',
+      'apply HTTP referrers or IP restrictions to lock authorization permissions to client apps.'
+    ]
+  },
+  'sec-007': {
+    steps: [
+      'open your Slack workspace integration dashboard.',
+      'revoke the active webhook URL endpoint configuration.',
+      'migrate slack messaging payloads to a private Slack App credential workflow.'
+    ]
+  },
+  'sec-008': {
+    steps: [
+      'verify if the flagged token is actually a secret or just a random hash string.',
+      'if it is a database password or salt, place it in your local environment file.',
+      'if it is false positive, append "# securify:ignore" at the end of the line to bypass scans.'
+    ]
+  }
+};
+
 export const SecurifyRules = () => {
   const [search, setSearch] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
 
   const rules: Rule[] = [
     {
@@ -112,7 +174,7 @@ export const SecurifyRules = () => {
             what securify detects.
           </h2>
           <p className="text-neutral-400 text-sm font-light lowercase leading-relaxed max-w-xl">
-            our open-source scanning rules catalog is updated continuously by security researchers. search our active rules database below.
+            our open-source scanning rules catalog is updated continuously. click on any rule to view its step-by-step key rotation and remediation guide.
           </p>
         </div>
 
@@ -152,7 +214,10 @@ export const SecurifyRules = () => {
           {filteredRules.map((rule) => (
             <div
               key={rule.id}
-              className="bg-neutral-950/80 border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all duration-300 relative group flex flex-col justify-between"
+              onClick={() => setSelectedRuleId(selectedRuleId === rule.id ? null : rule.id)}
+              className={`bg-neutral-950/80 border rounded-2xl p-6 transition-all duration-300 relative group flex flex-col justify-between cursor-pointer ${
+                selectedRuleId === rule.id ? 'border-white/20 bg-neutral-900/30' : 'border-white/5 hover:border-white/10'
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-3 mb-4 select-none">
@@ -177,8 +242,11 @@ export const SecurifyRules = () => {
                   </div>
                 </div>
 
-                <h3 className="text-base font-medium text-white mb-2 lowercase tracking-tight">
-                  {rule.name}
+                <h3 className="text-base font-medium text-white mb-2 lowercase tracking-tight flex items-center justify-between">
+                  <span>{rule.name}</span>
+                  <span className="text-[10px] font-mono text-neutral-500 group-hover:text-white transition-colors">
+                    {selectedRuleId === rule.id ? 'hide guide ▲' : 'view guide ▼'}
+                  </span>
                 </h3>
                 <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed mb-6">
                   {rule.description}
@@ -195,6 +263,39 @@ export const SecurifyRules = () => {
                   {rule.remedy}
                 </div>
               </div>
+
+              {/* Remediation Guide Dropdown */}
+              {selectedRuleId === rule.id && (
+                <div className="mt-6 pt-6 border-t border-white/10 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                  <span className="text-[10px] font-mono text-neutral-400 block lowercase tracking-wider">
+                    ⚡ step-by-step rotation guide
+                  </span>
+                  <ol className="list-decimal pl-4 space-y-2 text-[11px] text-neutral-400 lowercase leading-relaxed font-light">
+                    {(remediationPlans[rule.id]?.steps || []).map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                  </ol>
+                  
+                  {remediationPlans[rule.id]?.command && (
+                    <div className="space-y-1.5 pt-2">
+                      <span className="text-[9px] font-mono text-neutral-500 block lowercase">emergency purge command:</span>
+                      <div className="flex justify-between items-center bg-black border border-white/5 rounded-lg p-2 font-mono text-[9px] text-neutral-300">
+                        <code>{remediationPlans[rule.id]?.command}</code>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(remediationPlans[rule.id]?.command || '');
+                          }}
+                          className="hover:text-white transition-colors text-[9px] lowercase underline decoration-white/20 shrink-0 ml-2"
+                        >
+                          copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           ))}
 
