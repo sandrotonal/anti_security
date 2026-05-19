@@ -11,7 +11,7 @@ interface ScanReport {
 }
 
 export const SecurifySandbox = () => {
-  const [activeTab, setActiveTab] = useState<'scan' | 'config' | 'entropy'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'config' | 'entropy' | 'secrets' | 'custom-rule'>('scan');
   
   // Tab 3: Entropy Calculator States
   const [entropyInput, setEntropyInput] = useState<string>('sk_test_51N34ghJkL90AcdSfErtYuiOp');
@@ -40,6 +40,102 @@ export const SecurifySandbox = () => {
   const [customDirInput, setCustomDirInput] = useState<string>('');
   const [customExtInput, setCustomExtInput] = useState<string>('');
   const [configCopied, setConfigCopied] = useState<boolean>(false);
+
+  // Tab 4: Secrets Generator States
+  const [genLength, setGenLength] = useState<number>(32);
+  const [genUpper, setGenUpper] = useState<boolean>(true);
+  const [genLower, setGenLower] = useState<boolean>(true);
+  const [genNumbers, setGenNumbers] = useState<boolean>(true);
+  const [genSymbols, setGenSymbols] = useState<boolean>(true);
+  const [genPrefix, setGenPrefix] = useState<'none' | 'stripe_test' | 'stripe_live' | 'securify' | 'custom'>('none');
+  const [customPrefixVal, setCustomPrefixVal] = useState<string>('');
+  const [generatedSecret, setGeneratedSecret] = useState<string>('');
+  const [secretCopied, setSecretCopied] = useState<boolean>(false);
+
+  // Tab 5: Custom Rule Tester States
+  const [ruleName, setRuleName] = useState<string>('my-custom-token');
+  const [ruleRegex, setRuleRegex] = useState<string>('sec_secret_[a-zA-Z0-9]{16}');
+  const [ruleDescription, setRuleDescription] = useState<string>('detects custom company authentication tokens');
+  const [testText, setTestText] = useState<string>('const token = "sec_secret_A1b2C3d4E5f6G7h8";');
+  const [ruleCopied, setRuleCopied] = useState<boolean>(false);
+
+  const generateSecretValue = () => {
+    let chars = '';
+    if (genUpper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    if (genLower) chars += 'abcdefghijklmnopqrstuvwxyz';
+    if (genNumbers) chars += '0123456789';
+    if (genSymbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
+    
+    let result = '';
+    const array = new Uint32Array(genLength);
+    window.crypto.getRandomValues(array);
+    for (let i = 0; i < genLength; i++) {
+      result += chars[array[i] % chars.length];
+    }
+    
+    let finalPrefix = '';
+    if (genPrefix === 'stripe_test') finalPrefix = 'sk_test_';
+    else if (genPrefix === 'stripe_live') finalPrefix = 'sk_live_';
+    else if (genPrefix === 'securify') finalPrefix = 'sec_key_';
+    else if (genPrefix === 'custom') finalPrefix = customPrefixVal;
+    
+    setGeneratedSecret(finalPrefix + result);
+  };
+
+  useEffect(() => {
+    generateSecretValue();
+  }, [genLength, genUpper, genLower, genNumbers, genSymbols, genPrefix, customPrefixVal]);
+
+  const handleCopySecret = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedSecret);
+      setSecretCopied(true);
+      setTimeout(() => setSecretCopied(false), 2000);
+    } catch (err) {
+      console.error('failed to copy secret', err);
+    }
+  };
+
+  const generateYAMLRule = (): string => {
+    return `rules:
+  - id: "${ruleName.toLowerCase().replace(/\s+/g, '-')}"
+    name: "${ruleName.toLowerCase()}"
+    description: "${ruleDescription.toLowerCase()}"
+    pattern: "${ruleRegex.replace(/"/g, '\\"')}"
+    severity: "critical"
+    remedy: "revoke key immediately and remove from code."`;
+  };
+
+  const handleCopyRule = async () => {
+    try {
+      await navigator.clipboard.writeText(generateYAMLRule());
+      setRuleCopied(true);
+      setTimeout(() => setRuleCopied(false), 2000);
+    } catch (err) {
+      console.error('failed to copy rule', err);
+    }
+  };
+
+  const getRegexTestResults = () => {
+    if (!ruleRegex) return { error: 'pattern is empty', matched: false, matches: [] };
+    try {
+      const rx = new RegExp(ruleRegex, 'g');
+      const matches = [...testText.matchAll(rx)];
+      return {
+        error: null,
+        matched: matches.length > 0,
+        matches: matches.map(m => m[0])
+      };
+    } catch (err: any) {
+      return {
+        error: err.message,
+        matched: false,
+        matches: []
+      };
+    }
+  };
 
   const handleFileUpload = (file: File) => {
     const reader = new FileReader();
@@ -265,6 +361,26 @@ ssh_keys = ${enabledScanners.ssh}
             }`}
           >
             entropy meter
+          </button>
+          <button
+            onClick={() => setActiveTab('secrets')}
+            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
+              activeTab === 'secrets'
+                ? 'bg-white text-black border-white'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+            }`}
+          >
+            secret generator
+          </button>
+          <button
+            onClick={() => setActiveTab('custom-rule')}
+            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
+              activeTab === 'custom-rule'
+                ? 'bg-white text-black border-white'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+            }`}
+          >
+            custom rule tester
           </button>
         </div>
 
@@ -542,7 +658,7 @@ ssh_keys = ${enabledScanners.ssh}
             </div>
 
           </div>
-        ) : (
+        ) : activeTab === 'entropy' ? (
           /* Tab 3: ENTROPY WORKSPACE */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
             {/* Left Side: Input area */}
@@ -670,6 +786,311 @@ ssh_keys = ${enabledScanners.ssh}
               <div className="text-[9px] text-neutral-500 font-mono mt-6 leading-relaxed lowercase">
                 shannon entropy measures the randomness of strings. cryptographic secrets usually have high character diversity, resulting in score above 4.5.
               </div>
+            </div>
+          </div>
+        ) : activeTab === 'secrets' ? (
+          /* Tab 4: SECRETS GENERATOR */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+            {/* Left Side: Controls */}
+            <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
+              <div className="space-y-5">
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  cryptographic secret parameters
+                </span>
+
+                {/* Length Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-mono text-neutral-400">
+                    <span className="lowercase">secret length:</span>
+                    <span className="text-white font-medium">{genLength} characters</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="8"
+                    max="128"
+                    step="1"
+                    value={genLength}
+                    onChange={(e) => setGenLength(parseInt(e.target.value))}
+                    className="w-full h-1 bg-neutral-900 rounded-lg appearance-none cursor-pointer accent-white"
+                  />
+                </div>
+
+                {/* Character Sets */}
+                <div className="space-y-2.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase">character diversity sets:</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={genUpper}
+                        onChange={() => setGenUpper(!genUpper)}
+                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">A-Z uppercase</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={genLower}
+                        onChange={() => setGenLower(!genLower)}
+                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">a-z lowercase</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={genNumbers}
+                        onChange={() => setGenNumbers(!genNumbers)}
+                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">0-9 numbers</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={genSymbols}
+                        onChange={() => setGenSymbols(!genSymbols)}
+                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">symbols (!@#...)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Prefixes */}
+                <div className="space-y-3 pt-2">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">credential signature prefix:</label>
+                  <select
+                    value={genPrefix}
+                    onChange={(e: any) => setGenPrefix(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-white/20 lowercase font-mono cursor-pointer"
+                  >
+                    <option value="none">no prefix signature (raw secret)</option>
+                    <option value="stripe_test">stripe test prefix (sk_test_...)</option>
+                    <option value="stripe_live">stripe live prefix (sk_live_...)</option>
+                    <option value="securify">securify prefix (sec_key_...)</option>
+                    <option value="custom">custom prefix custom...</option>
+                  </select>
+
+                  {genPrefix === 'custom' && (
+                    <input
+                      type="text"
+                      placeholder="e.g. env_secret_..."
+                      value={customPrefixVal}
+                      onChange={(e) => setCustomPrefixVal(e.target.value)}
+                      className="w-full bg-black border border-white/5 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-white/20 lowercase"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/5">
+                <button
+                  onClick={generateSecretValue}
+                  className="w-full bg-white hover:bg-neutral-200 text-black font-mono text-xs font-medium py-3 rounded-xl transition-colors lowercase"
+                >
+                  regenerate cryptographic key
+                </button>
+              </div>
+            </div>
+
+            {/* Right Side: Key Output & Entropy */}
+            <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 flex flex-col justify-between min-h-[420px]">
+              <div>
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  generated high-entropy key output
+                </span>
+
+                <div className="space-y-5">
+                  <div className="relative group">
+                    <pre className="w-full bg-black border border-white/5 rounded-xl p-4 font-mono text-xs text-neutral-300 whitespace-pre-wrap break-all select-all min-h-[64px]">
+                      {generatedSecret}
+                    </pre>
+                    <button
+                      onClick={handleCopySecret}
+                      className={`absolute right-3 top-3 px-3 py-1.5 rounded-lg text-[9px] font-mono lowercase border transition-all ${
+                        secretCopied
+                          ? 'bg-emerald-950 text-emerald-400 border-emerald-500/20'
+                          : 'bg-neutral-900 border-white/5 hover:text-white text-neutral-400'
+                      }`}
+                    >
+                      {secretCopied ? 'copied!' : 'copy'}
+                    </button>
+                  </div>
+
+                  {/* Live Entropy stats */}
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-mono text-neutral-400 lowercase">
+                        <span>secret shannon entropy:</span>
+                        <span className="text-white">{calculateEntropy(generatedSecret)} bits/symbol</span>
+                      </div>
+                      <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-emerald-500 transition-all duration-300"
+                          style={{ width: `${Math.min((calculateEntropy(generatedSecret) / 8.0) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] font-mono lowercase border-b border-white/[0.02] pb-2">
+                      <span className="text-neutral-500">strength rating:</span>
+                      <span className={`font-semibold ${getStrengthRating(calculateEntropy(generatedSecret), generatedSecret.length).color}`}>
+                        {getStrengthRating(calculateEntropy(generatedSecret), generatedSecret.length).label}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 lowercase">
+                      <span className="text-[10px] font-mono text-neutral-500 font-mono">estimated brute-force duration:</span>
+                      <p className="text-sm font-semibold text-white font-mono leading-none">
+                        {estimateBruteForceTime(calculateEntropy(generatedSecret), generatedSecret.length)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[9px] text-neutral-500 font-mono mt-6 leading-relaxed lowercase">
+                utilizes browser cryptographically secure pseudorandom number generator (CSPRNG) interface for entropy-maximized values.
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Tab 5: CUSTOM RULE TESTER */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+            {/* Left Side: Rule details & Test text */}
+            <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
+              <div className="space-y-4">
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  custom rule criteria definitions
+                </span>
+
+                {/* Rule Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">rule identity identifier:</label>
+                  <input
+                    type="text"
+                    value={ruleName}
+                    onChange={(e) => setRuleName(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 lowercase"
+                    placeholder="e.g. acme-api-token"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">rule query description:</label>
+                  <input
+                    type="text"
+                    value={ruleDescription}
+                    onChange={(e) => setRuleDescription(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 lowercase"
+                    placeholder="detects corporate secrets"
+                  />
+                </div>
+
+                {/* Regex Pattern */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">regex matching pattern:</label>
+                  <input
+                    type="text"
+                    value={ruleRegex}
+                    onChange={(e) => setRuleRegex(e.target.value)}
+                    className={`w-full bg-black border rounded-xl px-4 py-2.5 font-mono text-xs text-white focus:outline-none focus:border-white/20 ${
+                      getRegexTestResults().error ? 'border-red-500/30 focus:border-red-500/50' : 'border-white/5'
+                    }`}
+                    placeholder="e.g. acme_[a-zA-Z0-9]{20}"
+                  />
+                  {getRegexTestResults().error && (
+                    <p className="text-[9px] text-red-400 font-mono lowercase">
+                      invalid regex syntax: {getRegexTestResults().error}
+                    </p>
+                  )}
+                </div>
+
+                {/* Test Text */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">sample code test input string:</label>
+                  <textarea
+                    rows={4}
+                    value={testText}
+                    onChange={(e) => setTestText(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl p-4 font-mono text-xs text-white focus:outline-none focus:border-white/20 select-text resize-none"
+                    placeholder="type some test code here containing the secret key to see if your regex matches..."
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-white/5 pt-4 mt-6 text-[10px] font-mono text-neutral-600 select-none lowercase leading-normal">
+                rules sandbox compiling is performed in realtime. test your regex before committing patterns to local configurations.
+              </div>
+            </div>
+
+            {/* Right Side: Live test report & YAML export */}
+            <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl flex flex-col justify-between overflow-hidden shadow-2xl min-h-[420px]">
+              
+              <div className="p-6 space-y-6">
+                <div>
+                  <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                    real-time pattern matching test
+                  </span>
+
+                  {/* Regex test results */}
+                  <div className="p-4 bg-black border border-white/5 rounded-xl space-y-3">
+                    <div className="flex justify-between items-center text-xs font-mono lowercase">
+                      <span className="text-neutral-400">regex validation state:</span>
+                      {getRegexTestResults().error ? (
+                        <span className="text-red-400">compilation error</span>
+                      ) : getRegexTestResults().matched ? (
+                        <span className="text-emerald-400 font-medium animate-pulse">leak detected ✔</span>
+                      ) : (
+                        <span className="text-neutral-500">no matches found ✖</span>
+                      )}
+                    </div>
+
+                    {!getRegexTestResults().error && getRegexTestResults().matched && (
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] font-mono text-neutral-500 lowercase block">captured substring matches:</span>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                          {getRegexTestResults().matches.map((m, idx) => (
+                            <code key={idx} className="bg-red-950/30 border border-red-500/20 text-red-400 text-[10px] font-mono px-2 py-0.5 rounded break-all font-mono">
+                              {m}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Generated YML rule chunk */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-mono text-neutral-500 block lowercase">generated rule payload config:</span>
+                  <div className="relative group">
+                    <pre className="w-full bg-black border border-white/5 rounded-xl p-4 font-mono text-[11px] text-neutral-400 whitespace-pre-wrap leading-relaxed select-all">
+                      {generateYAMLRule()}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-white/5 bg-neutral-900/10 flex justify-end">
+                <button
+                  onClick={handleCopyRule}
+                  disabled={!!getRegexTestResults().error}
+                  className={`text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none ${
+                    ruleCopied 
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' 
+                      : getRegexTestResults().error
+                      ? 'bg-neutral-900 text-neutral-600 border border-white/5 cursor-not-allowed'
+                      : 'bg-white hover:bg-neutral-200 text-black'
+                  }`}
+                >
+                  {ruleCopied ? 'copied rule!' : 'copy rule block'}
+                </button>
+              </div>
+
             </div>
           </div>
         )}
