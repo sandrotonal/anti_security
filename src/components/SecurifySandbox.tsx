@@ -16,6 +16,36 @@ export const SecurifySandbox = () => {
   );
 
   const [report, setReport] = useState<ScanReport>({ isSafe: true, leaks: [] });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setCode(text);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
 
   const runBrowserScan = (text: string) => {
     const lines = text.split('\n');
@@ -114,17 +144,39 @@ export const SecurifySandbox = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           
           {/* Input Text Area (lg:col-span-7) */}
-          <div className="lg:col-span-7 bg-neutral-950 border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col min-h-[350px]">
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`lg:col-span-7 bg-neutral-950 border rounded-2xl overflow-hidden shadow-2xl flex flex-col min-h-[350px] transition-all duration-300 ${
+              isDragging ? 'border-white/40 bg-neutral-900/40 scale-[1.01]' : 'border-white/5'
+            }`}
+          >
             <div className="px-4 py-3 bg-neutral-900/50 border-b border-white/5 flex justify-between items-center select-none">
-              <span className="text-[10px] font-mono text-neutral-500 lowercase">sandbox-input.env</span>
-              <span className="w-2 h-2 rounded-full bg-neutral-800"></span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-neutral-500 lowercase">sandbox-input.env</span>
+                <span className="text-[9px] text-neutral-600 font-mono">/</span>
+                <label className="text-[10px] font-mono text-neutral-400 hover:text-white cursor-pointer transition-colors underline decoration-white/20">
+                  upload local file
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                    className="hidden"
+                    accept=".env,.json,.txt,.js,.ts,.py,.go,.yml,.yaml,.md"
+                  />
+                </label>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-neutral-800 animate-pulse"></span>
             </div>
             
             <textarea
               value={code}
               onChange={(e) => setCode(e.target.value)}
               className="w-full flex-1 bg-black/60 p-6 font-mono text-xs md:text-sm text-neutral-300 focus:outline-none resize-none leading-relaxed select-text"
-              placeholder="// Paste your credentials code block here..."
+              placeholder="// Paste your credentials code block here, or drag & drop/upload a file to scan..."
             />
           </div>
 
