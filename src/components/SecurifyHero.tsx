@@ -79,14 +79,6 @@ export const SecurifyHero = () => {
         </main>
       </div>
 
-      {/* Scroll Down Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center justify-center gap-1.5 animate-bounce select-none pointer-events-none">
-        <span className="text-[9px] font-mono text-white/40 tracking-widest lowercase text-center">scroll</span>
-        <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-
       {/* Bottom Gradient Overlay */}
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-b from-transparent to-black" />
     </section>
