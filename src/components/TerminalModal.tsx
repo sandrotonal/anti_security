@@ -187,7 +187,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
         <div className="px-5 py-4 bg-neutral-900/30 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-neutral-500">
           <span className="lowercase">opensourced under MIT license</span>
           <a
-            href="https://github.com/securify-cli/securify"
+            href="https://github.com/sandrotonal/anti_security"
             target="_blank"
             rel="noopener noreferrer"
             className="text-white hover:underline lowercase inline-flex items-center gap-1.5"

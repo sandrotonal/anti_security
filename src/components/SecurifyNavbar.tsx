@@ -225,14 +225,24 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
             </a>
           </nav>
 
-          <div className="border-t border-white/5 pt-6 flex flex-col gap-4">
+          <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
             <button
               onClick={handleInstallClick}
-              className="w-full bg-white text-black py-4 rounded-full text-sm font-medium transition-colors lowercase"
+              className="w-full bg-white text-black py-3.5 rounded-full text-sm font-medium transition-colors lowercase"
             >
               install cli
             </button>
-            <span className="text-[10px] font-mono text-neutral-600 text-center lowercase">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                setIsMobileMenuOpen(false);
+                onOpenTerminal();
+              }}
+              className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
+            >
+              terminal hook
+            </button>
+            <span className="text-[10px] font-mono text-neutral-600 text-center lowercase mt-1">
               securify cli. open-source and local-first.
             </span>
           </div>

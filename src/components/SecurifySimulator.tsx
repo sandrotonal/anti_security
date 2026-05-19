@@ -7,75 +7,147 @@ interface MockFile {
   code: string;
   leakLine: number;
   secretType: string;
-  scanResult: string;
 }
+
+const mockFiles: MockFile[] = [
+  {
+    name: 'supabase.ts',
+    lang: 'typescript',
+    path: 'src/lib/supabase.ts',
+    code: `import { createClient } from '@supabase/supabase-js';\n\nconst supabaseUrl = 'https://xyzcompany.supabase.co';\n\n// CRITICAL: DO NOT COMMIT PRIVILEGED SERVICE KEY\nconst supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service-role-key-xyz-123-abc';\n\nexport const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);`,
+    leakLine: 6,
+    secretType: 'supabase service_role key'
+  },
+  {
+    name: 'aws_config.py',
+    lang: 'python',
+    path: 'config/aws_config.py',
+    code: `import boto3\n\ndef get_s3_client():\n    # TODO: Migrate credentials to IAM Role instead of hardcoding keys\n    session = boto3.Session(\n        aws_access_key_id="AKIAIOSFODNN7EXAMPLE",\n        aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"\n    )\n    return session.client('s3')`,
+    leakLine: 7,
+    secretType: 'aws secret access key'
+  },
+  {
+    name: 'stripe.json',
+    lang: 'json',
+    path: 'secrets/stripe.json',
+    code: `{\n  "environment": "production",\n  "api_version": "2023-10-16",\n  "stripe_publishable_key": "pk_test_51N...",\n  "stripe_secret_key": "sk_test_51N34ghJkL90AcdSfErtYuiOp789QwAsDfGhJkLop1234"\n}`,
+    leakLine: 5,
+    secretType: 'stripe live API secret key'
+  },
+  {
+    name: '.env',
+    lang: 'shell',
+    path: '.env',
+    code: `# Server Configuration\nPORT=8080\nDATABASE_URL="postgresql://postgres:root_password_99xYz@db.example.com:5432/prod"\nJWT_SECRET="super-secret-salt-key-string-change-me"`,
+    leakLine: 3,
+    secretType: 'database credentials URL'
+  },
+  {
+    name: 'main.go',
+    lang: 'go',
+    path: 'cmd/server/main.go',
+    code: `package main\n\nimport "net/http"\n\nconst SlackWebhook = "https://hooks.slack.com/services/T00000000/B00000000/DUMMYSHORTKEY"\n\nfunc main() {\n    // Send server health alerts to slack channel\n    http.Post(SlackWebhook, "application/json", nil)\n}`,
+    leakLine: 5,
+    secretType: 'slack webhook URL'
+  },
+  {
+    name: 'deploy.yml',
+    lang: 'yaml',
+    path: '.github/workflows/deploy.yml',
+    code: `name: Deploy Service\non: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Git Dispatch\n        run: | \n          curl -H "Authorization: token ghp_abc123xyzPersonalAccessTokenKeyHere" https://api.github.com/repos/org/repo/dispatches`,
+    leakLine: 9,
+    secretType: 'github personal access token'
+  }
+];
+
+const scanRules = [
+  { name: 'aws-access-key-id', regex: /AKIA[A-Z0-9]{16}/ },
+  { name: 'aws-secret-access-key', regex: /aws(.{0,20})?[0-9a-zA-Z\/+]{40}/i },
+  { name: 'supabase-service-key', regex: /eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/ },
+  { name: 'stripe-secret-key', regex: /sk_(live|test)_[0-9a-zA-Z]{24}/ },
+  { name: 'github-pat', regex: /ghp_[a-zA-Z0-9]{36}/ },
+  { name: 'slack-incoming-webhook', regex: /https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9\/]+/ },
+  { name: 'db-credentials-url', regex: /postgres(ql)?:\/\/([^:]+):([^@]+)@/ }
+];
 
 export const SecurifySimulator = () => {
   const [selectedFile, setSelectedFile] = useState<number>(0);
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'blocked' | 'bypassed'>('idle');
+  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'blocked' | 'bypassed' | 'clean'>('idle');
   const [progress, setProgress] = useState<number>(0);
+  const [editableCodes, setEditableCodes] = useState<string[]>(mockFiles.map(f => f.code));
 
-  const mockFiles: MockFile[] = [
-    {
-      name: 'supabase.ts',
-      lang: 'typescript',
-      path: 'src/lib/supabase.ts',
-      code: `import { createClient } from '@supabase/supabase-js';\n\nconst supabaseUrl = 'https://xyzcompany.supabase.co';\n\n// CRITICAL: DO NOT COMMIT PRIVILEGED SERVICE KEY\nconst supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service-role-key-xyz-123-abc';\n\nexport const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);`,
-      leakLine: 6,
-      secretType: 'supabase service_role key',
-      scanResult: '[error] high-entropy string matched rule: "supabase-service-key"\n[file] src/lib/supabase.ts:L6\n[entropy] 4.82 bits\n\n[action] git commit aborted. remove secrets or use a secure environment file.'
-    },
-    {
-      name: 'aws_config.py',
-      lang: 'python',
-      path: 'config/aws_config.py',
-      code: `import boto3\n\ndef get_s3_client():\n    # TODO: Migrate credentials to IAM Role instead of hardcoding keys\n    session = boto3.Session(\n        aws_access_key_id="AKIAIOSFODNN7EXAMPLE",\n        aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"\n    )\n    return session.client('s3')`,
-      leakLine: 7,
-      secretType: 'aws secret access key',
-      scanResult: '[error] token matched rule: "aws-secret-access-key"\n[file] config/aws_config.py:L7\n[entropy] 5.12 bits\n\n[action] git commit aborted. remove secrets or use aws credentials manager.'
-    },
-    {
-      name: 'stripe.json',
-      lang: 'json',
-      path: 'secrets/stripe.json',
-      code: `{\n  "environment": "production",\n  "api_version": "2023-10-16",\n  "stripe_publishable_key": "pk_test_51N...",\n  "stripe_secret_key": "sk_test_51N34ghJkL90AcdSfErtYuiOp789QwAsDfGhJkLop1234"\n}`,
-      leakLine: 5,
-      secretType: 'stripe live API secret key',
-      scanResult: '[error] high-entropy token matched rule: "stripe-secret-key"\n[file] secrets/stripe.json:L5\n[entropy] 4.98 bits\n\n[action] git commit aborted. strip keys out of version control.'
-    },
-    {
-      name: '.env',
-      lang: 'shell',
-      path: '.env',
-      code: `# Server Configuration\nPORT=8080\nDATABASE_URL="postgresql://postgres:root_password_99xYz@db.example.com:5432/prod"\nJWT_SECRET="super-secret-salt-key-string-change-me"`,
-      leakLine: 3,
-      secretType: 'database credentials URL',
-      scanResult: '[error] connection string contains password matched rule: "db-password"\n[file] .env:L3\n[entropy] 4.54 bits\n\n[action] git commit aborted. environment configurations must not be tracked.'
-    },
-    {
-      name: 'main.go',
-      lang: 'go',
-      path: 'cmd/server/main.go',
-      code: `package main\n\nimport "net/http"\n\nconst SlackWebhook = "https://hooks.slack.com/services/PLACEHOLDER/PLACEHOLDER/PLACEHOLDER"\n\nfunc main() {\n    // Send server health alerts to slack channel\n    http.Post(SlackWebhook, "application/json", nil)\n}`,
-      leakLine: 5,
-      secretType: 'slack webhook URL',
-      scanResult: '[error] web hook match rule: "slack-incoming-webhook"\n[file] cmd/server/main.go:L5\n[entropy] 4.21 bits\n\n[action] git commit aborted. migrate slack webhooks to secure secrets store.'
-    },
-    {
-      name: 'deploy.yml',
-      lang: 'yaml',
-      path: '.github/workflows/deploy.yml',
-      code: `name: Deploy Service\non: push\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Git Dispatch\n        run: | \n          curl -H "Authorization: token ghp_abc123xyzPersonalAccessTokenKeyHere" https://api.github.com/repos/org/repo/dispatches`,
-      leakLine: 9,
-      secretType: 'github personal access token',
-      scanResult: '[error] personal access token matched rule: "github-pat"\n[file] .github/workflows/deploy.yml:L9\n[entropy] 4.76 bits\n\n[action] git commit aborted. use GitHub Action Repository Secrets instead.'
-    }
-  ];
+  const [pendingScanResult, setPendingScanResult] = useState<{
+    state: 'blocked' | 'bypassed' | 'clean';
+    output: string;
+    leakLine: number;
+  }>({ state: 'clean', output: '', leakLine: -1 });
+
+  const activeFile = mockFiles[selectedFile];
 
   const handleStartScan = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (isScanning) return;
+
+    const currentCode = editableCodes[selectedFile];
+    const lines = currentCode.split('\n');
+    let foundLeak = false;
+    let bypassed = false;
+    let matchedRuleName = '';
+    let matchedLineIdx = -1;
+    let matchedToken = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineText = lines[i];
+      const hasIgnore = /securify:ignore/i.test(lineText);
+
+      for (const rule of scanRules) {
+        const match = rule.regex.exec(lineText);
+        if (match) {
+          if (hasIgnore) {
+            bypassed = true;
+          } else {
+            foundLeak = true;
+            matchedLineIdx = i + 1;
+            matchedRuleName = rule.name;
+            matchedToken = match[0];
+            break;
+          }
+        }
+      }
+      if (foundLeak) break;
+    }
+
+    let finalState: 'blocked' | 'bypassed' | 'clean' = 'clean';
+    let output = '';
+
+    if (foundLeak) {
+      finalState = 'blocked';
+      output = `[error] high-entropy string matched rule: "${matchedRuleName}"
+[file] ${activeFile.path}:L${matchedLineIdx}
+[token] "${matchedToken.substring(0, 16)}..."
+
+[action] git commit aborted. remove secrets or bypass with '// securify:ignore'.`;
+    } else if (bypassed) {
+      finalState = 'bypassed';
+      output = `[securify] ✔ bypass active
+[file] ${activeFile.path}
+[reason] inline comment 'securify:ignore' detected.
+
+[action] git commit passed with warnings.`;
+    } else {
+      finalState = 'clean';
+      output = `[securify] ✔ git commit passed
+[status] scanned 1 files, 0 leaks identified.
+[engine] local hooks signature match finished.`;
+    }
+
+    setPendingScanResult({
+      state: finalState,
+      output,
+      leakLine: matchedLineIdx
+    });
+
     setIsScanning(true);
     setScanState('scanning');
     setProgress(0);
@@ -89,20 +161,26 @@ export const SecurifySimulator = () => {
           if (prev >= 100) {
             clearInterval(interval);
             setIsScanning(false);
-            setScanState('blocked');
+            setScanState(pendingScanResult.state);
             return 100;
           }
-          return prev + 25; // 4 steps
+          return prev + 25;
         });
-      }, 250);
+      }, 200);
     }
     return () => clearInterval(interval);
-  }, [isScanning]);
+  }, [isScanning, pendingScanResult]);
 
-  const activeFile = mockFiles[selectedFile];
+  const handleReset = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setScanState('idle');
+    setProgress(0);
+    setPendingScanResult({ state: 'clean', output: '', leakLine: -1 });
+    setEditableCodes(mockFiles.map(f => f.code));
+  };
 
   return (
-    <section id="platform" className="bg-black py-28 px-6 md:px-12 border-t border-white/5 relative overflow-hidden">
+    <section id="platform" className="bg-black py-28 px-6 md:px-12 border-t border-white/5 relative overflow-hidden select-none">
       {/* Visual background lines */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
@@ -158,29 +236,54 @@ export const SecurifySimulator = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[380px] lg:min-h-[420px]">
             
             {/* Code Panel (lg:col-span-7) */}
-            <div className="lg:col-span-7 p-6 border-b lg:border-b-0 lg:border-r border-white/5 font-mono text-[12px] md:text-xs leading-relaxed overflow-x-auto bg-black/40 min-w-0">
-              <div className="text-neutral-500 text-[10px] lowercase mb-4 select-none pb-2 border-b border-white/5 flex justify-between items-center">
+            <div className="lg:col-span-7 p-6 border-b lg:border-b-0 lg:border-r border-white/5 font-mono text-[12px] md:text-xs leading-relaxed bg-black/40 flex flex-col min-w-0">
+              <div className="text-neutral-500 text-[10px] lowercase mb-4 select-none pb-2 border-b border-white/5 flex justify-between items-center shrink-0">
                 <span>{activeFile.path}</span>
-                <span className="text-yellow-500/80 font-mono">⚠️ contains api credentials</span>
+                <span className="text-yellow-500/80 font-mono flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-ping"></span>
+                  edit code below to test
+                </span>
               </div>
-              <pre className="select-text">
-                {activeFile.code.split('\n').map((line, idx) => {
-                  const isLeakLine = idx + 1 === activeFile.leakLine;
-                  return (
+              
+              <div className="flex-1 flex gap-4 min-h-[250px] relative">
+                {/* Line Numbers Column */}
+                <div className="text-neutral-600 w-6 text-right select-none pr-2 border-r border-white/5 font-mono text-[12px] md:text-xs leading-relaxed shrink-0">
+                  {editableCodes[selectedFile].split('\n').map((_, idx) => (
                     <div
                       key={idx}
-                      className={`flex gap-4 px-2 -mx-2 min-w-0 ${
-                        isLeakLine && scanState === 'blocked'
-                          ? 'bg-red-950/20 text-red-400 border-l-2 border-red-500 font-medium'
-                          : 'text-neutral-300'
-                      }`}
+                      className={
+                        idx + 1 === pendingScanResult.leakLine && scanState === 'blocked'
+                          ? 'text-red-500 font-bold'
+                          : ''
+                      }
                     >
-                      <span className="text-neutral-600 w-5 text-right select-none shrink-0">{idx + 1}</span>
-                      <span className="whitespace-pre-wrap break-all min-w-0 flex-1">{line}</span>
+                      {idx + 1}
                     </div>
-                  );
-                })}
-              </pre>
+                  ))}
+                </div>
+
+                {/* Textarea Code Editor */}
+                <textarea
+                  value={editableCodes[selectedFile]}
+                  onChange={(e) => {
+                    const updated = [...editableCodes];
+                    updated[selectedFile] = e.target.value;
+                    setEditableCodes(updated);
+                    if (scanState !== 'idle') {
+                      setScanState('idle');
+                      setProgress(0);
+                    }
+                  }}
+                  spellCheck={false}
+                  className="flex-1 bg-transparent text-neutral-300 font-mono text-[12px] md:text-xs leading-relaxed focus:outline-none resize-none overflow-y-auto whitespace-pre break-all select-text"
+                  style={{ minHeight: '250px' }}
+                />
+              </div>
+
+              {/* Live Hint */}
+              <div className="mt-4 pt-3 border-t border-white/5 text-[10px] text-neutral-500 font-mono lowercase select-none shrink-0">
+                💡 <span className="text-neutral-400">tip:</span> add <span className="text-white bg-neutral-900 px-1.5 py-0.5 rounded border border-white/10 font-bold">// securify:ignore</span> to the line with the key, then try committing.
+              </div>
             </div>
 
             {/* Terminal Actions & Output (lg:col-span-5) */}
@@ -201,7 +304,7 @@ export const SecurifySimulator = () => {
                     <span className="block select-none animate-pulse">⠏ running pre-commit hook (securify)...</span>
                     <div className="w-full bg-neutral-900 h-1.5 rounded overflow-hidden mt-3">
                       <div 
-                        className="bg-white h-full transition-all duration-300"
+                        className="bg-white h-full transition-all duration-200"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -216,7 +319,33 @@ export const SecurifySimulator = () => {
                       [securify] ❌ commit blocked
                     </span>
                     <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-red-400/90 whitespace-pre-wrap select-text">
-                      {activeFile.scanResult}
+                      {pendingScanResult.output}
+                    </pre>
+                  </div>
+                )}
+
+                {scanState === 'bypassed' && (
+                  <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
+                    <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
+                    <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [18ms]</span>
+                    <span className="block text-amber-500 font-medium font-sans text-sm mt-3 select-text">
+                      [securify] ⚠️ bypass active (passed with warnings)
+                    </span>
+                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-amber-400/90 whitespace-pre-wrap select-text">
+                      {pendingScanResult.output}
+                    </pre>
+                  </div>
+                )}
+
+                {scanState === 'clean' && (
+                  <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
+                    <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
+                    <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [12ms]</span>
+                    <span className="block text-emerald-500 font-medium font-sans text-sm mt-3 select-text">
+                      [securify] ✔ git commit passed
+                    </span>
+                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-emerald-400/90 whitespace-pre-wrap select-text">
+                      {pendingScanResult.output}
                     </pre>
                   </div>
                 )}
@@ -232,11 +361,7 @@ export const SecurifySimulator = () => {
                   {isScanning ? 'scanning repos...' : 'git commit'}
                 </button>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setScanState('idle');
-                    setProgress(0);
-                  }}
+                  onClick={handleReset}
                   className="px-4 bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white py-3 rounded-xl text-xs font-mono transition-colors lowercase"
                 >
                   reset

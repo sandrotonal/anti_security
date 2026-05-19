@@ -55,7 +55,7 @@ export const SecurifyIntegrations = () => {
             securify runs locally and globally. it shields credentials in real-time from the moment you write code on your machine up to the deployment release in cloud servers.
           </p>
           <a
-            href="https://github.com/securify-cli/securify#integrations"
+            href="https://github.com/sandrotonal/anti_security#integrations"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-white hover:text-neutral-300 text-sm lowercase border-b border-white/20 pb-1 hover:border-white transition-all select-none"

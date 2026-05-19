@@ -13,7 +13,6 @@ export const SecurifyConsoleDocs = () => {
   const [query, setQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<string>('');
-  const [error, setError] = useState<string>('');
 
   const docOutputs: Record<TerminalCommand, string> = {
     '--help': `securify cli v2.4.0\n\nUsage:\n  securify [command] [flags]\n\nCommands:\n  scan       scan files or folder paths for exposed secrets\n  init-hook  generate pre-commit hook files inside .git/hooks\n  bypass     bypass pre-commit scanning check for specific hashes\n  rules      list active scanner detection templates\n\nFlags:\n  -h, --help      display help logs\n  -c, --config    path to securify.toml configuration file`,
@@ -43,34 +42,17 @@ export const SecurifyConsoleDocs = () => {
     return () => clearInterval(timer);
   }, [activeCommand]);
 
-  const handleSupportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setSuccess('');
-    setError('');
-
-    try {
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          if (!email.includes('@')) {
-            reject(new Error('please enter a valid email address.'));
-          } else {
-            resolve(true);
-          }
-        }, 1200);
-      });
-      setSuccess('request submitted. our team will respond shortly.');
-      setEmail('');
-      setQuery('');
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('an unexpected error occurred.');
-      }
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('support_submitted') === 'true') {
+      // Clear URL parameter immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setSuccess('inquiry submitted. our team will respond shortly.');
     }
+  }, []);
+
+  const handleFormSubmit = () => {
+    setLoading(true);
   };
 
   return (
@@ -137,7 +119,19 @@ export const SecurifyConsoleDocs = () => {
               can't find a solution in our active command log? submit your developer request or question directly.
             </p>
 
-            <form onSubmit={handleSupportSubmit} className="space-y-4">
+            <form 
+              action="https://submify.vercel.app/omeriletisimportfolyo@gmail.com"
+              method="POST"
+              onSubmit={handleFormSubmit}
+              className="space-y-4"
+            >
+              {/* Redirect back with flag */}
+              <input 
+                type="hidden" 
+                name="_next" 
+                value={window.location.origin + window.location.pathname + "?support_submitted=true"} 
+              />
+              
               <div>
                 <label htmlFor="email" className="block text-[10px] text-neutral-500 lowercase mb-1 font-mono">
                   developer email
@@ -145,6 +139,7 @@ export const SecurifyConsoleDocs = () => {
                 <input
                   type="email"
                   id="email"
+                  name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase"
@@ -159,6 +154,7 @@ export const SecurifyConsoleDocs = () => {
                 </label>
                 <textarea
                   id="query"
+                  name="inquiry_detail"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   rows={4}
@@ -167,12 +163,6 @@ export const SecurifyConsoleDocs = () => {
                   required
                 />
               </div>
-
-              {error && (
-                <div className="bg-red-950/40 border border-red-500/30 text-red-400 rounded-lg p-3 text-[11px] font-mono lowercase">
-                  error: {error}
-                </div>
-              )}
 
               {success && (
                 <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-lg p-3 text-[11px] font-mono lowercase">
