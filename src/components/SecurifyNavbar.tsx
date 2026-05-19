@@ -35,7 +35,7 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
 
   return (
     <>
-      <header className="fixed z-40 px-4 md:px-10 pt-6 top-0 left-0 right-0 select-none">
+      <header className="fixed z-50 px-4 md:px-10 pt-6 top-0 left-0 right-0 select-none">
         <nav className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
           
           {/* Left - Logo (Link to Home) */}
@@ -116,11 +116,7 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
           <div className="flex items-center gap-2">
             <button
               onClick={handleInstallClick}
-              className={`hidden md:block text-sm font-normal rounded-full px-6 py-3 transition-colors lowercase border ${
-                activeView === 'install'
-                  ? 'bg-neutral-900 text-white border-white/20'
-                  : 'bg-white text-black border-white hover:bg-neutral-200'
-              }`}
+              className="hidden md:block text-sm font-normal rounded-full px-6 py-3 transition-colors lowercase border bg-white text-black border-white hover:bg-neutral-200"
             >
               install cli
             </button>
@@ -134,18 +130,26 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
             {/* Burger toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex lg:hidden items-center justify-center bg-neutral-900/90 backdrop-blur border border-white/5 w-11 h-11 rounded-full text-white"
+              className="flex lg:hidden flex-col items-center justify-center bg-neutral-900/90 backdrop-blur border border-white/5 w-11 h-11 rounded-full text-white relative focus:outline-none"
               aria-label="Toggle Menu"
             >
-              {isMobileMenuOpen ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
+              <div className="w-5 h-4 flex flex-col justify-between relative">
+                <span
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${
+                    isMobileMenuOpen ? 'rotate-45 translate-y-[7px]' : ''
+                  }`}
+                />
+                <span
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 ${
+                    isMobileMenuOpen ? 'opacity-0 scale-x-0' : 'opacity-100'
+                  }`}
+                />
+                <span
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${
+                    isMobileMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''
+                  }`}
+                />
+              </div>
             </button>
           </div>
 
@@ -154,7 +158,7 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
 
       {/* Mobile Drawer Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg lg:hidden flex flex-col justify-between p-8 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-lg lg:hidden flex flex-col justify-between p-8 pt-28 animate-in fade-in slide-in-from-bottom duration-300">
           <div className="flex items-center justify-between border-b border-white/5 pb-6">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 256 256" className="h-5 w-5 fill-white">
@@ -162,14 +166,6 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
               </svg>
               <span className="text-white text-sm font-normal tracking-tight">securify</span>
             </div>
-            <button
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="text-neutral-400 hover:text-white"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
 
           <nav className="flex flex-col gap-6 my-auto select-none">

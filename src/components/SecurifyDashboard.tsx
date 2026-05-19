@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 
 interface ScanLog {
   timestamp: string;
@@ -21,11 +21,10 @@ const rulesList = [
 
 export const SecurifyDashboard = () => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
-  const [isLive, setIsLive] = useState<boolean>(true);
   const [stats, setStats] = useState({
-    totalScanned: 1542091,
-    blockedLeaks: 43012,
-    activeHooks: 65120
+    totalScanned: 0,
+    blockedLeaks: 0,
+    activeHooks: 1
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,72 +37,12 @@ export const SecurifyDashboard = () => {
     durationMs: number;
   } | null>(null);
 
-  const mockRepos = [
-    'web-gateway-service',
-    'auth-provider-api',
-    'payment-engine-v2',
-    'analytics-collector',
-    'supabase-adapter',
-    'admin-portal-dashboard',
-    'database-migrator'
-  ];
-
-  const mockFailures = [
-    { type: 'aws access key', rule: 'sec-001', code: 'AKIAIOSFODNN7EXAMPLE' },
-    { type: 'supabase service role key', rule: 'sec-003', code: 'eyJhbGciOiJIUzI1Ni...' },
-    { type: 'stripe API key', rule: 'sec-004', code: 'sk_live_51N34ghJk...' },
-    { type: 'github token', rule: 'sec-005', code: 'ghp_abc123XYZ...' }
-  ];
-
-  // Simulation effect
-  useEffect(() => {
-    if (!isLive || scanning) return;
-
-    const interval = setInterval(() => {
-      const timestamp = new Date().toLocaleTimeString();
-      const repo = mockRepos[Math.floor(Math.random() * mockRepos.length)];
-      const isFailed = Math.random() < 0.15; // 15% fail rate
-
-      let newLog: ScanLog;
-      if (isFailed) {
-        const failInfo = mockFailures[Math.floor(Math.random() * mockFailures.length)];
-        newLog = {
-          timestamp,
-          repo,
-          status: 'failed',
-          details: `❌ scan aborted: found hardcoded ${failInfo.type} [rule ${failInfo.rule}]`
-        };
-        setStats(prev => ({
-          ...prev,
-          totalScanned: prev.totalScanned + 1,
-          blockedLeaks: prev.blockedLeaks + 1
-        }));
-      } else {
-        newLog = {
-          timestamp,
-          repo,
-          status: 'passed',
-          details: `✔ pre-commit audit passed: zero security signatures matched`
-        };
-        setStats(prev => ({
-          ...prev,
-          totalScanned: prev.totalScanned + 1
-        }));
-      }
-
-      setLogs((prevLogs) => [newLog, ...prevLogs.slice(0, 49)]);
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [isLive, scanning]);
-
   const handleFolderScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filesList = e.target.files;
     if (!filesList || filesList.length === 0) return;
 
     setScanning(true);
     setLogs([]);
-    setIsLive(false);
 
     const startTime = performance.now();
     const totalFiles = filesList.length;
@@ -233,11 +172,10 @@ audit performed client-side using Securify Interactive Portal.
     setCustomScanResults(null);
     setLogs([]);
     setStats({
-      totalScanned: 1542091,
-      blockedLeaks: 43012,
-      activeHooks: 65120
+      totalScanned: 0,
+      blockedLeaks: 0,
+      activeHooks: 1
     });
-    setIsLive(true);
   };
 
   return (
@@ -302,7 +240,7 @@ audit performed client-side using Securify Interactive Portal.
                   onClick={handleReset}
                   className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
                 >
-                  restore simulation
+                  clear results
                 </button>
               </div>
             ) : (
@@ -381,18 +319,6 @@ audit performed client-side using Securify Interactive Portal.
             </div>
             
             <div className="flex gap-2">
-              {!customScanResults && (
-                <button
-                  onClick={() => setIsLive(!isLive)}
-                  className={`px-3 py-1 rounded text-[10px] font-mono border transition-all lowercase ${
-                    isLive
-                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/20'
-                      : 'bg-neutral-900 text-neutral-500 border-white/5 hover:text-white'
-                  }`}
-                >
-                  {isLive ? '● live streaming' : 'paused'}
-                </button>
-              )}
               <button
                 onClick={() => {
                   setLogs([]);
@@ -400,7 +326,7 @@ audit performed client-side using Securify Interactive Portal.
                 }}
                 className="px-2 py-1 rounded text-[10px] font-mono bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white transition-colors lowercase"
               >
-                {customScanResults ? "restore simulation" : "clear logs"}
+                clear results
               </button>
             </div>
           </div>
@@ -409,14 +335,14 @@ audit performed client-side using Securify Interactive Portal.
           <div className="p-6 flex-1 font-mono text-[11px] md:text-xs text-neutral-400 overflow-y-auto space-y-2 select-text">
             {logs.length === 0 ? (
               <div className="text-center text-neutral-600 py-20 select-none lowercase">
-                [console] waiting for commit scanner payloads...
+                [console] standby. select a local project folder above to run a client-side compliance audit scan.
               </div>
             ) : (
               logs.map((log, idx) => (
                 <div
                   key={idx}
                   className={`py-1 border-b border-white/[0.02] flex flex-col md:flex-row md:items-start gap-1 md:gap-4 transition-all duration-300 ${
-                    log.status === 'failed' ? 'text-red-400 animate-pulse' : 'text-neutral-300'
+                    log.status === 'failed' ? 'text-red-400' : 'text-neutral-300'
                   }`}
                 >
                   <span className="text-neutral-600 select-none shrink-0">[{log.timestamp}]</span>
