@@ -11,6 +11,7 @@ import { SecurifySandbox } from './components/SecurifySandbox';
 import { SecurifyInstall } from './components/SecurifyInstall';
 import { SecurifyFooter } from './components/SecurifyFooter';
 import { TerminalModal } from './components/TerminalModal';
+import { CookieBanner } from './components/CookieBanner';
 
 function App() {
   const [activeView, setActiveView] = useState<ViewType>('home');
@@ -71,6 +72,9 @@ function App() {
         isOpen={isTerminalOpen}
         onClose={() => setIsTerminalOpen(false)}
       />
+
+      {/* Cookie Banner */}
+      <CookieBanner />
     </div>
   );
 }

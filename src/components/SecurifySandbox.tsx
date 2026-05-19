@@ -11,8 +11,11 @@ interface ScanReport {
 }
 
 export const SecurifySandbox = () => {
-  const [activeTab, setActiveTab] = useState<'scan' | 'config'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'config' | 'entropy'>('scan');
   
+  // Tab 3: Entropy Calculator States
+  const [entropyInput, setEntropyInput] = useState<string>('sk_test_51N34ghJkL90AcdSfErtYuiOp');
+
   // Tab 1: Scanner States
   const [code, setCode] = useState<string>(
     `// Paste your configuration or environment variables here to test.\n// Securify runs completely client-side in this playground.\n\nconst databaseUrl = "postgresql://db_user:password@localhost:5432/main";\nconst stripeKey = "sk_test_51N34ghJkL90AcdSfErtYuiOp";`
@@ -232,10 +235,10 @@ ssh_keys = ${enabledScanners.ssh}
         </div>
 
         {/* Tab Selection */}
-        <div className="flex gap-2 mb-8 border-b border-white/5 pb-4">
+        <div className="flex gap-2 mb-8 border-b border-white/5 pb-4 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('scan')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase ${
+            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'scan'
                 ? 'bg-white text-black border-white'
                 : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
@@ -245,13 +248,23 @@ ssh_keys = ${enabledScanners.ssh}
           </button>
           <button
             onClick={() => setActiveTab('config')}
-            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase ${
+            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'config'
                 ? 'bg-white text-black border-white'
                 : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
             }`}
           >
             config generator (.toml)
+          </button>
+          <button
+            onClick={() => setActiveTab('entropy')}
+            className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
+              activeTab === 'entropy'
+                ? 'bg-white text-black border-white'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+            }`}
+          >
+            entropy meter
           </button>
         </div>
 
@@ -363,7 +376,7 @@ ssh_keys = ${enabledScanners.ssh}
             </div>
 
           </div>
-        ) : (
+        ) : activeTab === 'config' ? (
           /* Tab 2: CONFIG GENERATOR WORKSPACE */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
             
@@ -529,9 +542,187 @@ ssh_keys = ${enabledScanners.ssh}
             </div>
 
           </div>
+        ) : (
+          /* Tab 3: ENTROPY WORKSPACE */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+            {/* Left Side: Input area */}
+            <div className="lg:col-span-7 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
+              <div className="space-y-4">
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  credential entropy scanner input
+                </span>
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase">raw secret string:</label>
+                  <input
+                    type="text"
+                    value={entropyInput}
+                    onChange={(e) => setEntropyInput(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl p-4 font-mono text-sm text-white focus:outline-none focus:border-white/20 select-text"
+                    placeholder="paste your token, api key or password..."
+                  />
+                </div>
+
+                <div className="space-y-2 select-none">
+                  <span className="text-[10px] font-mono text-neutral-500 block lowercase">quick preset tests:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: 'stripe test key', value: 'sk_test_51N34ghJkL90AcdSfErtYuiOp' },
+                      { name: 'aws credential', value: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY' },
+                      { name: 'db connection string', value: 'postgres://db_user:password_xyz123@localhost:5432' },
+                      { name: 'weak key', value: 'admin1234' }
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => setEntropyInput(preset.value)}
+                        className="px-2.5 py-1 bg-neutral-900 border border-white/5 text-[9px] font-mono text-neutral-400 rounded-lg hover:text-white transition-colors lowercase"
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/5 pt-4 mt-6 text-[10px] font-mono text-neutral-600 select-none lowercase leading-normal">
+                entropy values greater than 4.5 bits represent high-entropy keys that securify marks for audit blockages.
+              </div>
+            </div>
+
+            {/* Right Side: Math Analysis logs */}
+            <div className="lg:col-span-5 bg-neutral-950 border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  shannon complexity analysis
+                </span>
+
+                <div className="space-y-5">
+                  
+                  {/* Entropy Score */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-mono text-neutral-400 lowercase">
+                      <span>calculated entropy:</span>
+                      <span className="text-white font-medium">{calculateEntropy(entropyInput)} bits/symbol</span>
+                    </div>
+                    <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-300 ${
+                          calculateEntropy(entropyInput) > 4.5 ? 'bg-red-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min((calculateEntropy(entropyInput) / 8.0) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rating */}
+                  <div className="flex justify-between items-center text-xs font-mono lowercase border-b border-white/[0.02] pb-3">
+                    <span className="text-neutral-500">strength rating:</span>
+                    <span className={`font-semibold ${getStrengthRating(calculateEntropy(entropyInput), entropyInput.length).color}`}>
+                      {getStrengthRating(calculateEntropy(entropyInput), entropyInput.length).label}
+                    </span>
+                  </div>
+
+                  {/* Guessing Complexity */}
+                  <div className="space-y-1 lowercase border-b border-white/[0.02] pb-3">
+                    <span className="text-[10px] font-mono text-neutral-500">estimated brute-force duration:</span>
+                    <p className="text-sm font-semibold text-white font-mono leading-none">
+                      {estimateBruteForceTime(calculateEntropy(entropyInput), entropyInput.length)}
+                    </p>
+                    <span className="text-[9px] text-neutral-600 block leading-normal">
+                      calculated assuming cluster capacity of 1 billion guesses per second.
+                    </span>
+                  </div>
+
+                  {/* Diversity Checklist */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-mono text-neutral-500 block lowercase">character diversity:</span>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-neutral-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className={/[A-Z]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                          {/[A-Z]/.test(entropyInput) ? '✔' : '✖'}
+                        </span>
+                        <span>uppercase letters</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={/[a-z]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                          {/[a-z]/.test(entropyInput) ? '✔' : '✖'}
+                        </span>
+                        <span>lowercase letters</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={/\d/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                          {/[0-9]/.test(entropyInput) ? '✔' : '✖'}
+                        </span>
+                        <span>numeric digits</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={/[^A-Za-z0-9]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                          {/[^A-Za-z0-9]/.test(entropyInput) ? '✔' : '✖'}
+                        </span>
+                        <span>special symbols</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="text-[9px] text-neutral-500 font-mono mt-6 leading-relaxed lowercase">
+                shannon entropy measures the randomness of strings. cryptographic secrets usually have high character diversity, resulting in score above 4.5.
+              </div>
+            </div>
+          </div>
         )}
 
       </div>
     </section>
   );
 };
+
+// Pure math helper functions for Shannon Entropy and complexity estimates
+const calculateEntropy = (str: string): number => {
+  if (!str) return 0;
+  const len = str.length;
+  const frequencies: Record<string, number> = {};
+  for (let i = 0; i < len; i++) {
+    const char = str[i];
+    frequencies[char] = (frequencies[char] || 0) + 1;
+  }
+  let entropy = 0;
+  for (const char in frequencies) {
+    const p = frequencies[char] / len;
+    entropy -= p * Math.log2(p);
+  }
+  return parseFloat(entropy.toFixed(2));
+};
+
+const getStrengthRating = (entropy: number, len: number) => {
+  if (len === 0) return { label: 'none', color: 'text-neutral-500' };
+  const totalBits = entropy * len;
+  if (totalBits < 40) return { label: 'very weak', color: 'text-red-500' };
+  if (totalBits < 60) return { label: 'weak', color: 'text-orange-500' };
+  if (totalBits < 80) return { label: 'medium strength', color: 'text-yellow-500' };
+  return { label: 'cryptographically strong', color: 'text-emerald-500' };
+};
+
+const estimateBruteForceTime = (entropy: number, len: number): string => {
+  if (len === 0) return '0 seconds';
+  const totalBits = entropy * len;
+  const guesses = Math.pow(2, Math.min(totalBits, 128)); // cap logic at 128-bit
+  const guessesPerSecond = 1e9; // 1 billion guesses per second
+  const seconds = guesses / guessesPerSecond;
+  
+  if (seconds < 1) return 'less than a millisecond';
+  if (seconds < 60) return `${Math.round(seconds)} seconds`;
+  const minutes = seconds / 60;
+  if (minutes < 60) return `${Math.round(minutes)} minutes`;
+  const hours = minutes / 60;
+  if (hours < 24) return `${Math.round(hours)} hours`;
+  const days = hours / 24;
+  if (days < 365) return `${Math.round(days)} days`;
+  const years = days / 365;
+  if (years < 1000) return `${Math.round(years)} years`;
+  if (years < 1e6) return `${Math.round(years / 1000)}k years`;
+  return 'practically infinite (centuries)';
+};
+
