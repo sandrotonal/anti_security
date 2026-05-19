@@ -198,6 +198,37 @@ export const SecurifyDashboard = () => {
     setScanProgress(null);
   };
 
+  const exportReportMarkdown = () => {
+    if (!customScanResults) return;
+    const reportText = `# Securify Security Scan Report
+generated on: ${new Date().toLocaleString()}
+project directory: ${customScanResults.folderName}
+
+## Summary
+- total files scanned: ${customScanResults.totalFiles}
+- leaks identified: ${customScanResults.leaksFound}
+- scan duration: ${customScanResults.durationMs}ms
+- status: ${customScanResults.leaksFound === 0 ? 'SAFE' : 'COMPROMISED'}
+
+## Detailed Leak Findings
+${logs
+  .filter(log => log.status === 'failed')
+  .map(log => `### File: ${log.repo}\n- ${log.details.replace(/\n\s*/g, '\n- ')}`)
+  .join('\n\n')}
+
+---
+audit performed client-side using Securify Interactive Portal.
+`;
+
+    const blob = new Blob([reportText], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securify-report-${customScanResults.folderName}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleReset = () => {
     setCustomScanResults(null);
     setLogs([]);
@@ -260,12 +291,20 @@ export const SecurifyDashboard = () => {
             />
             
             {customScanResults ? (
-              <button
-                onClick={handleReset}
-                className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
-              >
-                restore simulation
-              </button>
+              <div className="flex flex-wrap gap-2 justify-center md:justify-end">
+                <button
+                  onClick={exportReportMarkdown}
+                  className="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
+                >
+                  export report (.md)
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
+                >
+                  restore simulation
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}

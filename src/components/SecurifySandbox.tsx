@@ -272,8 +272,8 @@ ssh_keys = ${enabledScanners.ssh}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono text-neutral-500 lowercase">sandbox-input.env</span>
                   <span className="text-[9px] text-neutral-600 font-mono">/</span>
-                  <label className="text-[10px] font-mono text-neutral-400 hover:text-white cursor-pointer transition-colors underline decoration-white/20">
-                    upload local file
+                  <label className="text-xs md:text-[10px] font-mono text-white/90 hover:text-white cursor-pointer transition-colors bg-white/5 px-2.5 py-1 rounded-md border border-white/10 hover:bg-white/10">
+                    upload file
                     <input
                       type="file"
                       onChange={(e) => {
@@ -288,12 +288,24 @@ ssh_keys = ${enabledScanners.ssh}
                 <span className="w-2 h-2 rounded-full bg-neutral-800 animate-pulse"></span>
               </div>
               
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full flex-1 bg-black/60 p-6 font-mono text-xs md:text-sm text-neutral-300 focus:outline-none resize-none leading-relaxed select-text"
-                placeholder="// Paste your credentials code block here, or drag & drop/upload a file to scan..."
-              />
+              <div className="flex-1 w-full relative flex flex-col">
+                <textarea
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full flex-1 bg-black/60 p-6 font-mono text-xs md:text-sm text-neutral-300 focus:outline-none resize-none leading-relaxed select-text relative z-10"
+                  placeholder=""
+                />
+                
+                {code.trim() === '' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 select-none pointer-events-none">
+                    <svg className="w-8 h-8 text-neutral-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <span className="text-xs text-neutral-400 font-mono lowercase">paste code or drag & drop files here</span>
+                    <span className="text-[10px] text-neutral-600 font-mono lowercase">or click the 'upload file' button above</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Audit Report View (lg:col-span-5) */}
@@ -449,7 +461,7 @@ ssh_keys = ${enabledScanners.ssh}
                 {/* Enabled Scanners */}
                 <div className="space-y-2">
                   <label className="text-xs font-mono text-neutral-400 block lowercase">scanners to execute:</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {Object.entries(enabledScanners).map(([scannerKey, enabled]) => (
                       <label key={scannerKey} className="flex items-center gap-2 cursor-pointer select-none">
                         <input
