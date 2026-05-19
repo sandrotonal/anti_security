@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install';
+export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact';
 
 interface NavbarProps {
   activeView: ViewType;
@@ -110,6 +110,15 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
             >
               sandbox scanner
             </a>
+            <a
+              href="#contact"
+              onClick={(e) => handleLinkClick(e, 'contact')}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
+                activeView === 'contact' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+              }`}
+            >
+              contact
+            </a>
           </div>
 
           {/* Right Action Button & Mobile Burger */}
@@ -206,6 +215,13 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
               className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               sandbox scanner
+            </a>
+            <a
+              href="#contact"
+              onClick={(e) => handleLinkClick(e, 'contact')}
+              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+            >
+              contact
             </a>
           </nav>
 

@@ -1,5 +1,8 @@
+interface SecurifyFooterProps {
+  onSelectModal: (type: 'license' | 'security' | 'pgp') => void;
+}
 
-export const SecurifyFooter = () => {
+export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
   return (
     <footer className="bg-black py-16 px-6 md:px-12 border-t border-white/5 relative z-10 text-neutral-500 font-mono text-[10px] md:text-xs">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -27,37 +30,31 @@ export const SecurifyFooter = () => {
         {/* Right - Resource Links */}
         <div className="flex flex-wrap gap-x-8 gap-y-4 select-text">
           <a
-            href="https://github.com/securify-cli/securify"
+            href="https://github.com/sandrotonal/anti_security"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-white transition-colors lowercase"
           >
             github
           </a>
-          <a
-            href="https://github.com/securify-cli/securify/blob/main/LICENSE"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors lowercase"
+          <button
+            onClick={() => onSelectModal('license')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none"
           >
             mit license
-          </a>
-          <a
-            href="https://github.com/securify-cli/securify/security/policy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors lowercase"
+          </button>
+          <button
+            onClick={() => onSelectModal('security')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none"
           >
             security policy
-          </a>
-          <a
-            href="https://securify.dev/keys/securify.asc"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors lowercase"
+          </button>
+          <button
+            onClick={() => onSelectModal('pgp')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none"
           >
             pgp key
-          </a>
+          </button>
         </div>
 
       </div>

