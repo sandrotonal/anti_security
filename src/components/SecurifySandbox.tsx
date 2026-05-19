@@ -592,18 +592,32 @@ ssh_keys = ${enabledScanners.ssh}
                   <label className="text-xs font-mono text-neutral-400 block lowercase">scanners to execute:</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {Object.entries(enabledScanners).map(([scannerKey, enabled]) => (
-                      <label key={scannerKey} className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={() => setEnabledScanners({
-                            ...enabledScanners,
-                            [scannerKey]: !enabled
-                          })}
-                          className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
-                        />
+                      <div 
+                        key={scannerKey} 
+                        onClick={() => setEnabledScanners({
+                          ...enabledScanners,
+                          [scannerKey]: !enabled
+                        })}
+                        className="flex items-center gap-2 cursor-pointer select-none"
+                      >
+                        <button
+                          type="button"
+                          className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                            enabled 
+                              ? 'bg-white border-white text-black font-bold' 
+                              : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                          }`}
+                          aria-checked={enabled}
+                          role="checkbox"
+                        >
+                          {enabled && (
+                            <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          )}
+                        </button>
                         <span className="text-[10px] font-mono text-neutral-400 lowercase">{scannerKey} detector</span>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -819,42 +833,97 @@ ssh_keys = ${enabledScanners.ssh}
                 <div className="space-y-2.5">
                   <label className="text-xs font-mono text-neutral-400 block lowercase">character diversity sets:</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={genUpper}
-                        onChange={() => setGenUpper(!genUpper)}
-                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
-                      />
+                    <div 
+                      onClick={() => setGenUpper(!genUpper)}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <button
+                        type="button"
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                          genUpper 
+                            ? 'bg-white border-white text-black font-bold' 
+                            : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                        }`}
+                        aria-checked={genUpper}
+                        role="checkbox"
+                      >
+                        {genUpper && (
+                          <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
                       <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">A-Z uppercase</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={genLower}
-                        onChange={() => setGenLower(!genLower)}
-                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
-                      />
+                    </div>
+
+                    <div 
+                      onClick={() => setGenLower(!genLower)}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <button
+                        type="button"
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                          genLower 
+                            ? 'bg-white border-white text-black font-bold' 
+                            : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                        }`}
+                        aria-checked={genLower}
+                        role="checkbox"
+                      >
+                        {genLower && (
+                          <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
                       <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">a-z lowercase</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={genNumbers}
-                        onChange={() => setGenNumbers(!genNumbers)}
-                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
-                      />
+                    </div>
+
+                    <div 
+                      onClick={() => setGenNumbers(!genNumbers)}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <button
+                        type="button"
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                          genNumbers 
+                            ? 'bg-white border-white text-black font-bold' 
+                            : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                        }`}
+                        aria-checked={genNumbers}
+                        role="checkbox"
+                      >
+                        {genNumbers && (
+                          <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
                       <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">0-9 numbers</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={genSymbols}
-                        onChange={() => setGenSymbols(!genSymbols)}
-                        className="w-3.5 h-3.5 rounded bg-black border border-white/10 checked:bg-white accent-white cursor-pointer"
-                      />
+                    </div>
+
+                    <div 
+                      onClick={() => setGenSymbols(!genSymbols)}
+                      className="flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <button
+                        type="button"
+                        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all shrink-0 ${
+                          genSymbols 
+                            ? 'bg-white border-white text-black font-bold' 
+                            : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                        }`}
+                        aria-checked={genSymbols}
+                        role="checkbox"
+                      >
+                        {genSymbols && (
+                          <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
                       <span className="text-[10px] font-mono text-neutral-400 lowercase font-mono">symbols (!@#...)</span>
-                    </label>
+                    </div>
                   </div>
                 </div>
 

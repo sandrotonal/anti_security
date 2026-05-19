@@ -202,46 +202,79 @@ exit 0`;
             {/* Options Panel */}
             <div className="lg:col-span-5 space-y-6">
               {/* Staged Scan */}
-              <div className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
+              <div className="flex items-start gap-3 select-none">
+                <button
+                  type="button"
                   id="stagedOnly"
-                  checked={stagedOnly}
-                  onChange={() => setStagedOnly(!stagedOnly)}
-                  className="w-4 h-4 rounded bg-black border border-white/10 checked:bg-white accent-white mt-0.5"
-                />
-                <div>
-                  <label htmlFor="stagedOnly" className="text-xs font-mono text-white block lowercase cursor-pointer">staged files only</label>
+                  onClick={() => setStagedOnly(!stagedOnly)}
+                  className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                    stagedOnly 
+                      ? 'bg-white border-white text-black font-bold' 
+                      : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                  }`}
+                  aria-checked={stagedOnly}
+                  role="checkbox"
+                >
+                  {stagedOnly && (
+                    <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </button>
+                <div onClick={() => setStagedOnly(!stagedOnly)} className="cursor-pointer">
+                  <span className="text-xs font-mono text-white block lowercase">staged files only</span>
                   <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">scans only files cached for commit to save scanning time.</p>
                 </div>
               </div>
 
               {/* Lockfiles Bypass */}
-              <div className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
+              <div className="flex items-start gap-3 select-none">
+                <button
+                  type="button"
                   id="excludeLockFiles"
-                  checked={excludeLockFiles}
-                  onChange={() => setExcludeLockFiles(!excludeLockFiles)}
-                  className="w-4 h-4 rounded bg-black border border-white/10 checked:bg-white accent-white mt-0.5"
-                />
-                <div>
-                  <label htmlFor="excludeLockFiles" className="text-xs font-mono text-white block lowercase cursor-pointer">skip lockfiles & packages</label>
+                  onClick={() => setExcludeLockFiles(!excludeLockFiles)}
+                  className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                    excludeLockFiles 
+                      ? 'bg-white border-white text-black font-bold' 
+                      : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                  }`}
+                  aria-checked={excludeLockFiles}
+                  role="checkbox"
+                >
+                  {excludeLockFiles && (
+                    <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </button>
+                <div onClick={() => setExcludeLockFiles(!excludeLockFiles)} className="cursor-pointer">
+                  <span className="text-xs font-mono text-white block lowercase">skip lockfiles & packages</span>
                   <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">bypasses package-lock.json, cargo.lock, yarn.lock to prevent false flags.</p>
                 </div>
               </div>
 
               {/* Fail commit vs Warning only */}
-              <div className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
+              <div className="flex items-start gap-3 select-none">
+                <button
+                  type="button"
                   id="failCommit"
-                  checked={failCommit}
-                  onChange={() => setFailCommit(!failCommit)}
-                  className="w-4 h-4 rounded bg-black border border-white/10 checked:bg-white accent-white mt-0.5"
-                />
-                <div>
-                  <label htmlFor="failCommit" className="text-xs font-mono text-white block lowercase cursor-pointer">abort commit on leaks</label>
+                  onClick={() => setFailCommit(!failCommit)}
+                  className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                    failCommit 
+                      ? 'bg-white border-white text-black font-bold' 
+                      : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                  }`}
+                  aria-checked={failCommit}
+                  role="checkbox"
+                >
+                  {failCommit && (
+                    <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </button>
+                <div onClick={() => setFailCommit(!failCommit)} className="cursor-pointer">
+                  <span className="text-xs font-mono text-white block lowercase">abort commit on leaks</span>
                   <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">strictly exits with status code 1 to reject git commit when secrets match.</p>
                 </div>
               </div>
