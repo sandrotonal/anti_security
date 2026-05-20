@@ -1,10 +1,13 @@
 use std::fs;
 use std::path::Path;
 
+use serde::Serialize;
+
 use crate::entropy;
 use crate::report::ScanMatch;
 use crate::rules::{Rule, get_rules};
 
+#[derive(Serialize)]
 pub struct ScanResult {
     pub total_files: u64,
     pub total_leaks: u64,
