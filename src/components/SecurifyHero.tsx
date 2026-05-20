@@ -1,50 +1,15 @@
-import { useEffect, useRef, useCallback } from 'react';
-
 export const SecurifyHero = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playedRef = useRef(false);
-
-  const tryPlay = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || playedRef.current) return;
-    video.play().then(() => { playedRef.current = true; }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    tryPlay();
-    video.addEventListener('canplay', tryPlay);
-    video.addEventListener('loadedmetadata', tryPlay);
-    document.addEventListener('touchstart', tryPlay, { once: true });
-    document.addEventListener('click', tryPlay, { once: true });
-    return () => {
-      video.removeEventListener('canplay', tryPlay);
-      video.removeEventListener('loadedmetadata', tryPlay);
-      document.removeEventListener('touchstart', tryPlay);
-      document.removeEventListener('click', tryPlay);
-    };
-  }, [tryPlay]);
-
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black select-none">
       {/* Background Video */}
       <video
-        ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         autoPlay
         loop
         muted
         playsInline
-        preload="auto"
-        disablePictureInPicture
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <source
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_063509_7d167302-4fd4-480b-8260-18ab572333d4.mp4"
-          type="video/mp4"
-        />
-      </video>
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_063509_7d167302-4fd4-480b-8260-18ab572333d4.mp4"
+      />
 
       {/* Dark Overlay for better text readability */}
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
@@ -68,8 +33,6 @@ export const SecurifyHero = () => {
           <p className="absolute left-6 md:left-10 top-[46%] max-w-[240px] text-[15px] leading-snug text-white/90 lowercase select-none font-light">
             we can guarding your data with utmost care, empowering you with privacy everywhere
           </p>
-
-
 
         </main>
       </div>
