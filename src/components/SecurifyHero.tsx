@@ -1,16 +1,30 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 export const SecurifyHero = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playedRef = useRef(false);
+
+  const tryPlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || playedRef.current) return;
+    video.play().then(() => { playedRef.current = true; }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const play = () => video.play().catch(() => {});
-    play();
-    video.addEventListener('canplay', play);
-    return () => video.removeEventListener('canplay', play);
-  }, []);
+    tryPlay();
+    video.addEventListener('canplay', tryPlay);
+    video.addEventListener('loadedmetadata', tryPlay);
+    document.addEventListener('touchstart', tryPlay, { once: true });
+    document.addEventListener('click', tryPlay, { once: true });
+    return () => {
+      video.removeEventListener('canplay', tryPlay);
+      video.removeEventListener('loadedmetadata', tryPlay);
+      document.removeEventListener('touchstart', tryPlay);
+      document.removeEventListener('click', tryPlay);
+    };
+  }, [tryPlay]);
 
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black select-none">
