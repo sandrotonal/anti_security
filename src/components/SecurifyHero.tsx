@@ -1,15 +1,36 @@
+import { useEffect, useRef } from 'react';
+
 export const SecurifyHero = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const play = () => video.play().catch(() => {});
+    play();
+    video.addEventListener('canplay', play);
+    return () => video.removeEventListener('canplay', play);
+  }, []);
+
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black select-none">
       {/* Background Video */}
       <video
+        ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         autoPlay
         loop
         muted
         playsInline
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_063509_7d167302-4fd4-480b-8260-18ab572333d4.mp4"
-      />
+        preload="auto"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <source
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260418_063509_7d167302-4fd4-480b-8260-18ab572333d4.mp4"
+          type="video/mp4"
+        />
+      </video>
 
       {/* Dark Overlay for better text readability */}
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
