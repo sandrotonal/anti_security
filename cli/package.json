@@ -1,0 +1,17 @@
+{
+  "name": "@securify/cli",
+  "version": "0.1.0",
+  "description": "Securify CLI - client-side credential leak detection",
+  "bin": {
+    "securify": "./bin/securify.js"
+  },
+  "scripts": {
+    "postinstall": "node ./bin/install.js"
+  },
+  "keywords": ["security", "secrets", "credentials", "scan", "git-hook"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omer/istanbul_api"
+  }
+}

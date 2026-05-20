@@ -34,47 +34,7 @@ export const SecurifyHero = () => {
             we can guarding your data with utmost care, empowering you with privacy everywhere
           </p>
 
-          {/* Stat Block - Top Right */}
-          <div className="absolute right-6 md:right-24 top-[14%] flex flex-col items-end">
-            <div className="flex items-center gap-3 justify-end">
-              <div 
-                className="hidden md:block h-px w-24 bg-white/40" 
-                style={{ transform: 'rotate(20deg)' }}
-              />
-              <span className="text-4xl md:text-5xl font-medium tracking-tight text-white">+65k</span>
-            </div>
-            <span className="text-xs md:text-sm text-white/70 mt-1 text-right lowercase font-light">
-              startups use
-            </span>
-          </div>
 
-          {/* Stat Block - Bottom Left */}
-          <div className="absolute left-6 md:left-20 bottom-20 md:bottom-24 flex flex-col items-start">
-            <div className="flex items-center gap-3">
-              <span className="text-4xl md:text-5xl font-medium tracking-tight text-white">+1.5b</span>
-              <div 
-                className="hidden md:block h-px w-24 bg-white/40" 
-                style={{ transform: 'rotate(-20deg)' }}
-              />
-            </div>
-            <span className="text-xs md:text-sm text-white/70 mt-1 lowercase font-light">
-              gb data was protected
-            </span>
-          </div>
-
-          {/* Stat Block - Bottom Right */}
-          <div className="absolute right-6 md:right-20 bottom-16 md:bottom-20 flex flex-col items-end">
-            <div className="flex items-center gap-3 justify-end">
-              <div 
-                className="hidden md:block h-px w-24 bg-white/40" 
-                style={{ transform: 'rotate(-20deg)' }}
-              />
-              <span className="text-4xl md:text-5xl font-medium tracking-tight text-white">+300k</span>
-            </div>
-            <span className="text-xs md:text-sm text-white/70 mt-1 text-right lowercase font-light">
-              downloads
-            </span>
-          </div>
 
         </main>
       </div>
