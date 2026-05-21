@@ -38,8 +38,8 @@ brew install securify-cli/securify/securify
 
 ### From Source
 ```bash
-git clone https://github.com/omer/istanbul_api
-cd istanbul_api/cli
+git clone https://github.com/sandrotonal/anti_security
+cd anti_security/cli
 cargo build --release
 ./target/release/securify --help
 ```
