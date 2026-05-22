@@ -1,8 +1,22 @@
+import { useEffect, useRef } from 'react';
+
 export const SecurifyHero = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    // Attempt programmatic play to bypass mobile restrictions on mount
+    if (videoRef.current) {
+      videoRef.current.play().catch((err) => {
+        console.warn("video auto-play blocked by browser settings or battery saver mode:", err);
+      });
+    }
+  }, []);
+
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black select-none">
       {/* Background Video */}
       <video
+        ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         autoPlay
         loop
