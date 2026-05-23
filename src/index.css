@@ -70,3 +70,44 @@ video::-webkit-media-controls-panel {
 video::-webkit-media-controls-play-button {
   display: none !important;
 }
+
+/* Print Stylesheet for Official PDF Audits */
+@media print {
+  body, html, #root {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+  }
+  header, nav, footer, button, input, .print\:hidden {
+    display: none !important;
+  }
+  section {
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+    background-color: #ffffff !important;
+  }
+  .bg-neutral-950, .bg-neutral-900, .bg-neutral-900\/40, .bg-black {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #000000 !important;
+  }
+  .text-white, .text-neutral-300, .text-neutral-400 {
+    color: #000000 !important;
+  }
+  .text-neutral-500, .text-neutral-600 {
+    color: #4b5563 !important;
+  }
+  .border-white\/5, .border-white\/10 {
+    border-color: #e5e7eb !important;
+  }
+  pre, code {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    white-space: pre-wrap !important;
+    word-break: break-all !important;
+  }
+  h2, h3, h4 {
+    color: #000000 !important;
+  }
+}

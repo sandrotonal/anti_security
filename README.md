@@ -17,7 +17,12 @@ The interactive web interface features a premium dark-mode developer experience:
 - **Custom Rule Tester & YAML Generator** — Test custom regular expressions against code payloads. Validates regex syntax and generates `.securify.toml` rule configurations.
 - **Live Hook Security Simulator** — Paste code fragments to test the engine's built-in detection rules. Simulates commit blockage with precise matched tokens, line offsets, and rule severities.
 - **Signature Database (Rules Reference)** — Browse built-in security signatures (AWS, Supabase, Stripe, GCP, GitHub PATs, Slack Webhooks, etc.) with remediation guides.
-- **Dashboard** — Run real client-side scans on local folders directly from the browser.
+- **Dashboard (Enterprise Upgrades)** — Run real client-side scans on local folders directly from the browser:
+  - **`.gitignore` & `.securifyignore` Parsing** — Automatically reads local project ignore lists, dynamically translates glob rules to regular expressions, and skips files for maximized performance and zero false positives.
+  - **Compliance & Severity Bar Graphs** — Categorizes leaks into *Critical*, *High*, and *Warning* categories, displaying real-time statistics with micro-animated percentage breakdown graphs.
+- **CI/CD Pipeline Generator** — Visually construct workflow YAML configuration templates for GitHub Actions and GitLab CI/CD with customizable event triggers and branch targeting.
+- **Official Audit PDF Print Template** — Clean, high-contrast `@media print` CSS template optimized for printing official compliance reports directly from the browser (Ctrl+P / Save as PDF).
+- **Brand Integrations Marquee** — Sleek infinite scroll marquee containing authentic, responsive brand SVG icons (GitHub, AWS, Supabase, Stripe, Slack, Vercel, GitLab, GCP, PostgreSQL) with interactive brand-specific neon drop-shadows and hover animations.
 
 ## CLI Installation
 
