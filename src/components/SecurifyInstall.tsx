@@ -8,6 +8,19 @@ export const SecurifyInstall = () => {
   const [shell, setShell] = useState<ShellType>('zsh');
   const [copied, setCopied] = useState<boolean>(false);
 
+  // Hook configurator states
+  const [stagedOnly, setStagedOnly] = useState<boolean>(true);
+  const [entropyThresholdVal, setEntropyThresholdVal] = useState<number>(4.5);
+  const [failCommit, setFailCommit] = useState<boolean>(true);
+  const [excludeLockFiles, setExcludeLockFiles] = useState<boolean>(true);
+  const [hookCopied, setHookCopied] = useState<boolean>(false);
+
+  // CI/CD configurator states
+  const [ciPlatform, setCiPlatform] = useState<'github' | 'gitlab'>('github');
+  const [ciTrigger, setCiTrigger] = useState<'push' | 'pr' | 'both'>('both');
+  const [ciBranch, setCiBranch] = useState<string>('main');
+  const [ciCopied, setCiCopied] = useState<boolean>(false);
+
   const getInstallCommand = (): string => {
     if (os === 'windows') {
       return `iwr -useb https://securify.dev/install.ps1 | iex\n# securify --version`;
@@ -31,12 +44,6 @@ export const SecurifyInstall = () => {
       console.error('failed to copy text', err);
     }
   };
-
-  const [stagedOnly, setStagedOnly] = useState<boolean>(true);
-  const [entropyThresholdVal, setEntropyThresholdVal] = useState<number>(4.5);
-  const [failCommit, setFailCommit] = useState<boolean>(true);
-  const [excludeLockFiles, setExcludeLockFiles] = useState<boolean>(true);
-  const [hookCopied, setHookCopied] = useState<boolean>(false);
 
   const generatePreCommitScript = (): string => {
     const excludes = excludeLockFiles ? 'node_modules,dist,*.lock,*-lock.json' : 'node_modules,dist';
@@ -74,6 +81,59 @@ exit 0`;
       setTimeout(() => setHookCopied(false), 2000);
     } catch (err) {
       console.error('failed to copy hook text', err);
+    }
+  };
+
+  const generateCiYaml = (): string => {
+    if (ciPlatform === 'github') {
+      const triggerSection = ciTrigger === 'push'
+        ? `on:\n  push:\n    branches: [ "${ciBranch}" ]`
+        : ciTrigger === 'pr'
+        ? `on:\n  pull_request:\n    branches: [ "${ciBranch}" ]`
+        : `on:\n  push:\n    branches: [ "${ciBranch}" ]\n  pull_request:\n    branches: [ "${ciBranch}" ]`;
+
+      return `name: Securify Leak Scan
+${triggerSection}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scan entire git history
+
+      - name: Execute Securify Audit
+        uses: securify-cli/securify-action@v2
+        with:
+          fail-on-leak: true
+          entropy-limit: ${entropyThresholdVal}`;
+    } else {
+      // GitLab CI/CD config
+      const triggerRule = ciTrigger === 'push'
+        ? `  only:\n    - ${ciBranch}`
+        : ciTrigger === 'pr'
+        ? `  only:\n    - merge_requests`
+        : `  only:\n    - ${ciBranch}\n    - merge_requests`;
+
+      return `securify-audit:
+  stage: test
+  image: securify/cli:latest
+  script:
+    - securify scan --entropy=${entropyThresholdVal} --fail-on-leak
+${triggerRule}`;
+    }
+  };
+
+  const handleCopyCi = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(generateCiYaml());
+      setCiCopied(true);
+      setTimeout(() => setCiCopied(false), 2000);
+    } catch (err) {
+      console.error('failed to copy CI yaml', err);
     }
   };
 
@@ -320,6 +380,124 @@ exit 0`;
                   }`}
                 >
                   {hookCopied ? 'copied hook script!' : 'copy hook script'}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* CI/CD Integration Section */}
+        <div className="border-t border-white/5 pt-16 mt-16">
+          <div className="max-w-3xl mb-8">
+            <span className="inline-block bg-neutral-900 border border-white/10 rounded-full px-4 py-1 text-xs text-neutral-400 lowercase mb-4 tracking-wider">
+              cloud pipelines
+            </span>
+            <h3 className="text-2xl font-medium text-white lowercase mb-2">
+              CI/CD pipeline configurator
+            </h3>
+            <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+              automatically scan repository pull requests and commits in remote environments before deployment builds start.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* CI/CD Settings */}
+            <div className="lg:col-span-5 space-y-6">
+              
+              {/* Platform selection */}
+              <div>
+                <span className="block text-[10px] font-mono text-neutral-500 mb-2 lowercase">
+                  ci/cd provider
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCiPlatform('github')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-mono border transition-all lowercase ${
+                      ciPlatform === 'github'
+                        ? 'bg-white text-black border-white'
+                        : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                    }`}
+                  >
+                    GitHub Actions
+                  </button>
+                  <button
+                    onClick={() => setCiPlatform('gitlab')}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-mono border transition-all lowercase ${
+                      ciPlatform === 'gitlab'
+                        ? 'bg-white text-black border-white'
+                        : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                    }`}
+                  >
+                    GitLab CI/CD
+                  </button>
+                </div>
+              </div>
+
+              {/* Trigger selection */}
+              <div>
+                <span className="block text-[10px] font-mono text-neutral-500 mb-2 lowercase">
+                  trigger event
+                </span>
+                <div className="flex gap-2">
+                  {(['push', 'pr', 'both'] as const).map((trig) => (
+                    <button
+                      key={trig}
+                      onClick={() => setCiTrigger(trig)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-mono border transition-all lowercase ${
+                        ciTrigger === trig
+                          ? 'bg-white text-black border-white'
+                          : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                      }`}
+                    >
+                      {trig === 'pr' ? 'pull request' : trig === 'both' ? 'push & pr' : 'push'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Target Branch selection */}
+              <div className="space-y-1.5">
+                <span className="block text-[10px] font-mono text-neutral-500 lowercase">
+                  target tracking branch
+                </span>
+                <input
+                  type="text"
+                  value={ciBranch}
+                  onChange={(e) => setCiBranch(e.target.value.trim() || 'main')}
+                  placeholder="e.g. main"
+                  className="w-full bg-neutral-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono"
+                />
+              </div>
+
+            </div>
+
+            {/* Compiled YAML File Display */}
+            <div className="lg:col-span-7 bg-neutral-950 border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col justify-between min-h-[300px]">
+              <div>
+                <div className="px-4 py-3 bg-neutral-900/50 border-b border-white/5 flex justify-between items-center select-none">
+                  <span className="text-[10px] font-mono text-neutral-500 lowercase">
+                    {ciPlatform === 'github' ? '.github/workflows/securify.yml' : '.gitlab-ci.yml'}
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-neutral-800"></span>
+                </div>
+                
+                <pre className="p-6 font-mono text-[11px] md:text-xs text-neutral-300 overflow-x-auto leading-relaxed select-all">
+                  {generateCiYaml()}
+                </pre>
+              </div>
+
+              <div className="p-4 border-t border-white/5 bg-neutral-900/10 flex justify-end">
+                <button
+                  onClick={handleCopyCi}
+                  className={`text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none ${
+                    ciCopied 
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-white hover:bg-neutral-200 text-black'
+                  }`}
+                >
+                  {ciCopied ? 'copied workflow config!' : 'copy workflow config'}
                 </button>
               </div>
             </div>

@@ -23,6 +23,162 @@ export const SecurifySandbox = () => {
   const [report, setReport] = useState<ScanReport>({ isSafe: true, leaks: [] });
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  const exportJSONReport = () => {
+    const reportData = {
+      timestamp: new Date().toISOString(),
+      status: report.isSafe ? 'SAFE' : 'COMPROMISED',
+      leaksCount: report.leaks.length,
+      leaks: report.leaks,
+      codeSnippet: code
+    };
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securify-sandbox-report-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportHTMLReport = () => {
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Securify - Sandbox Security Audit Report</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: monospace;
+      padding: 40px;
+      margin: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 30px;
+      background: #050505;
+    }
+    h1 {
+      font-size: 20px;
+      border-bottom: 1px solid #222;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+      font-weight: normal;
+      color: #fff;
+    }
+    .meta {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 25px;
+      line-height: 1.6;
+    }
+    .status {
+      font-size: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      font-weight: bold;
+    }
+    .status.compromised {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .status.safe {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .leak-card {
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      background: rgba(239, 68, 68, 0.03);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .leak-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: bold;
+      color: #ef4444;
+      margin-bottom: 8px;
+    }
+    .leak-match {
+      background: #000;
+      border: 1px solid #111;
+      padding: 8px;
+      font-size: 11px;
+      color: #e5e5e5;
+      display: block;
+      word-break: break-all;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .leak-desc {
+      font-size: 11px;
+      color: #666;
+    }
+    .footer {
+      margin-top: 40px;
+      border-top: 1px solid #222;
+      padding-top: 15px;
+      font-size: 10px;
+      color: #444;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Securify Sandbox Audit Report</h1>
+    <div class="meta">
+      Generated On: ${new Date().toLocaleString()}<br>
+      Engine: Securify Client-Side Sandbox (v1.0.0)<br>
+      Target Scan Code Length: ${code.length} characters
+    </div>
+
+    <div class="status ${report.isSafe ? 'safe' : 'compromised'}">
+      Status: ${report.isSafe ? 'SAFE CODE STRUCTURE' : 'COMPROMISED'}
+    </div>
+
+    ${report.leaks.map(leak => `
+      <div class="leak-card">
+        <div class="leak-header">
+          <span>${leak.type.toUpperCase()}</span>
+          <span>LINE ${leak.line}</span>
+        </div>
+        <code class="leak-match">${leak.match}</code>
+        <div class="leak-desc">${leak.description}</div>
+      </div>
+    `).join('')}
+
+    <div class="footer">
+      This security report was generated entirely client-side. Securify does not store or transmit codebase contents.
+    </div>
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securify-sandbox-report-${Date.now()}.html`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const applyRulePreset = (name: string, regex: string, desc: string, sample: string) => {
+    setRuleName(name);
+    setRuleRegex(regex);
+    setRuleDescription(desc);
+    setTestText(sample);
+  };
+
   // Tab 2: Configurator States
   const [entropyThreshold, setEntropyThreshold] = useState<number>(4.5);
   const [failOnSeverity, setFailOnSeverity] = useState<string>('critical');
@@ -483,6 +639,23 @@ ssh_keys = ${enabledScanners.ssh}
                     </div>
                   )}
                 </div>
+
+                {!report.isSafe && (
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-white/5 select-none">
+                    <button
+                      onClick={exportJSONReport}
+                      className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all select-none"
+                    >
+                      export json
+                    </button>
+                    <button
+                      onClick={exportHTMLReport}
+                      className="flex-1 bg-emerald-950/40 hover:bg-emerald-950 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all select-none"
+                    >
+                      print report
+                    </button>
+                  </div>
+                )}
 
                 <div className="border-t border-white/5 pt-4 mt-6 text-[10px] font-mono text-neutral-600 select-none lowercase leading-normal">
                   sandbox engine runs entirely offline on browser threads. data is not sent to external servers.
@@ -1076,6 +1249,25 @@ ssh_keys = ${enabledScanners.ssh}
                       invalid regex syntax: {getRegexTestResults().error}
                     </p>
                   )}
+                  <div className="space-y-1.5 pt-1.5">
+                    <span className="text-[10px] font-mono text-neutral-500 block lowercase select-none">regex preset helpers:</span>
+                    <div className="flex flex-wrap gap-1.5 select-none">
+                      {[
+                        { name: 'bearer token', regex: 'Bearer\\s[a-zA-Z0-9_\\-\\.\\~\\+\\/]+=*', desc: 'matches generic Bearer authentication tokens', sample: 'const headers = {\n  Authorization: "Bearer token_abc123xyz_example_value"\n};' },
+                        { name: 'custom api key', regex: 'api_key_[a-zA-Z0-9]{24}', desc: 'detects company generic api keys', sample: 'const config = {\n  apiKey: "api_key_A1b2C3d4E5f6G7h8I9j0K1l2"\n};' },
+                        { name: 'private key foot', regex: '-----END [A-Z ]+ PRIVATE KEY-----', desc: 'identifies cryptographic private key files', sample: 'const key = `-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQD...\n-----END PRIVATE KEY-----`;' }
+                      ].map((preset) => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => applyRulePreset(preset.name, preset.regex, preset.desc, preset.sample)}
+                          className="px-2 py-0.5 rounded text-[9px] font-mono bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white hover:border-white/20 transition-all lowercase"
+                        >
+                          + {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Test Text */}

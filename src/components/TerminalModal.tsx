@@ -14,18 +14,49 @@ interface CommandMap {
   brew: string;
 }
 
+interface CommandHistoryItem {
+  input: string;
+  output: string;
+}
+
 export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
   const [selectedPm, setSelectedPm] = useState<PackageManager>('npm');
   const [copied, setCopied] = useState<boolean>(false);
-  const [commandSuccess, setCommandSuccess] = useState<boolean>(false);
-  const [typedOutput, setTypedOutput] = useState<string>('');
+  
+  // Interactive Shell States
+  const [inputText, setInputText] = useState<string>('');
+  const [history, setHistory] = useState<CommandHistoryItem[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [rawHistory, setRawHistory] = useState<string[]>([]);
+  const [themeColor, setThemeColor] = useState<string>('emerald'); // emerald, amber, cyan, white
+  
   const modalRef = useRef<HTMLDivElement>(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const commands: CommandMap = {
+  const installCommands: CommandMap = {
     npm: 'npm install -g @securify/cli',
     pnpm: 'pnpm add -g @securify/cli',
     cargo: 'cargo install securify',
     brew: 'brew install securify-cli/securify/securify'
+  };
+
+  const getThemeTextClass = () => {
+    switch (themeColor) {
+      case 'amber': return 'text-amber-400';
+      case 'cyan': return 'text-cyan-400';
+      case 'white': return 'text-white';
+      default: return 'text-emerald-400';
+    }
+  };
+
+  const getThemePromptClass = () => {
+    switch (themeColor) {
+      case 'amber': return 'text-amber-500';
+      case 'cyan': return 'text-cyan-500';
+      case 'white': return 'text-neutral-400';
+      default: return 'text-emerald-500';
+    }
   };
 
   // Close on Escape key press
@@ -37,14 +68,20 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
     };
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
-      // Prevent background scrolling
       document.body.style.overflow = 'hidden';
+      // Autofocus terminal input on open
+      setTimeout(() => inputRef.current?.focus(), 150);
     }
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
+
+  // Scroll to bottom on history change
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history]);
 
   // Click outside to close
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -53,43 +90,143 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
     }
   };
 
-  // Copy command to clipboard with try-catch
+  // Copy command to clipboard
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(commands[selectedPm]);
+      await navigator.clipboard.writeText(installCommands[selectedPm]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Clipboard copy failed:', err);
-      // Fallback: alert or standard handling if clipboard fails
     }
   };
 
-  // Simulate typing effect for the demo output
+  // Auto-typing boot message on open
   useEffect(() => {
     if (!isOpen) {
-      setTypedOutput('');
-      setCommandSuccess(false);
+      setHistory([]);
+      setInputText('');
+      setRawHistory([]);
+      setHistoryIndex(-1);
       return;
     }
 
-    const fullText = '$ securify init\n\n[info] scanning git repository...\n[info] 0 secrets detected.\n[success] pre-commit hook installed successfully!\n[success] your credentials are now securified. 🔒';
-    let currentIndex = 0;
-    setTypedOutput('');
-    setCommandSuccess(false);
-
-    const timer = setInterval(() => {
-      if (currentIndex < fullText.length) {
-        setTypedOutput((prev) => prev + fullText.charAt(currentIndex));
-        currentIndex++;
-      } else {
-        clearInterval(timer);
-        setCommandSuccess(true);
+    const bootLogs = [
+      {
+        input: 'securify --version',
+        output: 'securify core CLI v1.2.4\n[info] loading secret scanning modules...\n[success] 9 scanning filters successfully mounted.\n\ntype "--help" to list available terminal commands.'
       }
-    }, 15);
+    ];
+    setHistory(bootLogs);
+  }, [isOpen]);
 
-    return () => clearInterval(timer);
-  }, [isOpen, selectedPm]);
+  const handleCommandSubmit = (cmdStr: string) => {
+    const trimmed = cmdStr.trim().toLowerCase();
+    if (!trimmed) return;
+
+    let output = '';
+    
+    switch (trimmed) {
+      case 'help':
+      case '--help':
+      case '?':
+        output = `securify cli options:
+  - rules           list all core secret detection rules
+  - scan            run simulated codebase security audit
+  - bypass          show how to ignore/bypass rule detections
+  - faq             view frequently asked security questions
+  - clear           clear the terminal buffer logs
+  - exit            close this terminal session`;
+        break;
+      case 'rules':
+        output = `active detection rule sets:
+  [sec-001] aws access key id (critical)
+  [sec-002] aws secret access key (critical)
+  [sec-003] supabase service role jwt (critical)
+  [sec-004] stripe secret api key (critical)
+  [sec-005] github personal token (high)
+  [sec-006] google cloud api key (high)
+  [sec-007] slack webhook incoming URL (high)
+  [sec-008] generic high-entropy token (warning)`;
+        break;
+      case 'scan':
+        output = `[info] scanning git repository...
+[info] 12 files verified in 14ms
+[success] 0 leaks found. codebase is secure! 🔒`;
+        break;
+      case 'bypass':
+        output = `to ignore a false positive detection, append:
+  "# securify:ignore" at the end of the flagged code line.`;
+        break;
+      case 'faq':
+        output = `securify faq list:
+  Q: does securify send my codebase to cloud servers?
+  A: no. securify scans fully locally on your device.
+  Q: how do i update the scanning signatures?
+  A: run 'npm update -g @securify/cli'`;
+        break;
+      case 'clear':
+        setHistory([]);
+        setInputText('');
+        setHistoryIndex(-1);
+        return;
+      case 'exit':
+        onClose();
+        return;
+      default:
+        output = `securify: command not found: "${trimmed}". type "--help" for list of options.`;
+    }
+
+    const newRaw = [...rawHistory, cmdStr];
+    setRawHistory(newRaw);
+    setHistoryIndex(-1);
+    setHistory(prev => [...prev, { input: cmdStr, output }]);
+    setInputText('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Submit Command
+    if (e.key === 'Enter') {
+      handleCommandSubmit(inputText);
+      return;
+    }
+
+    // Auto-complete (Tab)
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const suggestions = ['rules', 'scan', 'bypass', 'faq', 'clear', 'exit', '--help'];
+      const matches = suggestions.filter(s => s.startsWith(inputText.trim().toLowerCase()));
+      if (matches.length === 1) {
+        setInputText(matches[0]);
+      }
+      return;
+    }
+
+    // Up Arrow (History Back)
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (rawHistory.length === 0) return;
+      const nextIndex = historyIndex === -1 ? rawHistory.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(nextIndex);
+      setInputText(rawHistory[nextIndex]);
+      return;
+    }
+
+    // Down Arrow (History Forward)
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex === -1) return;
+      if (historyIndex === rawHistory.length - 1) {
+        setHistoryIndex(-1);
+        setInputText('');
+      } else {
+        const nextIndex = historyIndex + 1;
+        setHistoryIndex(nextIndex);
+        setInputText(rawHistory[nextIndex]);
+      }
+      return;
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -112,7 +249,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
             <span className="w-3 h-3 rounded-full bg-yellow-500/80 block"></span>
             <span className="w-3 h-3 rounded-full bg-green-500/80 block"></span>
             <span id="terminal-title" className="text-xs text-neutral-400 font-mono ml-2 lowercase">
-              securify --get-started
+              securify --interactive-shell
             </span>
           </div>
           <button
@@ -120,31 +257,27 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
             className="text-neutral-500 hover:text-white transition-colors"
             aria-label="close terminal"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Tab Selection */}
         <div className="flex border-b border-white/5 bg-neutral-900/50">
-          {(Object.keys(commands) as Array<PackageManager>).map((pm) => (
+          {(Object.keys(installCommands) as Array<PackageManager>).map((pm) => (
             <button
               key={pm}
               onClick={() => {
                 setSelectedPm(pm);
-                setTypedOutput('');
-                setCommandSuccess(false);
+                // Also type the install CLI command simulation in the terminal for premium experience
+                setHistory(prev => [
+                  ...prev,
+                  {
+                    input: `securify install --manager=${pm}`,
+                    output: `[info] installing CLI binary...\n[cmd] ${installCommands[pm]}\n[success] ready for local repository scans.`
+                  }
+                ]);
               }}
               className={`px-4 py-2 text-xs font-mono border-r border-white/5 transition-all lowercase ${
                 selectedPm === pm
@@ -161,7 +294,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
         <div className="p-5 font-mono text-sm">
           <div className="relative flex items-center justify-between bg-neutral-900/90 rounded-lg p-3 border border-white/5">
             <span className="text-white select-all text-xs md:text-sm">
-              {commands[selectedPm]}
+              {installCommands[selectedPm]}
             </span>
             <button
               onClick={copyToClipboard}
@@ -177,15 +310,63 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
           </div>
 
           {/* Interactive Shell Output Simulation */}
-          <div className="mt-4 bg-neutral-950 p-4 rounded-lg border border-white/5 text-[12px] md:text-xs leading-relaxed text-neutral-400 min-h-[140px] whitespace-pre-wrap font-mono select-none">
-            {typedOutput}
-            {!commandSuccess && <span className="animate-pulse">|</span>}
+          <div className="mt-4 bg-neutral-950 p-4 rounded-lg border border-white/5 min-h-[160px] max-h-[240px] overflow-y-auto font-mono text-[11px] md:text-xs leading-relaxed flex flex-col space-y-2">
+            
+            {/* Command Logs history */}
+            {history.map((item, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center gap-1.5 text-neutral-500 font-bold select-none">
+                  <span>$</span>
+                  <span className="text-neutral-300 font-normal">{item.input}</span>
+                </div>
+                <div className={`whitespace-pre-wrap ${getThemeTextClass()}`}>
+                  {item.output}
+                </div>
+              </div>
+            ))}
+
+            {/* Input Prompt line */}
+            <div className="flex items-center gap-1.5 pt-1">
+              <span className={`font-bold select-none ${getThemePromptClass()}`}>$</span>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1 bg-transparent text-neutral-200 border-none outline-none focus:ring-0 p-0 font-mono text-[11px] md:text-xs lowercase"
+                placeholder="type command (e.g. rules, scan, --help)..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+            </div>
+            
+            <div ref={terminalEndRef} />
           </div>
         </div>
 
         {/* Footer info */}
-        <div className="px-5 py-4 bg-neutral-900/30 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-neutral-500">
-          <span className="lowercase">opensourced under MIT license</span>
+        <div className="px-5 py-4 bg-neutral-900/30 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs text-neutral-500 select-none">
+          {/* Terminal Theme Selector */}
+          <div className="flex items-center gap-1.5 select-none">
+            <span className="text-[10px] text-neutral-500 font-mono lowercase">shell theme:</span>
+            {['emerald', 'amber', 'cyan', 'white'].map((col) => (
+              <button
+                key={col}
+                onClick={() => setThemeColor(col)}
+                className={`w-2.5 h-2.5 rounded-full border transition-all ${
+                  col === 'emerald' ? 'bg-emerald-500 border-emerald-400' :
+                  col === 'amber' ? 'bg-amber-500 border-amber-400' :
+                  col === 'cyan' ? 'bg-cyan-500 border-cyan-400' :
+                  'bg-white border-neutral-300'
+                } ${themeColor === col ? 'scale-125 border-white' : 'opacity-60 hover:opacity-100'}`}
+                title={`${col} theme`}
+              />
+            ))}
+          </div>
+
           <a
             href="https://github.com/sandrotonal/anti_security"
             target="_blank"

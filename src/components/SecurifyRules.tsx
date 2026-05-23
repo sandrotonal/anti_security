@@ -5,6 +5,7 @@ interface Rule {
   name: string;
   category: 'cloud' | 'database' | 'saas' | 'vcs';
   severity: 'critical' | 'high' | 'warning';
+  cvss: number;
   description: string;
   regexPattern: string;
   remedy: string;
@@ -75,6 +76,7 @@ export const SecurifyRules = () => {
   const [search, setSearch] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const rules: Rule[] = [
     {
@@ -82,6 +84,7 @@ export const SecurifyRules = () => {
       name: 'aws access key id',
       category: 'cloud',
       severity: 'critical',
+      cvss: 9.8,
       description: 'identifies amazon web services credentials used to manage cloud compute, storage, and IAM user policies.',
       regexPattern: 'AKIA[A-Z0-9]{16}',
       remedy: 'revoke token immediately. use AWS IAM Roles or AWS Secrets Manager.'
@@ -91,6 +94,7 @@ export const SecurifyRules = () => {
       name: 'aws secret access key',
       category: 'cloud',
       severity: 'critical',
+      cvss: 9.8,
       description: 'identifies high-entropy signature key paired with access keys to sign AWS requests.',
       regexPattern: '(?i)aws(.{0,20})?[0-9a-zA-Z\\/+]{40}',
       remedy: 'rotate credential and delete the compromised secret version.'
@@ -100,6 +104,7 @@ export const SecurifyRules = () => {
       name: 'supabase service role jwt',
       category: 'database',
       severity: 'critical',
+      cvss: 9.3,
       description: 'matches supabase service_role json web tokens containing database root bypass permissions.',
       regexPattern: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+',
       remedy: 're-generate the service role key from supabase dashboard and add to environment files.'
@@ -109,6 +114,7 @@ export const SecurifyRules = () => {
       name: 'stripe secret api key',
       category: 'saas',
       severity: 'critical',
+      cvss: 8.9,
       description: 'matches live stripe payment transaction private keys used to manage customer billing systems.',
       regexPattern: 'sk_(live|test)_[0-9a-zA-Z]{24}',
       remedy: 'expire live key from stripe dashboard. replace with test key (sk_test_...) during local development.'
@@ -118,6 +124,7 @@ export const SecurifyRules = () => {
       name: 'github personal access token',
       category: 'vcs',
       severity: 'high',
+      cvss: 8.2,
       description: 'matches github repository read/write access tokens linked to user accounts.',
       regexPattern: 'ghp_[a-zA-Z0-9]{36}',
       remedy: 'delete compromised personal token. generate fine-grained repository tokens instead.'
@@ -127,6 +134,7 @@ export const SecurifyRules = () => {
       name: 'google cloud api key',
       category: 'cloud',
       severity: 'high',
+      cvss: 7.8,
       description: 'matches static credentials access keys used across GCP services like Maps, Firebase, or Translation.',
       regexPattern: 'AIzaSy[a-zA-Z0-9-_]{33}',
       remedy: 'apply http or IP restrictions on GCP console to lock key usage to client endpoints.'
@@ -136,6 +144,7 @@ export const SecurifyRules = () => {
       name: 'slack webhook incoming URL',
       category: 'saas',
       severity: 'high',
+      cvss: 7.5,
       description: 'matches slack channel integration URLs that allow unauthenticated chat message broadcasts.',
       regexPattern: 'https:\\/\\/hooks\\.slack\\.com\\/services\\/[A-Za-z0-9\\/]+',
       remedy: 'revoke webhook and delete integration. migrate to slack app credentials.'
@@ -145,6 +154,7 @@ export const SecurifyRules = () => {
       name: 'generic high-entropy token',
       category: 'database',
       severity: 'warning',
+      cvss: 4.3,
       description: 'identifies high-entropy characters (e.g. database credentials, encryption salts) by Shannon entropy formula.',
       regexPattern: 'entropy-shannon >4.5 bits',
       remedy: 'inspect line content. verify string is not a secret or use .securifyignore to exclude.'
@@ -157,6 +167,17 @@ export const SecurifyRules = () => {
     const matchesCategory = activeCategory === 'all' || rule.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const handleCopyCommand = async (e: React.MouseEvent, command: string, ruleId: string) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedId(ruleId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
 
   return (
     <section className="bg-black min-h-screen py-28 px-6 md:px-12 relative overflow-hidden select-none">
@@ -181,7 +202,7 @@ export const SecurifyRules = () => {
         {/* Filters and Search */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-10 pb-6 border-b border-white/5">
           {/* Search Box */}
-          <div className="w-full md:max-w-xs relative">
+          <div className="w-full md:max-w-xs relative flex items-center">
             <input
               type="text"
               value={search}
@@ -189,115 +210,143 @@ export const SecurifyRules = () => {
               placeholder="search patterns (e.g. aws, key)..."
               className="w-full bg-neutral-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 transition-all lowercase"
             />
+            {search && (
+              <button 
+                onClick={() => setSearch('')}
+                className="absolute right-3 text-neutral-500 hover:text-white text-[10px] font-mono lowercase"
+              >
+                clear
+              </button>
+            )}
           </div>
 
           {/* Category Tabs */}
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            {['all', 'cloud', 'database', 'saas', 'vcs'].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all lowercase ${
-                  activeCategory === cat
-                    ? 'bg-white text-black border-white'
-                    : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+            <span className="text-[10px] font-mono text-neutral-500 lowercase mr-1 hidden sm:inline-block">
+              showing {filteredRules.length} rules in
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {['all', 'cloud', 'database', 'saas', 'vcs'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all lowercase ${
+                    activeCategory === cat
+                      ? 'bg-white text-black border-white'
+                      : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Rules List Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 select-text">
-          {filteredRules.map((rule) => (
-            <div
-              key={rule.id}
-              onClick={() => setSelectedRuleId(selectedRuleId === rule.id ? null : rule.id)}
-              className={`bg-neutral-950/80 border rounded-2xl p-6 transition-all duration-300 relative group flex flex-col justify-between cursor-pointer ${
-                selectedRuleId === rule.id ? 'border-white/20 bg-neutral-900/30' : 'border-white/5 hover:border-white/10'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-3 mb-4 select-none">
-                  <span className="text-[10px] font-mono text-neutral-500 lowercase">
-                    {rule.id}
-                  </span>
-                  <div className="flex gap-1.5">
-                    <span className="text-[9px] font-mono border border-white/5 bg-neutral-900 px-2 py-0.5 rounded text-neutral-400 lowercase">
-                      {rule.category}
+          {filteredRules.map((rule) => {
+            const isSelected = selectedRuleId === rule.id;
+            return (
+              <div
+                key={rule.id}
+                onClick={() => setSelectedRuleId(isSelected ? null : rule.id)}
+                className={`bg-neutral-950/80 border rounded-2xl p-6 transition-all duration-300 relative group flex flex-col justify-between cursor-pointer ${
+                  isSelected ? 'border-white/25 bg-neutral-900/40 shadow-[0_0_20px_rgba(255,255,255,0.02)]' : 'border-white/5 hover:border-white/15'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-4 select-none">
+                    <span className="text-[10px] font-mono text-neutral-500 lowercase">
+                      {rule.id}
                     </span>
-                    <span 
-                      className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
-                        rule.severity === 'critical'
-                          ? 'bg-red-950/40 text-red-400 border border-red-500/20'
-                          : rule.severity === 'high'
-                          ? 'bg-orange-950/40 text-orange-400 border border-orange-500/20'
-                          : 'bg-yellow-950/40 text-yellow-400 border border-yellow-500/20'
-                      }`}
-                    >
-                      {rule.severity}
+                    <div className="flex gap-1.5 items-center">
+                      <span className="text-[9px] font-mono border border-white/5 bg-neutral-900 px-2 py-0.5 rounded text-neutral-400 lowercase">
+                        {rule.category}
+                      </span>
+                      <span 
+                        className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
+                          rule.severity === 'critical'
+                            ? 'bg-red-950/40 text-red-400 border border-red-500/20'
+                            : rule.severity === 'high'
+                            ? 'bg-orange-950/40 text-orange-400 border border-orange-500/20'
+                            : 'bg-yellow-950/40 text-yellow-400 border border-yellow-500/20'
+                        }`}
+                      >
+                        {rule.severity}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h3 className="text-base font-medium text-white mb-2 lowercase tracking-tight flex items-center justify-between">
+                    <span>{rule.name}</span>
+                    <span className="text-[10px] font-mono text-neutral-500 group-hover:text-white transition-colors">
+                      {isSelected ? 'hide guide ▲' : 'view guide ▼'}
                     </span>
+                  </h3>
+                  <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed mb-6">
+                    {rule.description}
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-white/5">
+                  <div className="font-mono text-[10px] bg-black border border-white/5 p-2 rounded text-neutral-300">
+                    <span className="text-neutral-500 block select-none lowercase mb-1">regex format:</span>
+                    <code className="whitespace-pre-wrap break-all">{rule.regexPattern}</code>
+                  </div>
+                  <div className="text-[10px] text-neutral-500 leading-normal lowercase">
+                    <span className="text-white font-mono select-none">remedy: </span>
+                    {rule.remedy}
                   </div>
                 </div>
 
-                <h3 className="text-base font-medium text-white mb-2 lowercase tracking-tight flex items-center justify-between">
-                  <span>{rule.name}</span>
-                  <span className="text-[10px] font-mono text-neutral-500 group-hover:text-white transition-colors">
-                    {selectedRuleId === rule.id ? 'hide guide ▲' : 'view guide ▼'}
-                  </span>
-                </h3>
-                <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed mb-6">
-                  {rule.description}
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-white/5">
-                <div className="font-mono text-[10px] bg-black border border-white/5 p-2 rounded text-neutral-300">
-                  <span className="text-neutral-500 block select-none lowercase mb-1">regex format:</span>
-                  <code className="whitespace-pre-wrap break-all">{rule.regexPattern}</code>
-                </div>
-                <div className="text-[10px] text-neutral-500 leading-normal lowercase">
-                  <span className="text-white font-mono select-none">remedy: </span>
-                  {rule.remedy}
-                </div>
-              </div>
-
-              {/* Remediation Guide Dropdown */}
-              {selectedRuleId === rule.id && (
-                <div className="mt-6 pt-6 border-t border-white/10 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                  <span className="text-[10px] font-mono text-neutral-400 block lowercase tracking-wider">
-                    ⚡ step-by-step rotation guide
-                  </span>
-                  <ol className="list-decimal pl-4 space-y-2 text-[11px] text-neutral-400 lowercase leading-relaxed font-light">
-                    {(remediationPlans[rule.id]?.steps || []).map((step, idx) => (
-                      <li key={idx}>{step}</li>
-                    ))}
-                  </ol>
-                  
-                  {remediationPlans[rule.id]?.command && (
-                    <div className="space-y-1.5 pt-2">
-                      <span className="text-[9px] font-mono text-neutral-500 block lowercase">emergency purge command:</span>
-                      <div className="flex justify-between items-center bg-black border border-white/5 rounded-lg p-2 font-mono text-[9px] text-neutral-300">
-                        <code>{remediationPlans[rule.id]?.command}</code>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(remediationPlans[rule.id]?.command || '');
-                          }}
-                          className="hover:text-white transition-colors text-[9px] lowercase underline decoration-white/20 shrink-0 ml-2"
-                        >
-                          copy
-                        </button>
+                {/* Remediation Guide Dropdown */}
+                {isSelected && (
+                  <div className="mt-6 pt-6 border-t border-white/10 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                    
+                    {/* CVSS Metric Meter */}
+                    <div className="space-y-1 bg-black/40 border border-white/5 rounded-xl p-3">
+                      <div className="flex justify-between items-center text-[10px] font-mono">
+                        <span className="text-neutral-400 lowercase">CVSS Severity Rating</span>
+                        <span className={`${rule.cvss >= 9.0 ? 'text-red-400' : rule.cvss >= 7.0 ? 'text-orange-400' : 'text-yellow-400'}`}>{rule.cvss} / 10</span>
+                      </div>
+                      <div className="w-full bg-neutral-900 h-1 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${rule.cvss >= 9.0 ? 'bg-red-500' : rule.cvss >= 7.0 ? 'bg-orange-500' : 'bg-yellow-500'}`}
+                          style={{ width: `${rule.cvss * 10}%` }}
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
 
-            </div>
-          ))}
+                    <span className="text-[10px] font-mono text-neutral-400 block lowercase tracking-wider">
+                      ⚡ step-by-step rotation guide
+                    </span>
+                    <ol className="list-decimal pl-4 space-y-2 text-[11px] text-neutral-400 lowercase leading-relaxed font-light">
+                      {(remediationPlans[rule.id]?.steps || []).map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ol>
+                    
+                    {remediationPlans[rule.id]?.command && (
+                      <div className="space-y-1.5 pt-2">
+                        <span className="text-[9px] font-mono text-neutral-500 block lowercase">emergency purge command:</span>
+                        <div className="flex justify-between items-center bg-black border border-white/5 rounded-lg p-2 font-mono text-[9px] text-neutral-300">
+                          <code>{remediationPlans[rule.id]?.command}</code>
+                          <button 
+                            onClick={(e) => handleCopyCommand(e, remediationPlans[rule.id]?.command || '', rule.id)}
+                            className="hover:text-white transition-colors text-[9px] lowercase underline decoration-white/20 shrink-0 ml-2"
+                          >
+                            {copiedId === rule.id ? 'copied!' : 'copy'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
+            );
+          })}
 
           {filteredRules.length === 0 && (
             <div className="col-span-full text-center py-20 text-neutral-500 text-xs font-mono lowercase select-none">
