@@ -11,6 +11,41 @@ interface NavbarProps {
   onGithubLogout: () => void;
 }
 
+const UserAvatar = ({ username, avatarUrl, sizeClass = "w-7 h-7" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
+  const [imgSrc, setImgSrc] = useState<string>(avatarUrl);
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setImgSrc(avatarUrl);
+    setHasError(false);
+  }, [avatarUrl, username]);
+
+  if (hasError || !imgSrc) {
+    const initial = username.charAt(0).toUpperCase();
+    return (
+      <div className={`${sizeClass} rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 border border-white/10 flex items-center justify-center font-mono text-white text-[10px] font-bold select-none uppercase`}>
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={username}
+      onError={() => {
+        const directUrl = `https://avatars.githubusercontent.com/${username}`;
+        if (imgSrc !== directUrl) {
+          setImgSrc(directUrl);
+        } else {
+          setHasError(true);
+        }
+      }}
+      className={`${sizeClass} rounded-full border border-white/20 object-cover`}
+    />
+  );
+};
+
 export const SecurifyNavbar = ({ 
   activeView, 
   onViewChange, 
@@ -164,14 +199,7 @@ export const SecurifyNavbar = ({
                   }}
                   className="flex items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 border border-white/10 rounded-full w-11 h-11 transition-colors"
                 >
-                  <img
-                    src={githubUser.avatarUrl}
-                    alt={githubUser.username}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${githubUser.username}`;
-                    }}
-                    className="w-7 h-7 rounded-full border border-white/20 object-cover"
-                  />
+                  <UserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-7 h-7" />
                 </button>
 
                 {isDropdownOpen && (
@@ -299,11 +327,7 @@ export const SecurifyNavbar = ({
           <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
             {githubUser ? (
               <div className="flex items-center gap-3 bg-neutral-900/60 border border-white/5 rounded-2xl p-3 mb-2">
-                <img
-                  src={githubUser.avatarUrl}
-                  alt={githubUser.username}
-                  className="w-8 h-8 rounded-full border border-white/20"
-                />
+                <UserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-8 h-8" />
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] text-neutral-500 font-mono block lowercase">connected as</span>
                   <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>

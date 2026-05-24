@@ -56,7 +56,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     // Pass real GitHub avatar URL dynamically based on username
     onSuccess({
       username: username.trim(),
-      avatarUrl: `https://github.com/${username.trim()}.png`
+      avatarUrl: `https://avatars.githubusercontent.com/${username.trim()}`
     });
     onClose();
   };

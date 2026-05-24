@@ -45,6 +45,41 @@ const globToRegex = (glob: string): RegExp => {
   return new RegExp(`(^|\\/)${regexStr}(\\/|$)`, 'i');
 };
 
+const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
+  const [imgSrc, setImgSrc] = useState<string>(avatarUrl);
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setImgSrc(avatarUrl);
+    setHasError(false);
+  }, [avatarUrl, username]);
+
+  if (hasError || !imgSrc) {
+    const initial = username.charAt(0).toUpperCase();
+    return (
+      <div className={`${sizeClass} rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 border border-white/10 flex items-center justify-center font-mono text-white text-[8px] font-bold select-none uppercase`}>
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={username}
+      onError={() => {
+        const directUrl = `https://avatars.githubusercontent.com/${username}`;
+        if (imgSrc !== directUrl) {
+          setImgSrc(directUrl);
+        } else {
+          setHasError(true);
+        }
+      }}
+      className={`${sizeClass} rounded-full border border-white/20 object-cover`}
+    />
+  );
+};
+
 interface SecurifyDashboardProps {
   githubUser: { username: string; avatarUrl: string } | null;
   onGithubLogin: () => void;
@@ -150,6 +185,35 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
   const [reportShared, setReportShared] = useState<boolean>(false);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [copiedFix, setCopiedFix] = useState<boolean>(false);
+
+  // Wave 7 States
+  interface GithubCommitInfo {
+    sha: string;
+    message: string;
+    date: string;
+    author: string;
+    findingsCount?: number;
+    findings?: Finding[];
+    loading?: boolean;
+    expanded?: boolean;
+  }
+  const [githubCommits, setGithubCommits] = useState<GithubCommitInfo[]>([]);
+  const [activeGithubSubTab, setActiveGithubSubTab] = useState<'code' | 'sentinel' | 'pipeline'>('code');
+
+  interface WorkflowFinding {
+    file: string;
+    rule: string;
+    severity: 'critical' | 'high' | 'warning';
+    description: string;
+    remediation: string;
+    codeSnippet?: string;
+  }
+  const [workflowFindings, setWorkflowFindings] = useState<WorkflowFinding[]>([]);
+
+  // Exploit Simulator state
+  const [exploitSimulating, setExploitSimulating] = useState<Finding | null>(null);
+  const [simulatedConsoleLogs, setSimulatedConsoleLogs] = useState<string[]>([]);
+
 
   // Disable body scroll when finding modal is open
   useEffect(() => {
@@ -460,6 +524,57 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
           if (match) commitsCount = parseInt(match[1], 10);
         }
       }
+
+      // Wave 7: Fetch recent 10 commits for Git Sentinel Timeline
+      const recentCommitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=10`);
+      let commitsData: GithubCommitInfo[] = [];
+      if (recentCommitsRes.ok) {
+        const cData = await recentCommitsRes.json();
+        if (Array.isArray(cData)) {
+          const rules = [
+            { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
+            { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
+            { name: 'Generic Database Connection String', regex: /(postgres|postgresql|mongodb|mysql):\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+:\d+\/[a-zA-Z0-9_-]+/g, severity: 'warning', explanation: 'Exposed database connection string with password.', remediation: 'Move to secure secret store.' },
+            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
+          ];
+
+          commitsData = cData.map((c: any) => {
+            const findings: Finding[] = [];
+            const message = c.commit.message || '';
+            
+            rules.forEach(rule => {
+              const matches = message.match(rule.regex);
+              if (matches && matches.length > 0) {
+                matches.forEach(match => {
+                  findings.push({
+                    file: 'Commit Message',
+                    line: 1,
+                    type: rule.name,
+                    codeMatch: match,
+                    details: rule.name,
+                    contextLines: [{ lineNum: 1, content: message }],
+                    safeFix: `Remove credential from commit message`,
+                    explanation: `Exposed ${rule.name.toLowerCase()} inside the commit message history.`,
+                    remediation: `Use git history cleaner to rewrite commit message.`
+                  });
+                });
+              }
+            });
+
+            return {
+              sha: c.sha,
+              message,
+              date: new Date(c.commit.author.date).toLocaleDateString(),
+              author: c.commit.author.name,
+              findingsCount: findings.length,
+              findings,
+              loading: false,
+              expanded: false
+            };
+          });
+        }
+      }
+      setGithubCommits(commitsData);
       
       setScanProgress({ current: 4, total: 10, filename: `retrieved commits list...` });
       addLog(`retrieved ${commitsCount} commits. starting differential scan...`);
@@ -487,6 +602,65 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     if (repoFiles.length === 0) {
       repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
     }
+
+    // Wave 7: Scan CI/CD Actions Workflows
+    const workflowFiles = repoFiles.filter(path => 
+      path.startsWith('.github/workflows/') && (path.endsWith('.yml') || path.endsWith('.yaml'))
+    );
+
+    const tempWorkflowFindings: WorkflowFinding[] = [];
+
+    for (const wfPath of workflowFiles) {
+      try {
+        const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${wfPath}`);
+        if (rawRes.ok) {
+          const content = await rawRes.text();
+          
+          // Rule 1: check pull_request_target
+          if (content.includes('pull_request_target:')) {
+            tempWorkflowFindings.push({
+              file: wfPath,
+              rule: 'Unsafe trigger: pull_request_target',
+              severity: 'critical',
+              description: 'using pull_request_target trigger allows PRs from forks to run with read/write tokens and access secrets, posing a risk of code execution / secret exfiltration.',
+              remediation: 'change trigger to pull_request or restrict permissions on the repository level.',
+              codeSnippet: 'on:\n  pull_request_target:'
+            });
+          }
+
+          // Rule 2: unpinned actions
+          const lines = content.split('\n');
+          lines.forEach((line, idx) => {
+            const match = line.match(/uses:\s*([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]+)@(v[0-9]+|[a-zA-Z0-9._-]+)/);
+            if (match && !line.includes('@sha')) {
+              tempWorkflowFindings.push({
+                file: wfPath,
+                rule: 'Unpinned action dependency',
+                severity: 'warning',
+                description: `Action '${match[1]}/${match[2]}' is pinned to tag/branch '${match[3]}' instead of an immutable commit SHA. Attackers can hijack tags to inject malicious code.`,
+                remediation: `Use the immutable 40-character commit SHA instead of a version tag (e.g., uses: actions/checkout@1d96c772...)`,
+                codeSnippet: `line ${idx + 1}: ${line.trim()}`
+              });
+            }
+          });
+
+          // Rule 3: check write-all permissions
+          if (content.includes('permissions: write-all') || content.includes('permissions: read-all')) {
+            tempWorkflowFindings.push({
+              file: wfPath,
+              rule: 'Excessive workflow permissions',
+              severity: 'high',
+              description: 'setting excessive write-all or read-all permissions exposes GITHUB_TOKEN permissions beyond the minimum required scope.',
+              remediation: 'specify narrow scopes explicitly: permissions: contents: read, pull-requests: read.',
+              codeSnippet: 'permissions: write-all'
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to audit workflow file:', wfPath, err);
+      }
+    }
+    setWorkflowFindings(tempWorkflowFindings);
 
     let leaksFound = 0;
     const tempLogs: ScanLog[] = [];
@@ -715,6 +889,156 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     setLogs(prev => [...tempLogs, ...prev]);
     setScanning(false);
     setScanProgress(null);
+  };
+
+  const handleAnalyzeCommit = async (repoName: string, sha: string, idx: number) => {
+    if (githubCommits[idx].loading) return;
+    if (githubCommits[idx].findings && githubCommits[idx].findings!.length > 0 && githubCommits[idx].findings![0].file !== 'Commit Message') {
+      // Toggle expansion if already loaded and scanned
+      setGithubCommits(prev => prev.map((c, i) => i === idx ? { ...c, expanded: !c.expanded } : c));
+      return;
+    }
+
+    setGithubCommits(prev => prev.map((c, i) => i === idx ? { ...c, loading: true } : c));
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repoName}/commits/${sha}`);
+      if (res.ok) {
+        const data = await res.json();
+        const findings: Finding[] = [...(githubCommits[idx].findings || [])];
+        
+        if (Array.isArray(data.files)) {
+          const rules = [
+            { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
+            { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
+            { name: 'Generic Database Connection String', regex: /(postgres|postgresql|mongodb|mysql):\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+:\d+\/[a-zA-Z0-9_-]+/g, severity: 'warning', explanation: 'Exposed database connection string with password.', remediation: 'Move to secure secret store.' },
+            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
+          ];
+
+          data.files.forEach((file: any) => {
+            const patch = file.patch || '';
+            rules.forEach(rule => {
+              const matches = patch.match(rule.regex);
+              if (matches && matches.length > 0) {
+                matches.forEach(match => {
+                  const lines = patch.split('\n');
+                  const lineNum = lines.findIndex((l: string) => l.includes(match)) + 1;
+                  const contextStart = Math.max(0, lineNum - 3);
+                  const contextEnd = Math.min(lines.length, lineNum + 2);
+                  const contextLines = lines.slice(contextStart, contextEnd).map((l: string, lIdx: number) => ({
+                    lineNum: contextStart + lIdx + 1,
+                    content: l
+                  }));
+
+                  // Avoid duplicates
+                  if (!findings.some(f => f.codeMatch === match && f.file === file.filename)) {
+                    findings.push({
+                      file: file.filename,
+                      line: lineNum || 1,
+                      type: rule.name,
+                      codeMatch: match,
+                      details: rule.name,
+                      contextLines,
+                      safeFix: `// Load from environment variable: process.env.${rule.name.replace(/\s+/g, '_').toUpperCase()}`,
+                      explanation: rule.explanation,
+                      remediation: rule.remediation
+                    });
+                  }
+                });
+              }
+            });
+          });
+        }
+
+        setGithubCommits(prev => prev.map((c, i) => i === idx ? { 
+          ...c, 
+          findings, 
+          findingsCount: findings.length,
+          expanded: true, 
+          loading: false 
+        } : c));
+      } else {
+        throw new Error('Failed to fetch commit details');
+      }
+    } catch (err) {
+      console.warn('API limit or error during commit audit:', err);
+      setGithubCommits(prev => prev.map((c, i) => i === idx ? { 
+        ...c, 
+        expanded: !c.expanded, 
+        loading: false 
+      } : c));
+    }
+  };
+
+  const handleStartExploitSimulation = (finding: Finding) => {
+    setExploitSimulating(finding);
+    setSimulatedConsoleLogs([]);
+    
+    // Simulate typing terminal steps
+    const steps: string[] = [];
+    const type = finding.type.toLowerCase();
+    
+    if (type.includes('slack')) {
+      steps.push(`[+] target asset: slack incoming webhook url`);
+      steps.push(`[+] initiating active exfiltration simulation...`);
+      steps.push(`$ curl -X POST -H 'Content-type: application/json' --data '{"text":"[ALERT] Securify Penetration Test"}' ${finding.codeMatch.substring(0, Math.min(finding.codeMatch.length, 55))}...`);
+      steps.push(`[~] resolving hooks.slack.com dns...`);
+      steps.push(`[~] negotiating TLS v1.3 handshake...`);
+      steps.push(`[+] connection established. sending payload...`);
+      steps.push(`[+] response: HTTP 200 OK (payload accepted)`);
+      steps.push(`[!] CRITICAL COMPROMISE: attackers can inject arbitrary workspace alerts or bypass logging channels.`);
+    } else if (type.includes('aws')) {
+      steps.push(`[+] target asset: aws access key ID`);
+      steps.push(`[+] initializing aws credential profile...`);
+      steps.push(`$ export AWS_ACCESS_KEY_ID=${finding.codeMatch}`);
+      steps.push(`$ aws sts get-caller-identity`);
+      steps.push(`[~] communicating with aws security token service...`);
+      steps.push(`[+] caller user: deploy_srv_production`);
+      steps.push(`$ aws s3 ls`);
+      steps.push(`[+] enumerated s3 buckets:`);
+      steps.push(`    - client-database-backups`);
+      steps.push(`    - secret-vault-keys`);
+      steps.push(`    - application-static-assets`);
+      steps.push(`$ aws s3 cp s3://client-database-backups/prod_backup_may2026.sql .`);
+      steps.push(`[+] exfiltrated prod_backup_may2026.sql (1.4 GB) successfully.`);
+      steps.push(`[!] CRITICAL COMPROMISE: full storage asset access acquired.`);
+    } else if (type.includes('stripe')) {
+      steps.push(`[+] target asset: stripe secret API key`);
+      steps.push(`[+] initializing stripe rest api wrapper...`);
+      steps.push(`$ curl https://api.stripe.com/v1/balance -u ${finding.codeMatch.substring(0, Math.min(finding.codeMatch.length, 20))}...:`);
+      steps.push(`[~] handshaking api.stripe.com...`);
+      steps.push(`[+] authentication succeeded.`);
+      steps.push(`[+] balance metrics fetched:`);
+      steps.push(`    - available balance: $24,500.22 USD`);
+      steps.push(`    - pending transfer: $8,901.00 USD`);
+      steps.push(`$ curl https://api.stripe.com/v1/charges -d limit=3 -u ${finding.codeMatch.substring(0, Math.min(finding.codeMatch.length, 20))}...:`);
+      steps.push(`[+] exfiltrated customer transaction lists & card references.`);
+      steps.push(`[!] CRITICAL COMPROMISE: financial account compromised.`);
+    } else {
+      steps.push(`[+] target asset: database credentials`);
+      steps.push(`[+] initiating socket connection...`);
+      steps.push(`$ psql "${finding.codeMatch.substring(0, Math.min(finding.codeMatch.length, 40))}..."`);
+      steps.push(`[~] handshaking pg_hba credentials...`);
+      steps.push(`[+] sql connection established.`);
+      steps.push(`SELECT schema_name FROM information_schema.schemata;`);
+      steps.push(`[+] schema query completed:`);
+      steps.push(`    - public (default)`);
+      steps.push(`    - client_profiles_secure`);
+      steps.push(`SELECT * FROM client_profiles_secure.users LIMIT 3;`);
+      steps.push(`[+] exfiltrated 3 client profiles containing password hashes.`);
+      steps.push(`[!] CRITICAL COMPROMISE: root administrative database access exposed.`);
+    }
+    
+    // Type logs line by line
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < steps.length) {
+        setSimulatedConsoleLogs(prev => [...prev, steps[i]]);
+        i++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 450);
   };
 
   const handleCreateCustomRepo = (e: React.FormEvent) => {
@@ -1257,11 +1581,7 @@ audit performed client-side using Securify Interactive Portal.
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <img 
-                          src={githubUser.avatarUrl} 
-                          alt={githubUser.username}
-                          className="w-5 h-5 rounded-full border border-white/20"
-                        />
+                        <DashboardUserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-5 h-5" />
                         <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
                           remote workspaces for @{githubUser.username}
                         </span>
@@ -1465,169 +1785,377 @@ audit performed client-side using Securify Interactive Portal.
         {/* Rich Scanning Report Card */}
         {customScanResults && (
           <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 mb-8 space-y-6 print:border-neutral-300 print:text-black">
-            <div className="flex flex-col lg:flex-row gap-8 items-stretch">
-              
-              {/* Security Grade Circular Gauge */}
-              <div className="flex flex-col items-center justify-center text-center p-6 bg-neutral-950/40 rounded-2xl border border-white/5 lg:w-1/4 min-w-[200px]">
-                <span className="text-[10px] font-mono text-neutral-500 mb-4 lowercase">security rating</span>
-                <div className="relative flex items-center justify-center">
-                  {/* Gauge SVG Circle */}
-                  <svg className="w-32 h-32 transform -rotate-90">
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="54"
-                      stroke="rgba(255,255,255,0.03)"
-                      strokeWidth="8"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="54"
-                      stroke={
-                        customScanResults.grade === 'A+' 
-                          ? '#10b981' 
-                          : customScanResults.grade === 'B' 
-                            ? '#f59e0b' 
-                            : customScanResults.grade === 'C' 
-                              ? '#f97316' 
-                              : '#ef4444'
-                      }
-                      strokeWidth="8"
-                      fill="transparent"
-                      strokeDasharray="339.29"
-                      strokeDashoffset={
-                        customScanResults.grade === 'A+' 
-                          ? 0 
-                          : customScanResults.grade === 'B' 
-                            ? 85 
-                            : customScanResults.grade === 'C' 
-                              ? 170 
-                              : 254
-                      }
-                      className="transition-all duration-1000 ease-out"
-                    />
+            
+            {/* Wave 7 Sub-tabs (Only for GitHub tab scans) */}
+            {scanTab === 'github' && (
+              <div className="flex border-b border-white/5 select-none -mx-6 px-6 pb-4 mb-2 overflow-x-auto scrollbar-none gap-2">
+                <button
+                  onClick={() => setActiveGithubSubTab('code')}
+                  className={`px-4 py-2 text-xs font-mono lowercase tracking-wider border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+                    activeGithubSubTab === 'code'
+                      ? 'border-white text-white font-medium'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
-                  <div className="absolute flex flex-col items-center justify-center">
-                    <span className={`text-4xl font-extrabold font-mono ${
-                      customScanResults.grade === 'A+' 
-                        ? 'text-emerald-400' 
-                        : customScanResults.grade === 'B' 
-                          ? 'text-amber-400' 
-                          : customScanResults.grade === 'C' 
-                            ? 'text-orange-400' 
-                            : 'text-red-500'
-                    }`}>
-                      {customScanResults.grade}
+                  code audit
+                </button>
+                <button
+                  onClick={() => setActiveGithubSubTab('sentinel')}
+                  className={`px-4 py-2 text-xs font-mono lowercase tracking-wider border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+                    activeGithubSubTab === 'sentinel'
+                      ? 'border-white text-white font-medium'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  git sentinel timeline
+                </button>
+                <button
+                  onClick={() => setActiveGithubSubTab('pipeline')}
+                  className={`px-4 py-2 text-xs font-mono lowercase tracking-wider border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+                    activeGithubSubTab === 'pipeline'
+                      ? 'border-white text-white font-medium'
+                      : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  pipeline auditor
+                </button>
+              </div>
+            )}
+
+            {scanTab === 'local' || activeGithubSubTab === 'code' ? (
+              <div className="flex flex-col lg:flex-row gap-8 items-stretch animate-in fade-in duration-200">
+                
+                {/* Security Grade Circular Gauge */}
+                <div className="flex flex-col items-center justify-center text-center p-6 bg-neutral-950/40 rounded-2xl border border-white/5 lg:w-1/4 min-w-[200px]">
+                  <span className="text-[10px] font-mono text-neutral-500 mb-4 lowercase">security rating</span>
+                  <div className="relative flex items-center justify-center">
+                    {/* Gauge SVG Circle */}
+                    <svg className="w-32 h-32 transform -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="54"
+                        stroke="rgba(255,255,255,0.03)"
+                        strokeWidth="8"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="54"
+                        stroke={
+                          customScanResults.grade === 'A+' 
+                            ? '#10b981' 
+                            : customScanResults.grade === 'B' 
+                              ? '#f59e0b' 
+                              : customScanResults.grade === 'C' 
+                                ? '#f97316' 
+                                : '#ef4444'
+                        }
+                        strokeWidth="8"
+                        fill="transparent"
+                        strokeDasharray="339.29"
+                        strokeDashoffset={
+                          customScanResults.grade === 'A+' 
+                            ? 0 
+                            : customScanResults.grade === 'B' 
+                              ? 85 
+                              : customScanResults.grade === 'C' 
+                                ? 170 
+                                : 254
+                        }
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center">
+                      <span className={`text-4xl font-extrabold font-mono ${
+                        customScanResults.grade === 'A+' 
+                          ? 'text-emerald-400' 
+                          : customScanResults.grade === 'B' 
+                            ? 'text-amber-400' 
+                            : customScanResults.grade === 'C' 
+                              ? 'text-orange-400' 
+                              : 'text-red-500'
+                      }`}>
+                        {customScanResults.grade}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-1">
+                    <span className="block text-xs font-mono font-medium text-white lowercase">
+                      {customScanResults.leaksFound === 0 ? "repository safe" : `${customScanResults.leaksFound} credentials leaked`}
+                    </span>
+                    <span className="block text-[10px] text-neutral-400 lowercase">
+                      branch: {customScanResults.branch || 'main'} ({customScanResults.commitHash || 'latest'})
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 space-y-1">
-                  <span className="block text-xs font-mono font-medium text-white lowercase">
-                    {customScanResults.leaksFound === 0 ? "repository safe" : `${customScanResults.leaksFound} credentials leaked`}
+
+                {/* File Audited Tree Checklist */}
+                <div className="flex-1 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-[10px] font-mono text-neutral-500 lowercase">audited filesystem tree</span>
+                      <span className="text-[10px] font-mono text-neutral-400 lowercase">
+                        {customScanResults.filesStatus?.filter(f => f.status === 'clean').length} / {customScanResults.filesStatus?.length} files secure
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+                      {customScanResults.filesStatus?.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-neutral-900/30 border border-white/5 rounded-xl px-4 py-2 text-xs">
+                          <div className="flex items-center gap-2.5 truncate">
+                            <svg className={`w-3.5 h-3.5 shrink-0 ${file.status === 'clean' ? 'text-emerald-500' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              {file.status === 'clean' ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              )}
+                            </svg>
+                            <span className="font-mono text-neutral-300 truncate lowercase">{file.name}</span>
+                          </div>
+                          <span className={`text-[10px] font-mono rounded px-2 py-0.5 uppercase shrink-0 ${
+                            file.status === 'clean' 
+                              ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/10' 
+                              : 'bg-red-950/40 text-red-400 border border-red-500/10'
+                          }`}>
+                            {file.status === 'clean' ? 'secure' : file.leakType || 'compromised'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Git History Rewriter Helper */}
+                <div className="lg:w-1/3 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] font-mono text-neutral-500 lowercase">git history cleanup helper</span>
+                      <span className="text-[10px] font-mono text-neutral-500 lowercase">remediation</span>
+                    </div>
+                    
+                    {customScanResults.leaksFound === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center py-6 text-neutral-500 text-xs leading-relaxed lowercase font-light">
+                        <svg className="w-8 h-8 text-emerald-500/40 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        no leaks found. git history is clean and ready.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-neutral-400 text-xs font-light lowercase leading-normal">
+                          warning: secrets are in git history! use git-filter-repo to clean and purge from all branches:
+                        </p>
+                        
+                        <div className="bg-neutral-950 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-neutral-300 relative group overflow-x-auto select-all">
+                          {customScanResults.filesStatus?.some(f => f.status === 'compromised') ? (
+                            `git-filter-repo --path ${
+                              customScanResults.filesStatus
+                                ?.filter(f => f.status === 'compromised')
+                                .map(f => f.name)
+                                .join(' --path ')
+                            } --invert-paths`
+                          ) : (
+                            'git-filter-repo --path path/to/secret --invert-paths'
+                          )}
+                          <button
+                            onClick={async () => {
+                              const compromisedFiles = customScanResults.filesStatus
+                                ?.filter(f => f.status === 'compromised')
+                                .map(f => f.name)
+                                .join(' --path ');
+                              const cmd = compromisedFiles 
+                                ? `git-filter-repo --path ${compromisedFiles} --invert-paths` 
+                                : 'git-filter-repo --path path/to/secret --invert-paths';
+                              await navigator.clipboard.writeText(cmd);
+                            }}
+                            className="absolute right-2 top-2 bg-neutral-900 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white p-1 rounded transition-colors text-[9px] font-mono lowercase"
+                          >
+                            copy
+                          </button>
+                        </div>
+                        
+                        <p className="text-[10px] text-neutral-500 lowercase leading-normal">
+                          after running the cleanup, force push back to github:
+                          <code className="block mt-1 font-mono text-[9px] text-neutral-400">git push origin --force --all</code>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            ) : activeGithubSubTab === 'sentinel' ? (
+              /* Wave 7 Sentinel Timeline */
+              <div className="space-y-6 w-full animate-in fade-in duration-200">
+                <div className="flex justify-between items-center select-none border-b border-white/5 pb-3">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-white lowercase">git history sentinel timeline</h3>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed font-light">
+                      audits recent commit changes dynamically for exposed credentials. select a commit to run a differential audit on its code patches.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono bg-white/5 border border-white/10 rounded-full px-3 py-1 text-neutral-300 lowercase shrink-0">
+                    monitored: {githubCommits.length} commits
                   </span>
-                  <span className="block text-[10px] text-neutral-400 lowercase">
-                    branch: {customScanResults.branch || 'main'} ({customScanResults.commitHash || 'latest'})
-                  </span>
+                </div>
+
+                <div className="relative pl-6 border-l border-white/10 space-y-8 ml-3 py-2 text-xs select-none">
+                  {githubCommits.map((commit, idx) => (
+                    <div key={commit.sha} className="relative group text-left">
+                      {/* Timeline dot */}
+                      <span className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${
+                        commit.findingsCount && commit.findingsCount > 0
+                          ? 'bg-red-950 border-red-500'
+                          : 'bg-neutral-900 border-neutral-700 group-hover:border-white'
+                      }`}>
+                        {commit.findingsCount && commit.findingsCount > 0 && (
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        )}
+                      </span>
+
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-neutral-950/40 border border-white/5 rounded-2xl p-4 transition-all hover:border-white/10">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-neutral-400 bg-white/5 px-2 py-0.5 rounded text-[10px] lowercase select-all">
+                              {commit.sha.substring(0, 8)}
+                            </span>
+                            <span className="text-neutral-500 text-[10px]">{commit.date}</span>
+                            <span className="text-neutral-500 text-[10px]">by @{commit.author.toLowerCase()}</span>
+                          </div>
+                          <p className="text-white font-mono lowercase break-all leading-relaxed max-w-2xl truncate">{commit.message}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          {commit.findingsCount && commit.findingsCount > 0 ? (
+                            <span className="text-red-400 font-mono text-[9px] uppercase px-2 py-0.5 rounded bg-red-950/40 border border-red-500/20">
+                              {commit.findingsCount} leaks found
+                            </span>
+                          ) : (
+                            <span className="text-emerald-400 font-mono text-[9px] uppercase px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/20">
+                              clean
+                            </span>
+                          )}
+
+                          <button
+                            onClick={() => handleAnalyzeCommit(customScanResults.folderName, commit.sha, idx)}
+                            className="bg-white hover:bg-neutral-200 text-black font-mono text-[10px] rounded-xl px-4 py-2.5 transition-colors select-none flex items-center gap-1.5"
+                          >
+                            {commit.loading ? (
+                              <span className="w-2.5 h-2.5 rounded-full border-t border-neutral-700 animate-spin" />
+                            ) : commit.expanded ? (
+                              'hide diff'
+                            ) : (
+                              'scan diff'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded findings & diff */}
+                      {commit.expanded && commit.findings && (
+                        <div className="mt-4 bg-neutral-950/80 border border-white/5 rounded-2xl p-4 ml-2 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {commit.findings.length === 0 ? (
+                            <p className="text-neutral-500 text-[10px] font-mono lowercase">
+                              ✔ commit diff scanned. no credentials or hardcoded keys detected in this commit.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              <span className="block text-[9px] font-mono text-red-400 uppercase">flagged commit anomalies:</span>
+                              {commit.findings.map((f, fIdx) => (
+                                <div key={fIdx} className="bg-red-950/15 border border-red-500/10 rounded-xl p-3.5 space-y-2 text-xs text-left">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-red-400 font-medium font-mono lowercase">{f.type}</span>
+                                    <span className="text-[10px] text-neutral-500 font-mono select-all truncate">{f.file}</span>
+                                  </div>
+                                  <div className="bg-black/40 rounded-lg p-2.5 font-mono text-[10px] text-red-200 overflow-x-auto select-all">
+                                    {f.contextLines[0].content}
+                                  </div>
+                                  <p className="text-neutral-400 text-[10px] leading-relaxed font-light lowercase">{f.explanation}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* File Audited Tree Checklist */}
-              <div className="flex-1 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-[10px] font-mono text-neutral-500 lowercase">audited filesystem tree</span>
-                    <span className="text-[10px] font-mono text-neutral-400 lowercase">
-                      {customScanResults.filesStatus?.filter(f => f.status === 'clean').length} / {customScanResults.filesStatus?.length} files secure
-                    </span>
+            ) : (
+              /* Wave 7 Pipeline Auditor */
+              <div className="space-y-6 w-full animate-in fade-in duration-200">
+                <div className="flex justify-between items-center select-none border-b border-white/5 pb-3">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-medium text-white lowercase">ci/cd workflow security auditor</h3>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed font-light">
+                      scans github action workflows (.github/workflows/*.yml) automatically for malicious trigger mappings or tag hijack risks.
+                    </p>
                   </div>
-                  
-                  <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
-                    {customScanResults.filesStatus?.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-neutral-900/30 border border-white/5 rounded-xl px-4 py-2 text-xs">
-                        <div className="flex items-center gap-2.5 truncate">
-                          <svg className={`w-3.5 h-3.5 shrink-0 ${file.status === 'clean' ? 'text-emerald-500' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            {file.status === 'clean' ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            )}
-                          </svg>
-                          <span className="font-mono text-neutral-300 truncate lowercase">{file.name}</span>
+                  <span className="text-[10px] font-mono bg-white/5 border border-white/10 rounded-full px-3 py-1 text-neutral-300 lowercase shrink-0">
+                    status: {workflowFindings.length === 0 ? 'passed' : `${workflowFindings.length} alerts`}
+                  </span>
+                </div>
+
+                {workflowFindings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center p-8 bg-neutral-950/40 border border-white/5 rounded-2xl">
+                    <svg className="w-10 h-10 text-emerald-500/40 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span className="block text-xs font-mono font-medium text-white lowercase mb-1">no actions vulnerabilities detected</span>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed font-light max-w-md">
+                      all analyzed github actions use immutable version tracking or restrict repository scopes correctly.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {workflowFindings.map((finding, idx) => (
+                      <div key={idx} className="flex flex-col justify-between bg-neutral-950/40 border border-white/5 rounded-2xl p-4 space-y-4 transition-all hover:border-white/10 text-left">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] font-mono text-neutral-500 truncate lowercase">{finding.file}</span>
+                            <span className={`text-[9px] font-mono rounded px-2 py-0.5 uppercase shrink-0 ${
+                              finding.severity === 'critical'
+                                ? 'bg-red-950/40 text-red-400 border border-red-500/20'
+                                : finding.severity === 'high'
+                                ? 'bg-orange-950/40 text-orange-400 border border-orange-500/20'
+                                : 'bg-amber-950/40 text-amber-400 border border-amber-500/20'
+                            }`}>
+                              {finding.severity}
+                            </span>
+                          </div>
+
+                          <h4 className="text-white text-xs font-mono font-medium lowercase">{finding.rule}</h4>
+                          <p className="text-neutral-400 text-[10px] font-light lowercase leading-relaxed">{finding.description}</p>
+                          
+                          {finding.codeSnippet && (
+                            <div className="bg-black/50 rounded-xl p-2.5 font-mono text-[9px] text-neutral-300 overflow-x-auto select-all">
+                              {finding.codeSnippet}
+                            </div>
+                          )}
                         </div>
-                        <span className={`text-[10px] font-mono rounded px-2 py-0.5 uppercase shrink-0 ${
-                          file.status === 'clean' 
-                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/10' 
-                            : 'bg-red-950/40 text-red-400 border border-red-500/10'
-                        }`}>
-                          {file.status === 'clean' ? 'secure' : file.leakType || 'compromised'}
-                        </span>
+
+                        <div className="pt-2 border-t border-white/5 space-y-1">
+                          <span className="block text-[8px] font-mono text-neutral-500 uppercase">remediation advice:</span>
+                          <p className="text-emerald-400 text-[10px] leading-relaxed font-light lowercase">{finding.remediation}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
+            )}
 
-              {/* Git History Rewriter Helper */}
-              <div className="lg:w-1/3 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-[10px] font-mono text-neutral-500 lowercase">git history cleanup helper</span>
-                    <span className="text-[10px] font-mono text-neutral-500 lowercase">remediation</span>
-                  </div>
-                  
-                  {customScanResults.leaksFound === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center py-6 text-neutral-500 text-xs leading-relaxed lowercase font-light">
-                      <svg className="w-8 h-8 text-emerald-500/40 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                      no leaks found. git history is clean and ready.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-neutral-400 text-xs font-light lowercase leading-normal">
-                        warning: secrets are in git history! use git-filter-repo to clean and purge from all branches:
-                      </p>
-                      
-                      <div className="bg-neutral-950 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-neutral-300 relative group overflow-x-auto select-all">
-                        {customScanResults.filesStatus?.some(f => f.status === 'compromised') ? (
-                          `git-filter-repo --path ${
-                            customScanResults.filesStatus
-                              ?.filter(f => f.status === 'compromised')
-                              .map(f => f.name)
-                              .join(' --path ')
-                          } --invert-paths`
-                        ) : (
-                          'git-filter-repo --path path/to/secret --invert-paths'
-                        )}
-                        <button
-                          onClick={async () => {
-                            const compromisedFiles = customScanResults.filesStatus
-                              ?.filter(f => f.status === 'compromised')
-                              .map(f => f.name)
-                              .join(' --path ');
-                            const cmd = compromisedFiles 
-                              ? `git-filter-repo --path ${compromisedFiles} --invert-paths` 
-                              : 'git-filter-repo --path path/to/secret --invert-paths';
-                            await navigator.clipboard.writeText(cmd);
-                          }}
-                          className="absolute right-2 top-2 bg-neutral-900 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white p-1 rounded transition-colors text-[9px] font-mono lowercase"
-                        >
-                          copy
-                        </button>
-                      </div>
-                      
-                      <p className="text-[10px] text-neutral-500 lowercase leading-normal">
-                        after running the cleanup, force push back to github:
-                        <code className="block mt-1 font-mono text-[9px] text-neutral-400">git push origin --force --all</code>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
           </div>
         )}
 
@@ -2172,28 +2700,69 @@ audit performed client-side using Securify Interactive Portal.
                   </div>
                 </div>
 
-                {/* Code Window View */}
+                {/* Interactive Code Diff View */}
                 <div className="space-y-2">
-                  <span className="block text-[10px] text-neutral-500 lowercase select-none">vulnerable code block context:</span>
-                  <div className="bg-black border border-white/5 rounded-xl p-4 overflow-x-auto relative">
+                  <div className="flex justify-between items-center select-none text-[10px] text-neutral-500 lowercase">
+                    <span>interactive code diff (vulnerable vs secure)</span>
+                    <button
+                      onClick={() => handleStartExploitSimulation(selectedFinding)}
+                      className="bg-red-950/80 hover:bg-red-900/90 text-red-400 border border-red-500/20 px-2.5 py-1.5 rounded-xl text-[9px] font-mono transition-colors flex items-center gap-1.5"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse block"></span>
+                      simulate exploit
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Left: Vulnerable */}
                     <div className="space-y-1">
-                      {selectedFinding.contextLines?.map((line, cIdx) => {
-                        const isErrorLine = line.lineNum === selectedFinding.line;
-                        return (
-                          <div
-                            key={cIdx}
-                            className={`flex items-start gap-4 py-0.5 ${
-                              isErrorLine ? 'bg-red-500/10 text-red-200 border-l-2 border-red-500 -ml-4 pl-3.5' : 'text-neutral-400'
-                            }`}
-                          >
-                            <span className="text-neutral-600 select-none w-6 text-right font-mono shrink-0">{line.lineNum}</span>
-                            <span className="whitespace-pre break-all">
-                              {isErrorLine && <span className="text-red-500 mr-1.5 select-none font-bold">⚠</span>}
-                              {line.content}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      <span className="block text-[9px] text-red-400 font-mono pl-1 lowercase">[-] vulnerable code:</span>
+                      <div className="bg-neutral-950 border border-red-500/15 rounded-xl p-3 overflow-x-auto h-[180px] font-mono text-[10px] relative">
+                        <div className="space-y-0.5">
+                          {selectedFinding.contextLines?.map((line, cIdx) => {
+                            const isErrorLine = line.lineNum === selectedFinding.line;
+                            return (
+                              <div key={cIdx} className={`flex items-start gap-2 ${isErrorLine ? 'bg-red-950/30 text-red-300' : 'text-neutral-500'}`}>
+                                <span className="w-5 text-right text-neutral-600 select-none">{line.lineNum}</span>
+                                <span className="whitespace-pre break-all">
+                                  {isErrorLine && <span className="text-red-500 mr-1 select-none font-bold">⚠</span>}
+                                  {line.content}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Remediation */}
+                    <div className="space-y-1">
+                      <span className="block text-[9px] text-emerald-400 font-mono pl-1 lowercase">[+] secure code:</span>
+                      <div className="bg-neutral-950 border border-emerald-500/15 rounded-xl p-3 overflow-x-auto h-[180px] font-mono text-[10px] relative flex flex-col justify-between">
+                        <div className="space-y-0.5">
+                          {selectedFinding.contextLines?.map((line, cIdx) => {
+                            const isErrorLine = line.lineNum === selectedFinding.line;
+                            return (
+                              <div key={cIdx} className={`flex items-start gap-2 ${isErrorLine ? 'bg-emerald-950/20 text-emerald-300' : 'text-neutral-600'}`}>
+                                <span className="w-5 text-right text-neutral-700 select-none">{line.lineNum}</span>
+                                <span className="whitespace-pre break-all">
+                                  {isErrorLine ? selectedFinding.safeFix : line.content}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedFinding.safeFix);
+                            setCopiedFix(true);
+                            setTimeout(() => setCopiedFix(false), 2000);
+                          }}
+                          className="absolute right-3 bottom-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-neutral-300 text-[9px] font-mono px-2 py-1.5 rounded-lg transition-colors lowercase"
+                        >
+                          {copiedFix ? 'copied!' : 'copy fix'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2213,26 +2782,6 @@ audit performed client-side using Securify Interactive Portal.
                     {selectedFinding.remediation}
                   </p>
                 </div>
-
-                {/* Safe Code Block with Copy button */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[10px] text-neutral-500 select-none">
-                    <span>remediated secure code implementation:</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedFinding.safeFix);
-                        setCopiedFix(true);
-                        setTimeout(() => setCopiedFix(false), 2000);
-                      }}
-                      className="text-neutral-400 hover:text-white transition-colors lowercase"
-                    >
-                      {copiedFix ? '[copied!]' : '[copy fix]'}
-                    </button>
-                  </div>
-                  <div className="bg-neutral-900 border border-white/5 rounded-xl p-4 overflow-x-auto relative flex justify-between items-start">
-                    <pre className="text-emerald-400 whitespace-pre font-mono text-[11px] leading-relaxed break-all select-text">{selectedFinding.safeFix}</pre>
-                  </div>
-                </div>
               </div>
 
               {/* Footer */}
@@ -2242,6 +2791,72 @@ audit performed client-side using Securify Interactive Portal.
                   className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-2.5 lowercase transition-all"
                 >
                   dismiss inspector
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Attack Surface Exploitability Simulator Modal */}
+        {exploitSimulating && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-all duration-300 animate-in fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setExploitSimulating(null);
+            }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="w-full max-w-xl bg-black border border-red-500/20 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 transform scale-100 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[80vh] text-left">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 bg-red-950/20 border-b border-red-500/10 select-none shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 block animate-pulse"></span>
+                  <span className="text-xs text-red-500 font-mono font-bold lowercase tracking-wider">
+                    securify audit --exploit-simulator
+                  </span>
+                </div>
+                <button
+                  onClick={() => setExploitSimulating(null)}
+                  className="text-neutral-500 hover:text-white transition-colors"
+                  aria-label="close simulator"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Console logs terminal */}
+              <div className="p-5 bg-black overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed text-neutral-300 select-text min-h-[300px] max-h-[450px] space-y-2 custom-scrollbar">
+                {simulatedConsoleLogs.map((log, index) => {
+                  let logClass = 'text-neutral-300';
+                  if (log.startsWith('[!]')) logClass = 'text-red-500 font-bold';
+                  else if (log.startsWith('[+]')) logClass = 'text-emerald-400';
+                  else if (log.startsWith('$')) logClass = 'text-sky-400 font-bold';
+                  else if (log.startsWith('[~]')) logClass = 'text-amber-400 animate-pulse';
+
+                  return (
+                    <div key={index} className={`${logClass} whitespace-pre-wrap break-all`}>
+                      {log}
+                    </div>
+                  );
+                })}
+                {simulatedConsoleLogs.length < 8 && (
+                  <div className="flex items-center gap-1.5 text-neutral-600 animate-pulse">
+                    <span>loading simulation vectors...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 bg-red-950/10 border-t border-red-500/10 flex justify-between items-center shrink-0 select-none text-[10px] text-neutral-500 font-mono">
+                <span>target: {exploitSimulating.type.toLowerCase()}</span>
+                <button
+                  onClick={() => setExploitSimulating(null)}
+                  className="bg-red-950/50 hover:bg-red-900/60 border border-red-500/20 text-red-400 text-xs font-mono rounded-xl px-4 py-2 lowercase transition-all"
+                >
+                  close session
                 </button>
               </div>
             </div>
