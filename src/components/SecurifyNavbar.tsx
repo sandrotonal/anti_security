@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact';
 
@@ -6,10 +6,29 @@ interface NavbarProps {
   activeView: ViewType;
   onViewChange: (view: ViewType) => void;
   onOpenTerminal: () => void;
+  githubUser: { username: string; avatarUrl: string } | null;
+  onGithubLogin: () => void;
+  onGithubLogout: () => void;
 }
 
-export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: NavbarProps) => {
+export const SecurifyNavbar = ({ 
+  activeView, 
+  onViewChange, 
+  onOpenTerminal,
+  githubUser,
+  onGithubLogin,
+  onGithubLogout
+}: NavbarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const handleClose = () => setIsDropdownOpen(false);
+    window.addEventListener('click', handleClose);
+    return () => window.removeEventListener('click', handleClose);
+  }, [isDropdownOpen]);
 
   const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, targetView: ViewType, anchor?: string) => {
     e.preventDefault();
@@ -125,16 +144,68 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
           <div className="flex items-center gap-2">
             <button
               onClick={handleInstallClick}
-              className="hidden md:block text-sm font-normal rounded-full px-6 py-3 transition-colors lowercase border bg-white text-black border-white hover:bg-neutral-200"
+              className="hidden md:flex h-11 items-center justify-center text-sm font-normal rounded-full px-6 transition-colors lowercase border bg-white text-black border-white hover:bg-neutral-200"
             >
               install cli
             </button>
             <button
               onClick={onOpenTerminal}
-              className="hidden sm:block bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-full px-4 py-3 lowercase transition-all select-none"
+              className="hidden sm:flex h-11 items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-full px-5 lowercase transition-all select-none"
             >
               terminal hook
             </button>
+
+            {githubUser ? (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDropdownOpen(!isDropdownOpen);
+                  }}
+                  className="flex items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 border border-white/10 rounded-full w-11 h-11 transition-colors"
+                >
+                  <img
+                    src={githubUser.avatarUrl}
+                    alt={githubUser.username}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${githubUser.username}`;
+                    }}
+                    className="w-7 h-7 rounded-full border border-white/20 object-cover"
+                  />
+                </button>
+
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-neutral-950/95 border border-white/10 backdrop-blur-xl rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 text-left">
+                      <span className="text-[10px] text-neutral-500 font-mono block lowercase">connected as</span>
+                      <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onGithubLogout();
+                      }}
+                      className="w-full text-left text-red-400 hover:text-red-300 hover:bg-red-950/20 px-3 py-2 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      disconnect
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={onGithubLogin}
+                className="flex items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 rounded-full w-11 h-11 transition-all select-none"
+                aria-label="Connect GitHub"
+              >
+                <svg className="w-4.5 h-4.5 fill-white" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                </svg>
+              </button>
+            )}
             
             {/* Burger toggle */}
             <button
@@ -226,6 +297,41 @@ export const SecurifyNavbar = ({ activeView, onViewChange, onOpenTerminal }: Nav
           </nav>
 
           <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
+            {githubUser ? (
+              <div className="flex items-center gap-3 bg-neutral-900/60 border border-white/5 rounded-2xl p-3 mb-2">
+                <img
+                  src={githubUser.avatarUrl}
+                  alt={githubUser.username}
+                  className="w-8 h-8 rounded-full border border-white/20"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] text-neutral-500 font-mono block lowercase">connected as</span>
+                  <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onGithubLogout();
+                  }}
+                  className="text-red-400 hover:text-red-300 text-xs font-mono lowercase border border-red-500/20 bg-red-950/15 rounded-xl px-3 py-1.5"
+                >
+                  disconnect
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onGithubLogin();
+                }}
+                className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase flex items-center justify-center gap-2 mb-2"
+              >
+                <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                </svg>
+                connect github
+              </button>
+            )}
             <button
               onClick={handleInstallClick}
               className="w-full bg-white text-black py-3.5 rounded-full text-sm font-medium transition-colors lowercase"

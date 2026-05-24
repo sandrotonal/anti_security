@@ -15,6 +15,7 @@ import { TerminalModal } from './components/TerminalModal';
 import { CookieBanner } from './components/CookieBanner';
 import { FooterModal } from './components/FooterModal';
 import { SecurifyShortcuts } from './components/SecurifyShortcuts';
+import { GithubAuthModal } from './components/GithubAuthModal';
 
 function App() {
   const [activeView, setActiveView] = useState<ViewType>(() => {
@@ -24,6 +25,22 @@ function App() {
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [activeFooterModal, setActiveFooterModal] = useState<'license' | 'security' | 'pgp' | null>(null);
+
+  // GitHub integration states
+  const [isGithubModalOpen, setIsGithubModalOpen] = useState<boolean>(false);
+  const [githubUser, setGithubUser] = useState<{ username: string; avatarUrl: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem('securify_github_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleGithubLogout = () => {
+    localStorage.removeItem('securify_github_user');
+    setGithubUser(null);
+  };
 
   const [reportData, setReportData] = useState<{
     folder: string;
@@ -235,6 +252,9 @@ function App() {
         activeView={activeView}
         onViewChange={setActiveView}
         onOpenTerminal={() => setIsTerminalOpen(true)}
+        githubUser={githubUser}
+        onGithubLogin={() => setIsGithubModalOpen(true)}
+        onGithubLogout={handleGithubLogout}
       />
 
       {/* Main Pages Content routing */}
@@ -258,7 +278,10 @@ function App() {
 
         {activeView === 'dashboard' && (
           <div className="animate-page-entrance">
-            <SecurifyDashboard />
+            <SecurifyDashboard 
+              githubUser={githubUser}
+              onGithubLogin={() => setIsGithubModalOpen(true)}
+            />
           </div>
         )}
 
@@ -306,6 +329,16 @@ function App() {
           onClose={() => setActiveFooterModal(null)}
         />
       )}
+
+      {/* GitHub Auth Simulator Modal */}
+      <GithubAuthModal
+        isOpen={isGithubModalOpen}
+        onClose={() => setIsGithubModalOpen(false)}
+        onSuccess={(user) => {
+          setGithubUser(user);
+          localStorage.setItem('securify_github_user', JSON.stringify(user));
+        }}
+      />
     </div>
   );
 }

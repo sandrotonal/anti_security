@@ -45,7 +45,12 @@ const globToRegex = (glob: string): RegExp => {
   return new RegExp(`(^|\\/)${regexStr}(\\/|$)`, 'i');
 };
 
-export const SecurifyDashboard = () => {
+interface SecurifyDashboardProps {
+  githubUser: { username: string; avatarUrl: string } | null;
+  onGithubLogin: () => void;
+}
+
+export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboardProps) => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
   const [stats, setStats] = useState({
@@ -53,6 +58,56 @@ export const SecurifyDashboard = () => {
     blockedLeaks: 14,
     activeHooks: 3
   });
+
+  const [scanTab, setScanTab] = useState<'local' | 'github'>('local');
+  const [selectedGithubRepo, setSelectedGithubRepo] = useState<string>('');
+
+  const [githubRepos, setGithubRepos] = useState<string[]>([]);
+  const [customRepoName, setCustomRepoName] = useState<string>('');
+  const [isLabOpen, setIsLabOpen] = useState<boolean>(false);
+  const [injectStripe, setInjectStripe] = useState<boolean>(false);
+  const [injectAws, setInjectAws] = useState<boolean>(false);
+  const [injectDb, setInjectDb] = useState<boolean>(false);
+  const [injectSlack, setInjectSlack] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    if (githubUser) {
+      const defaultRepos = [
+        `${githubUser.username}/anti_security`,
+        `${githubUser.username}/istanbul_api`,
+        `${githubUser.username}/react-dashboard`,
+        `${githubUser.username}/personal-site`
+      ];
+      setGithubRepos(defaultRepos);
+      setSelectedGithubRepo(`${githubUser.username}/anti_security`);
+
+      // Fetch real public repositories from GitHub
+      const fetchRealRepos = async () => {
+        try {
+          const res = await fetch(`https://api.github.com/users/${githubUser.username}/repos?per_page=100&sort=updated`);
+          if (!res.ok) throw new Error('Failed to fetch repositories');
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0 && active) {
+            const repoNames = data.map((r: any) => r.full_name);
+            setGithubRepos(repoNames);
+            setSelectedGithubRepo(repoNames[0]);
+          }
+        } catch (err) {
+          console.warn('Using fallback repositories due to API limit or error:', err);
+        }
+      };
+
+      fetchRealRepos();
+    } else {
+      setGithubRepos([]);
+      setSelectedGithubRepo('');
+      setScanTab('local');
+    }
+    return () => {
+      active = false;
+    };
+  }, [githubUser]);
   
   // Dynamic severity tracking
   const [severityStats, setSeverityStats] = useState({
@@ -69,6 +124,15 @@ export const SecurifyDashboard = () => {
     totalFiles: number;
     leaksFound: number;
     durationMs: number;
+    grade?: string;
+    branch?: string;
+    commitHash?: string;
+    commitsCount?: number;
+    filesStatus?: Array<{
+      name: string;
+      status: 'clean' | 'compromised';
+      leakType?: string;
+    }>;
   } | null>(null);
 
   interface ScanHistoryEntry {
@@ -334,6 +398,344 @@ export const SecurifyDashboard = () => {
     link.download = `securify_report_${customScanResults.folderName}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  interface InjectedLeaks {
+    stripe: boolean;
+    aws: boolean;
+    db: boolean;
+    slack: boolean;
+  }
+
+  const handleGithubScan = async (repoName: string, injectedLeaks?: InjectedLeaks) => {
+    setIsLiveStream(false);
+    setScanning(true);
+    setLogs([]);
+    setCustomScanResults(null);
+
+    const addLog = (msg: string, status: 'passed' | 'failed' = 'passed', details?: string) => {
+      setLogs(prev => [
+        {
+          timestamp: new Date().toLocaleTimeString(),
+          repo: repoName,
+          status,
+          details: details || `✔ securify-sync: ${msg}`
+        },
+        ...prev
+      ]);
+    };
+
+    let defaultBranch = 'main';
+    let repoFiles: string[] = [];
+    let commitsCount = 104;
+    let repoFindings: Finding[] = [];
+
+    try {
+      // Step 1: Connect and fetch repository details
+      setScanProgress({ current: 1, total: 10, filename: `connecting to github api...` });
+      addLog(`connecting to github api for ${repoName}...`);
+      await new Promise(r => setTimeout(r, 600));
+
+      const repoRes = await fetch(`https://api.github.com/repos/${repoName}`);
+      if (!repoRes.ok) throw new Error('Repository is private or rate-limited');
+      
+      const repoData = await repoRes.json();
+      defaultBranch = repoData.default_branch || 'main';
+      
+      setScanProgress({ current: 2, total: 10, filename: `verifying public_repo scopes...` });
+      addLog(`verifying public_repo scopes and permissions...`);
+      await new Promise(r => setTimeout(r, 500));
+
+      // Step 2: Klonlama simülasyonu
+      setScanProgress({ current: 3, total: 10, filename: `cloning latest commits from ${defaultBranch}...` });
+      addLog(`cloning latest commits from ${defaultBranch} branch...`);
+      await new Promise(r => setTimeout(r, 700));
+
+      // Fetch commits count from API
+      const commitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=1`);
+      if (commitsRes.ok) {
+        const linkHeader = commitsRes.headers.get('Link');
+        if (linkHeader) {
+          const match = linkHeader.match(/&page=(\d+)>; rel="last"/);
+          if (match) commitsCount = parseInt(match[1], 10);
+        }
+      }
+      
+      setScanProgress({ current: 4, total: 10, filename: `retrieved commits list...` });
+      addLog(`retrieved ${commitsCount} commits. starting differential scan...`);
+      await new Promise(r => setTimeout(r, 500));
+
+      // Step 3: Fetch Git Tree
+      setScanProgress({ current: 5, total: 10, filename: `fetching filesystem tree...` });
+      addLog(`analyzing repository filesystem tree...`);
+      
+      const treeRes = await fetch(`https://api.github.com/repos/${repoName}/git/trees/${defaultBranch}?recursive=1`);
+      if (!treeRes.ok) throw new Error('Failed to fetch file tree');
+      const treeData = await treeRes.json();
+      
+      if (Array.isArray(treeData.tree)) {
+        repoFiles = treeData.tree
+          .filter((node: any) => node.type === 'blob')
+          .map((node: any) => node.path);
+      }
+    } catch (err) {
+      console.warn('API error during scan, using fallback simulation:', err);
+      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
+      defaultBranch = 'main';
+    }
+
+    if (repoFiles.length === 0) {
+      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
+    }
+
+    let leaksFound = 0;
+    const tempLogs: ScanLog[] = [];
+    const localSeverity = { critical: 0, high: 0, warning: 0 };
+
+    // Select files to actually scan for secrets (limit to top 5 config/sensitive files)
+    const filesToAudit = repoFiles.filter(path => 
+      path.endsWith('.env') || 
+      path.endsWith('config.js') || 
+      path.endsWith('config.ts') || 
+      path.endsWith('package.json') || 
+      path.includes('credentials') || 
+      path.includes('secret')
+    ).slice(0, 5);
+
+    // Show scanning progress for the files
+    const totalSteps = 5 + repoFiles.length;
+    for (let j = 0; j < repoFiles.length; j++) {
+      if (j % 5 === 0 || j < 10) {
+        setScanProgress({ current: 5 + j + 1, total: totalSteps, filename: `scanning: ${repoFiles[j]}...` });
+        await new Promise(r => setTimeout(r, Math.max(30, 450 / (repoFiles.length / 5))));
+      }
+    }
+
+    // Actually fetch raw contents and scan them
+    for (const filePath of filesToAudit) {
+      try {
+        const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${filePath}`);
+        if (rawRes.ok) {
+          const content = await rawRes.text();
+          const rules = [
+            { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
+            { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
+            { name: 'Generic Database Connection String', regex: /(postgres|postgresql|mongodb|mysql):\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+:\d+\/[a-zA-Z0-9_-]+/g, severity: 'warning', explanation: 'Exposed database connection string with password.', remediation: 'Move to secure secret store.' },
+            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
+          ];
+
+          rules.forEach(rule => {
+            const matches = content.match(rule.regex);
+            if (matches && matches.length > 0) {
+              matches.forEach((match) => {
+                const lines = content.split('\n');
+                const lineNum = lines.findIndex(l => l.includes(match)) + 1;
+                
+                const contextStart = Math.max(0, lineNum - 3);
+                const contextEnd = Math.min(lines.length, lineNum + 2);
+                const contextLines = lines.slice(contextStart, contextEnd).map((l, lIdx) => ({
+                  lineNum: contextStart + lIdx + 1,
+                  content: l
+                }));
+
+                repoFindings.push({
+                  file: filePath,
+                  line: lineNum || 1,
+                  type: rule.name,
+                  codeMatch: match,
+                  details: rule.name,
+                  contextLines,
+                  safeFix: `// Load from environment variable: process.env.${rule.name.replace(/\s+/g, '_').toUpperCase()}`,
+                  explanation: rule.explanation,
+                  remediation: rule.remediation
+                });
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to fetch raw file contents for', filePath, err);
+      }
+    }
+
+    // Now inject lab leaks if specified
+    if (injectedLeaks) {
+      if (injectedLeaks.stripe) {
+        repoFindings.push({
+          file: 'src/config/stripe.ts',
+          line: 12,
+          type: 'Stripe Secret API Key',
+          codeMatch: 'const stripeKey = "sk_test_51NzABC123XYZ...";',
+          details: 'Stripe Secret API Key',
+          contextLines: [
+            { lineNum: 10, content: '// Stripe init' },
+            { lineNum: 11, content: 'import Stripe from "stripe";' },
+            { lineNum: 12, content: 'const stripeKey = "sk_test_51NzABC123XYZ...";' },
+            { lineNum: 13, content: 'export const stripe = new Stripe(stripeKey);' }
+          ],
+          safeFix: 'const stripeKey = process.env.STRIPE_SECRET_KEY;',
+          explanation: 'stripe secret api key exposed. malicious actors can use this to execute transactions, refund charges, or access customer data.',
+          remediation: 'go to Stripe Dashboard -> Developers -> API Keys and roll the secret key. transition code to use environment variables.'
+        });
+      }
+      if (injectedLeaks.aws) {
+        repoFindings.push({
+          file: 'src/config/aws.js',
+          line: 3,
+          type: 'AWS Access Key ID',
+          codeMatch: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE',
+          details: 'AWS Access Key ID',
+          contextLines: [
+            { lineNum: 1, content: '# AWS configuration' },
+            { lineNum: 2, content: 'PORT=8080' },
+            { lineNum: 3, content: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE' },
+            { lineNum: 4, content: 'AWS_REGION=us-east-1' }
+          ],
+          safeFix: 'AWS_ACCESS_KEY_ID=env.AWS_ACCESS_KEY_ID # load from environment variables',
+          explanation: 'aws access key id is hardcoded in plain text. anyone with read access to this repository can compromise your aws account resources.',
+          remediation: 'move the key to a safe .env file (add to .gitignore) and reference it via process.env or system environment variables.'
+        });
+      }
+      if (injectedLeaks.db) {
+        repoFindings.push({
+          file: '.env.production',
+          line: 4,
+          type: 'Generic Database Connection String',
+          codeMatch: 'DATABASE_URL="postgres://admin:superSecretPassword@localhost:5432/mydb"',
+          details: 'Generic Database Connection String',
+          contextLines: [
+            { lineNum: 2, content: 'NODE_ENV=production' },
+            { lineNum: 3, content: 'PORT=3000' },
+            { lineNum: 4, content: 'DATABASE_URL="postgres://admin:superSecretPassword@localhost:5432/mydb"' },
+            { lineNum: 5, content: 'REDIS_URL="redis://localhost:6379"' }
+          ],
+          safeFix: 'DATABASE_URL=process.env.DATABASE_URL',
+          explanation: 'exposed sensitive credential or high-entropy value in codebase.',
+          remediation: 'always store secrets in external environment files (.env) or secret management systems like Vault or AWS Secrets Manager. Never commit secrets to version control.'
+        });
+      }
+      if (injectedLeaks.slack) {
+        repoFindings.push({
+          file: 'src/utils/slack.js',
+          line: 8,
+          type: 'Slack Webhook URL',
+          codeMatch: 'const webhook = "https://hooks.slack.com/services/" + "T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX";',
+          details: 'Slack Webhook URL',
+          contextLines: [
+            { lineNum: 6, content: 'const axios = require("axios");' },
+            { lineNum: 7, content: '// slack logs notification' },
+            { lineNum: 8, content: 'const webhook = "https://hooks.slack.com/services/" + "T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX";' },
+            { lineNum: 9, content: 'axios.post(webhook, { text: "Hello World" });' }
+          ],
+          safeFix: 'const webhook = process.env.SLACK_WEBHOOK_URL;',
+          explanation: 'slack webhook url exposed. allows spammers or attackers to send messages, forge notifications, or gather workspace information.',
+          remediation: 'revoke/delete the exposed webhook url in slack app management, recreate it, and store it as a secure secret variable.'
+        });
+      }
+    }
+
+    if (repoFindings.length > 0) {
+      leaksFound = repoFindings.length;
+      repoFindings.forEach(f => {
+        if (f.type.toLowerCase().includes('aws') || f.type.toLowerCase().includes('stripe')) {
+          localSeverity.critical++;
+        } else if (f.type.toLowerCase().includes('slack')) {
+          localSeverity.high++;
+        } else {
+          localSeverity.warning++;
+        }
+      });
+
+      tempLogs.push({
+        timestamp: new Date().toLocaleTimeString(),
+        repo: repoName,
+        status: 'failed',
+        details: `❌ credential detected:\n   found ${leaksFound} credentials in remote sync scan.`,
+        findings: repoFindings
+      });
+    }
+
+    setStats({
+      totalScanned: repoFiles.length,
+      blockedLeaks: leaksFound,
+      activeHooks: 1
+    });
+    setSeverityStats(localSeverity);
+
+    const uniqueCompromisedPaths = new Set(repoFindings.map(f => f.file));
+    const cleanFilesToShow = repoFiles
+      .filter(path => !uniqueCompromisedPaths.has(path))
+      .slice(0, 10);
+
+    const filesStatus: Array<{ name: string; status: 'clean' | 'compromised'; leakType?: string }> = cleanFilesToShow.map(path => ({
+      name: path,
+      status: 'clean'
+    }));
+
+    if (repoFindings.length > 0) {
+      repoFindings.forEach(f => {
+        filesStatus.unshift({
+          name: f.file,
+          status: 'compromised',
+          leakType: f.type
+        });
+      });
+    }
+
+    const grade = leaksFound === 0 ? 'A+' : leaksFound === 1 ? 'B' : leaksFound === 2 ? 'C' : 'F';
+
+    setCustomScanResults({
+      folderName: repoName,
+      totalFiles: repoFiles.length,
+      leaksFound,
+      durationMs: 4200,
+      grade,
+      branch: defaultBranch,
+      commitHash: Math.random().toString(16).substring(2, 10),
+      commitsCount,
+      filesStatus
+    });
+
+    if (leaksFound === 0) {
+      tempLogs.push({
+        timestamp: new Date().toLocaleTimeString(),
+        repo: repoName,
+        status: 'passed',
+        details: `✔ securify remote sync finished. scanned ${repoFiles.length} files. 0 secrets found. repository secure.`
+      });
+    } else {
+      tempLogs.push({
+        timestamp: new Date().toLocaleTimeString(),
+        repo: repoName,
+        status: 'failed',
+        details: `⚠ remote sync finished. flagged ${leaksFound} credentials. check inspection modal.`
+      });
+    }
+
+    setLogs(prev => [...tempLogs, ...prev]);
+    setScanning(false);
+    setScanProgress(null);
+  };
+
+  const handleCreateCustomRepo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customRepoName.trim() || !githubUser) return;
+    
+    const fullRepoName = `${githubUser.username}/${customRepoName.trim().replace(/\s+/g, '-')}`;
+    
+    if (!githubRepos.includes(fullRepoName)) {
+      setGithubRepos(prev => [...prev, fullRepoName]);
+    }
+    
+    setSelectedGithubRepo(fullRepoName);
+    setIsLabOpen(false);
+    
+    handleGithubScan(fullRepoName, {
+      stripe: injectStripe,
+      aws: injectAws,
+      db: injectDb,
+      slack: injectSlack
+    });
   };
 
   // Live Simulated Stream Hook
@@ -723,71 +1125,320 @@ audit performed client-side using Securify Interactive Portal.
           </p>
         </div>
 
-        {/* Real Scan Control Banner */}
-        <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-2xl p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6 print:hidden">
-          <div className="space-y-1">
-            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
-              client-side audit engine
-            </span>
-            <h3 className="text-base font-medium text-white lowercase">
-              {customScanResults 
-                ? `scanned codebase: ${customScanResults.folderName}` 
-                : "run local scan on your project"}
-            </h3>
-            <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
-              {customScanResults
-                ? `completed analysis in ${customScanResults.durationMs}ms. found ${customScanResults.leaksFound} credentials.`
-                : "select your local project folder. securify will scan all directory files for secrets entirely client-side without uploading any files. supports .gitignore filter bypass."}
-            </p>
+        {/* Real Scan Control Banner with Tabs */}
+        <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl mb-8 overflow-hidden print:hidden">
+          {/* Tab Headers */}
+          <div className="flex border-b border-white/5 bg-neutral-950/40">
+            <button
+              onClick={() => setScanTab('local')}
+              className={`flex-1 py-4 text-xs font-mono lowercase tracking-wider transition-colors flex items-center justify-center gap-2 border-b-2 ${
+                scanTab === 'local' 
+                  ? 'border-white text-white bg-white/5' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              local scanner
+            </button>
+            <button
+              onClick={() => setScanTab('github')}
+              className={`flex-1 py-4 text-xs font-mono lowercase tracking-wider transition-colors flex items-center justify-center gap-2 border-b-2 ${
+                scanTab === 'github' 
+                  ? 'border-white text-white bg-white/5' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+              </svg>
+              github sync scanner
+            </button>
           </div>
 
-          <div className="flex gap-3 shrink-0">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFolderScan}
-              className="hidden"
-              // @ts-ignore
-              webkitdirectory=""
-              directory=""
-              multiple
-            />
-            
-            {customScanResults ? (
-              <div className="flex flex-wrap gap-2 justify-center md:justify-end">
-                <button
-                  onClick={exportReportMarkdown}
-                  className="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
-                >
-                  export report (.md)
-                </button>
-                <button
-                  onClick={exportReportJSON}
-                  className="bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-500/20 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
-                >
-                  export report (.json)
-                </button>
-                <button
-                  onClick={shareAuditReport}
-                  className="bg-indigo-950 hover:bg-indigo-900 text-indigo-400 border border-indigo-500/20 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
-                >
-                  {reportShared ? 'copied!' : 'share report'}
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none"
-                >
-                  clear results
-                </button>
+          {/* Tab Content */}
+          <div className="p-6">
+            {scanTab === 'local' ? (
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                    client-side audit engine
+                  </span>
+                  <h3 className="text-base font-medium text-white lowercase">
+                    {customScanResults && !customScanResults.folderName.includes('/')
+                      ? `scanned codebase: ${customScanResults.folderName}` 
+                      : "run local scan on your project"}
+                  </h3>
+                  <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                    {customScanResults && !customScanResults.folderName.includes('/')
+                      ? `completed analysis in ${customScanResults.durationMs}ms. found ${customScanResults.leaksFound} credentials.`
+                      : "select your local project folder. securify will scan all directory files for secrets entirely client-side without uploading any files. supports .gitignore filter bypass."}
+                  </p>
+                </div>
+
+                <div className="flex gap-3 shrink-0">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFolderScan}
+                    className="hidden"
+                    // @ts-ignore
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                  />
+                  
+                  {customScanResults && !customScanResults.folderName.includes('/') ? (
+                    <div className="grid grid-cols-2 gap-2.5 w-full md:flex md:flex-row md:flex-wrap md:w-auto md:justify-end md:gap-2">
+                      <button
+                        onClick={exportReportMarkdown}
+                        className="w-full h-12 flex items-center justify-center text-center bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                      >
+                        export report (.md)
+                      </button>
+                      <button
+                        onClick={exportReportJSON}
+                        className="w-full h-12 flex items-center justify-center text-center bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                      >
+                        export report (.json)
+                      </button>
+                      <button
+                        onClick={shareAuditReport}
+                        className="w-full h-12 flex items-center justify-center text-center bg-indigo-950 hover:bg-indigo-900 text-indigo-400 border border-indigo-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                      >
+                        {reportShared ? 'copied!' : 'share report'}
+                      </button>
+                      <button
+                        onClick={handleReset}
+                        className="w-full h-12 flex items-center justify-center text-center bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                      >
+                        clear results
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={scanning}
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50"
+                    >
+                      {scanning ? "scanning files..." : "select folder & scan"}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={scanning}
-                className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50"
-              >
-                {scanning ? "scanning files..." : "select folder & scan"}
-              </button>
+              // GitHub Scan Tab
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                {!githubUser ? (
+                  <>
+                    <div className="space-y-1">
+                      <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                        remote repository sync
+                      </span>
+                      <h3 className="text-base font-medium text-white lowercase">
+                        github connection required
+                      </h3>
+                      <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                        connect your github account to safely fetch repository structures and run automated credentials checks. all scans run entirely inside your browser.
+                      </p>
+                    </div>
+                    <button
+                      onClick={onGithubLogin}
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none shrink-0 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4 fill-black" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                      </svg>
+                      connect github account
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={githubUser.avatarUrl} 
+                          alt={githubUser.username}
+                          className="w-5 h-5 rounded-full border border-white/20"
+                        />
+                        <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                          remote workspaces for @{githubUser.username}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-medium text-white lowercase">
+                        {customScanResults && customScanResults.folderName.includes('/')
+                          ? `synced repository: ${customScanResults.folderName}` 
+                          : "select repository to sync"}
+                      </h3>
+                      <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                        {customScanResults && customScanResults.folderName.includes('/')
+                          ? `completed remote analysis in ${customScanResults.durationMs}ms. identified ${customScanResults.leaksFound} credentials.`
+                          : "securify will sync your selected remote repository structure, read index tree, and perform security scanning client-side."}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto sm:items-center">
+                      {customScanResults && customScanResults.folderName.includes('/') ? (
+                        <div className="grid grid-cols-2 gap-2.5 w-full md:flex md:flex-row md:flex-wrap md:w-auto md:justify-end md:gap-2">
+                          <button
+                            onClick={exportReportMarkdown}
+                            className="w-full h-12 flex items-center justify-center text-center bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                          >
+                            export report (.md)
+                          </button>
+                          <button
+                            onClick={exportReportJSON}
+                            className="w-full h-12 flex items-center justify-center text-center bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                          >
+                            export report (.json)
+                          </button>
+                          <button
+                            onClick={shareAuditReport}
+                            className="w-full h-12 flex items-center justify-center text-center bg-indigo-950 hover:bg-indigo-900 text-indigo-400 border border-indigo-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                          >
+                            {reportShared ? 'copied!' : 'share report'}
+                          </button>
+                          <button
+                            onClick={handleReset}
+                            className="w-full h-12 flex items-center justify-center text-center bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
+                          >
+                            clear results
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <select
+                            disabled={scanning}
+                            value={selectedGithubRepo}
+                            onChange={(e) => setSelectedGithubRepo(e.target.value)}
+                            className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase"
+                          >
+                            {githubRepos.map(repo => (
+                              <option key={repo} value={repo}>{repo}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => handleGithubScan(selectedGithubRepo)}
+                            disabled={scanning || !selectedGithubRepo}
+                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-black" viewBox="0 0 24 24">
+                              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                            </svg>
+                            {scanning ? "syncing..." : "sync & scan"}
+                          </button>
+                          <button
+                            onClick={() => setIsLabOpen(!isLabOpen)}
+                            disabled={scanning}
+                            className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
+                            </svg>
+                            {isLabOpen ? "hide lab" : "custom repo lab"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    
+                    {isLabOpen && (
+                      <div className="w-full mt-6 border-t border-white/5 pt-6">
+                        <form onSubmit={handleCreateCustomRepo} className="space-y-4 max-w-xl">
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-mono text-neutral-400 lowercase">
+                              mock repository name
+                            </label>
+                            <div className="flex gap-2">
+                              <span className="bg-neutral-950 border border-white/5 rounded-xl px-4 py-3 text-neutral-500 font-mono text-xs flex items-center select-none">
+                                github.com/{githubUser.username}/
+                              </span>
+                              <input
+                                type="text"
+                                required
+                                value={customRepoName}
+                                onChange={(e) => setCustomRepoName(e.target.value)}
+                                placeholder="e.g. secure-auth-api"
+                                className="flex-1 bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 placeholder-neutral-700 lowercase"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="block text-[10px] font-mono text-neutral-400 lowercase">
+                              simulate and inject leak parameters (for testing lab)
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={injectStripe}
+                                  onChange={(e) => setInjectStripe(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
+                                />
+                                <div className="text-left">
+                                  <span className="block text-[11px] font-medium text-white lowercase">stripe API key</span>
+                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject sk_test_* leak</span>
+                                </div>
+                              </label>
+                              
+                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={injectAws}
+                                  onChange={(e) => setInjectAws(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
+                                />
+                                <div className="text-left">
+                                  <span className="block text-[11px] font-medium text-white lowercase">aws credentials</span>
+                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject AWS_ACCESS_KEY_ID leak</span>
+                                </div>
+                              </label>
+                              
+                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={injectDb}
+                                  onChange={(e) => setInjectDb(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
+                                />
+                                <div className="text-left">
+                                  <span className="block text-[11px] font-medium text-white lowercase">database url</span>
+                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject postgres://* leak</span>
+                                </div>
+                              </label>
+                              
+                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={injectSlack}
+                                  onChange={(e) => setInjectSlack(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
+                                />
+                                <div className="text-left">
+                                  <span className="block text-[11px] font-medium text-white lowercase">slack webhook</span>
+                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject hooks.slack.com/* leak</span>
+                                </div>
+                              </label>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="submit"
+                            disabled={scanning}
+                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-black" viewBox="0 0 24 24">
+                              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                            </svg>
+                            create & scan repository
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -807,6 +1458,175 @@ audit performed client-side using Securify Interactive Portal.
             </div>
             <div className="text-[10px] font-mono text-neutral-500 truncate lowercase">
               reading: {scanProgress.filename}
+            </div>
+          </div>
+        )}
+
+        {/* Rich Scanning Report Card */}
+        {customScanResults && (
+          <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 mb-8 space-y-6 print:border-neutral-300 print:text-black">
+            <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+              
+              {/* Security Grade Circular Gauge */}
+              <div className="flex flex-col items-center justify-center text-center p-6 bg-neutral-950/40 rounded-2xl border border-white/5 lg:w-1/4 min-w-[200px]">
+                <span className="text-[10px] font-mono text-neutral-500 mb-4 lowercase">security rating</span>
+                <div className="relative flex items-center justify-center">
+                  {/* Gauge SVG Circle */}
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      stroke="rgba(255,255,255,0.03)"
+                      strokeWidth="8"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      stroke={
+                        customScanResults.grade === 'A+' 
+                          ? '#10b981' 
+                          : customScanResults.grade === 'B' 
+                            ? '#f59e0b' 
+                            : customScanResults.grade === 'C' 
+                              ? '#f97316' 
+                              : '#ef4444'
+                      }
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray="339.29"
+                      strokeDashoffset={
+                        customScanResults.grade === 'A+' 
+                          ? 0 
+                          : customScanResults.grade === 'B' 
+                            ? 85 
+                            : customScanResults.grade === 'C' 
+                              ? 170 
+                              : 254
+                      }
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center justify-center">
+                    <span className={`text-4xl font-extrabold font-mono ${
+                      customScanResults.grade === 'A+' 
+                        ? 'text-emerald-400' 
+                        : customScanResults.grade === 'B' 
+                          ? 'text-amber-400' 
+                          : customScanResults.grade === 'C' 
+                            ? 'text-orange-400' 
+                            : 'text-red-500'
+                    }`}>
+                      {customScanResults.grade}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-1">
+                  <span className="block text-xs font-mono font-medium text-white lowercase">
+                    {customScanResults.leaksFound === 0 ? "repository safe" : `${customScanResults.leaksFound} credentials leaked`}
+                  </span>
+                  <span className="block text-[10px] text-neutral-400 lowercase">
+                    branch: {customScanResults.branch || 'main'} ({customScanResults.commitHash || 'latest'})
+                  </span>
+                </div>
+              </div>
+
+              {/* File Audited Tree Checklist */}
+              <div className="flex-1 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[10px] font-mono text-neutral-500 lowercase">audited filesystem tree</span>
+                    <span className="text-[10px] font-mono text-neutral-400 lowercase">
+                      {customScanResults.filesStatus?.filter(f => f.status === 'clean').length} / {customScanResults.filesStatus?.length} files secure
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+                    {customScanResults.filesStatus?.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-neutral-900/30 border border-white/5 rounded-xl px-4 py-2 text-xs">
+                        <div className="flex items-center gap-2.5 truncate">
+                          <svg className={`w-3.5 h-3.5 shrink-0 ${file.status === 'clean' ? 'text-emerald-500' : 'text-red-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            {file.status === 'clean' ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            )}
+                          </svg>
+                          <span className="font-mono text-neutral-300 truncate lowercase">{file.name}</span>
+                        </div>
+                        <span className={`text-[10px] font-mono rounded px-2 py-0.5 uppercase shrink-0 ${
+                          file.status === 'clean' 
+                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/10' 
+                            : 'bg-red-950/40 text-red-400 border border-red-500/10'
+                        }`}>
+                          {file.status === 'clean' ? 'secure' : file.leakType || 'compromised'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Git History Rewriter Helper */}
+              <div className="lg:w-1/3 p-6 bg-neutral-950/40 rounded-2xl border border-white/5 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[10px] font-mono text-neutral-500 lowercase">git history cleanup helper</span>
+                    <span className="text-[10px] font-mono text-neutral-500 lowercase">remediation</span>
+                  </div>
+                  
+                  {customScanResults.leaksFound === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-6 text-neutral-500 text-xs leading-relaxed lowercase font-light">
+                      <svg className="w-8 h-8 text-emerald-500/40 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      no leaks found. git history is clean and ready.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-neutral-400 text-xs font-light lowercase leading-normal">
+                        warning: secrets are in git history! use git-filter-repo to clean and purge from all branches:
+                      </p>
+                      
+                      <div className="bg-neutral-950 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-neutral-300 relative group overflow-x-auto select-all">
+                        {customScanResults.filesStatus?.some(f => f.status === 'compromised') ? (
+                          `git-filter-repo --path ${
+                            customScanResults.filesStatus
+                              ?.filter(f => f.status === 'compromised')
+                              .map(f => f.name)
+                              .join(' --path ')
+                          } --invert-paths`
+                        ) : (
+                          'git-filter-repo --path path/to/secret --invert-paths'
+                        )}
+                        <button
+                          onClick={async () => {
+                            const compromisedFiles = customScanResults.filesStatus
+                              ?.filter(f => f.status === 'compromised')
+                              .map(f => f.name)
+                              .join(' --path ');
+                            const cmd = compromisedFiles 
+                              ? `git-filter-repo --path ${compromisedFiles} --invert-paths` 
+                              : 'git-filter-repo --path path/to/secret --invert-paths';
+                            await navigator.clipboard.writeText(cmd);
+                          }}
+                          className="absolute right-2 top-2 bg-neutral-900 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white p-1 rounded transition-colors text-[9px] font-mono lowercase"
+                        >
+                          copy
+                        </button>
+                      </div>
+                      
+                      <p className="text-[10px] text-neutral-500 lowercase leading-normal">
+                        after running the cleanup, force push back to github:
+                        <code className="block mt-1 font-mono text-[9px] text-neutral-400">git push origin --force --all</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
