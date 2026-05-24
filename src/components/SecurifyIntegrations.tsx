@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface PipelineStep {
   step: string;
@@ -15,6 +15,86 @@ interface FaqItem {
 
 export const SecurifyIntegrations = () => {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  
+  const [activePlatform, setActivePlatform] = useState<'slack' | 'discord' | 'teams'>('slack');
+  const [webhookUrl, setWebhookUrl] = useState<string>('https://hooks.slack.com/services/T00000000/B00000000/DUMMYSHORTKEY');
+  const [channelName, setChannelName] = useState<string>('#security-alerts');
+  const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+
+  useEffect(() => {
+    if (activePlatform === 'slack') {
+      setWebhookUrl('https://hooks.slack.com/services/T00000000/B00000000/DUMMYSHORTKEY');
+      setChannelName('#security-alerts');
+    } else if (activePlatform === 'discord') {
+      setWebhookUrl('https://discord.com/api/webhooks/000000000000000000/DUMMYWEBHOOKKEY');
+      setChannelName('#general');
+    } else if (activePlatform === 'teams') {
+      setWebhookUrl('https://xyzcompany.webhook.office.com/webhookb2/00000000-0000-0000-0000-000000000000@00000000-0000-0000-0000-000000000000');
+      setChannelName('security channel');
+    }
+  }, [activePlatform]);
+
+  const getPayload = () => {
+    if (activePlatform === 'slack') {
+      return {
+        channel: channelName,
+        text: "⚠️ [securify] credential leak identified in commit!",
+        attachments: [
+          {
+            color: "#ef4444",
+            fields: [
+              { title: "repository", value: "github.com/org/billing-api", short: true },
+              { title: "file path", value: "src/config/db.js", short: true },
+              { title: "severity", value: "critical", short: true },
+              { title: "leaked type", value: "AWS Access Key ID", short: true }
+            ]
+          }
+        ]
+      };
+    } else if (activePlatform === 'discord') {
+      return {
+        username: "securify-monitor",
+        content: `⚠️ **credential leak detected** in ${channelName}!`,
+        embeds: [
+          {
+            title: "critical vulnerability flagged",
+            color: 15728640,
+            fields: [
+              { name: "repository", value: "github.com/org/billing-api", inline: true },
+              { name: "file", value: "src/config/db.js", inline: true },
+              { name: "rule triggered", value: "AWS Access Key ID", inline: false }
+            ]
+          }
+        ]
+      };
+    } else {
+      return {
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "themeColor": "EF4444",
+        "summary": "securify security incident",
+        "sections": [
+          {
+            "activityTitle": "securify leak scan failure",
+            "activitySubtitle": `critical credentials exposed in ${channelName}`,
+            "facts": [
+              { "name": "repository", "value": "github.com/org/billing-api" },
+              { "name": "file", "value": "src/config/db.js" },
+              { "name": "finding", "value": "AWS Access Key ID" }
+            ]
+          }
+        ]
+      };
+    }
+  };
+
+  const handleTestWebhook = () => {
+    setTestStatus('sending');
+    setTimeout(() => {
+      setTestStatus('success');
+      setTimeout(() => setTestStatus('idle'), 3000);
+    }, 1200);
+  };
 
   const steps: PipelineStep[] = [
     {
@@ -402,6 +482,104 @@ export const SecurifyIntegrations = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Webhook Notification Configurator */}
+        <div className="max-w-4xl mx-auto border-t border-white/5 pt-20 mt-20 select-text">
+          <div className="text-center mb-12">
+            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[10px] font-mono text-neutral-400 lowercase mb-3 tracking-wider">
+              real-time notifications
+            </span>
+            <h3 className="hero-title text-3xl md:text-4xl font-medium tracking-tight text-white lowercase">
+              webhook notification dispatcher.
+            </h3>
+            <p className="text-neutral-400 text-xs md:text-sm font-light lowercase leading-relaxed max-w-xl mx-auto mt-2">
+              configure outgoing integration webhooks to dispatch instant warnings to developer communication channels.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+            {/* Form Input fields (md:col-span-6) */}
+            <div className="md:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+              <div className="space-y-5">
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  dispatch endpoints parameters
+                </span>
+
+                {/* Platform select tabs */}
+                <div className="flex gap-2 border-b border-white/5 pb-4 select-none">
+                  {['slack', 'discord', 'teams'].map((plat) => (
+                    <button
+                      key={plat}
+                      onClick={() => setActivePlatform(plat as any)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-mono border transition-all lowercase ${
+                        activePlatform === plat
+                          ? 'bg-white text-black border-white'
+                          : 'bg-black text-neutral-500 border-white/5 hover:text-white'
+                      }`}
+                    >
+                      {plat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Webhook URL Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">webhook receiver url:</label>
+                  <input
+                    type="text"
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono"
+                  />
+                </div>
+
+                {/* Channel/Room Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-neutral-400 block lowercase font-mono">target channel / display identifier:</label>
+                  <input
+                    type="text"
+                    value={channelName}
+                    onChange={(e) => setChannelName(e.target.value)}
+                    className="w-full bg-black border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-3">
+                <button
+                  onClick={handleTestWebhook}
+                  disabled={testStatus === 'sending'}
+                  className="w-full bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none disabled:opacity-50"
+                >
+                  {testStatus === 'sending' ? 'dispatching request...' : 'test notification'}
+                </button>
+
+                {testStatus === 'success' && (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 rounded-xl text-center font-mono text-[10px] lowercase animate-page-entrance">
+                    ✔ test payload dispatched successfully! status code 200 ok.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* JSON Output Preview (md:col-span-6) */}
+            <div className="md:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-mono text-neutral-500 block mb-4 select-none lowercase border-b border-white/5 pb-2">
+                  live outgoing json payload
+                </span>
+                
+                <div className="bg-black/60 border border-white/5 rounded-xl p-4 font-mono text-[10px] text-neutral-400 overflow-auto max-h-[220px]">
+                  <pre className="whitespace-pre-wrap">{JSON.stringify(getPayload(), null, 2)}</pre>
+                </div>
+              </div>
+
+              <p className="text-[9px] font-mono text-neutral-500 lowercase mt-6 leading-relaxed">
+                securify server integrations leverage webhook payloads containing structured repo, file, and rule definitions. dispatch simulation is run purely inside local sandboxes.
+              </p>
+            </div>
           </div>
         </div>
 
