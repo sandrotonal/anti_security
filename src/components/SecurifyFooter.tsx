@@ -12,7 +12,7 @@ export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
           <div className="flex items-center gap-2 text-white">
             <svg
               viewBox="0 0 256 256"
-              className="h-4.5 w-4.5"
+              className="h-5 w-5"
               aria-hidden="true"
             >
               <path
