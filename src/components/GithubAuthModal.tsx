@@ -3,11 +3,14 @@ import { useState, useEffect } from 'react';
 interface GithubAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (user: { username: string; avatarUrl: string }) => void;
+  onSuccess: (user: { username: string; avatarUrl: string; token?: string }) => void;
 }
 
 export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalProps) => {
   const [username, setUsername] = useState<string>('sandrotonal');
+  const [token, setToken] = useState<string>(() => {
+    return localStorage.getItem('securify_github_pat') || '';
+  });
   const [step, setStep] = useState<'input' | 'authorizing' | 'success'>('input');
   const [progressMsg, setProgressMsg] = useState<string>('');
   
@@ -15,6 +18,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     if (isOpen) {
       setStep('input');
       setProgressMsg('');
+      setToken(localStorage.getItem('securify_github_pat') || '');
     }
   }, [isOpen]);
 
@@ -40,7 +44,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     const steps = [
       'establishing secure oauth handshake...',
       'requesting read:user and public_repo scopes...',
-      'verifying github authentication token...',
+      token.trim() ? 'verifying personal access token scopes...' : 'verifying github authentication token...',
       'generating secure access keys...',
       'synchronizing user profile details...'
     ];
@@ -53,10 +57,18 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     setStep('success');
     await new Promise((resolve) => setTimeout(resolve, 1000));
     
+    const trimmedToken = token.trim();
+    if (trimmedToken) {
+      localStorage.setItem('securify_github_pat', trimmedToken);
+    } else {
+      localStorage.removeItem('securify_github_pat');
+    }
+
     // Pass real GitHub avatar URL dynamically based on username
     onSuccess({
       username: username.trim(),
-      avatarUrl: `https://avatars.githubusercontent.com/${username.trim()}`
+      avatarUrl: `https://avatars.githubusercontent.com/${username.trim()}`,
+      token: trimmedToken || undefined
     });
     onClose();
   };
@@ -145,6 +157,24 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-neutral-500 lowercase block pl-1">
+                  personal access token (optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    className="w-full bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+                <span className="text-[9px] text-neutral-500 block pl-1 lowercase leading-relaxed font-light">
+                  provides 5,000 req/hr rate limits and private repository scanning access.
+                </span>
+              </div>
+
               {/* Permissions scope checkboxes */}
               <div className="bg-neutral-900/40 border border-white/5 rounded-2xl p-4 space-y-3">
                 <span className="text-[9px] font-mono text-neutral-500 block uppercase">requested permissions</span>
@@ -154,8 +184,14 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                     ✓
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[11px] font-medium text-neutral-200 block lowercase">public_repo</span>
-                    <span className="text-[9px] text-neutral-500 block lowercase leading-relaxed">read access to public repository structures and filenames</span>
+                    <span className="text-[11px] font-medium text-neutral-200 block lowercase">
+                      {token.trim() ? 'repo (private & public)' : 'public_repo'}
+                    </span>
+                    <span className="text-[9px] text-neutral-500 block lowercase leading-relaxed">
+                      {token.trim() 
+                        ? 'read access to all public and private repository files and metadata' 
+                        : 'read access to public repository structures and filenames'}
+                    </span>
                   </div>
                 </div>
 

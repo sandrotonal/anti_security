@@ -23,9 +23,22 @@ export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
             </svg>
             <span className="text-sm font-normal tracking-tight font-sans">securify</span>
           </div>
-          <p className="lowercase pl-1 text-[9px] text-neutral-600">
-            © {new Date().getFullYear()} securify-cli open-source project. all rights reserved.
-          </p>
+          <div className="space-y-1">
+            <p className="lowercase pl-1 text-[9px] text-neutral-600">
+              © {new Date().getFullYear()} securify-cli open-source project. all rights reserved.
+            </p>
+            <p className="lowercase pl-1 text-[9px] text-neutral-600">
+              crafted by{' '}
+              <a
+                href="https://gucluyumhe.dev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-neutral-500 hover:text-white transition-colors underline decoration-white/10 font-mono"
+              >
+                gucluyumhe
+              </a>
+            </p>
+          </div>
         </div>
 
         {/* Right - Resource Links */}

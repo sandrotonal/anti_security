@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 
-export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact';
+export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact' | 'auditor';
 
 interface NavbarProps {
   activeView: ViewType;
   onViewChange: (view: ViewType) => void;
   onOpenTerminal: () => void;
-  githubUser: { username: string; avatarUrl: string } | null;
+  githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
   onGithubLogout: () => void;
 }
@@ -165,6 +165,15 @@ export const SecurifyNavbar = ({
               sandbox scanner
             </a>
             <a
+              href="#auditor"
+              onClick={(e) => handleLinkClick(e, 'auditor')}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
+                activeView === 'auditor' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+              }`}
+            >
+              dependency auditor
+            </a>
+            <a
               href="#contact"
               onClick={(e) => handleLinkClick(e, 'contact')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -207,6 +216,21 @@ export const SecurifyNavbar = ({
                     <div className="px-3 py-2 border-b border-white/5 mb-1.5 text-left">
                       <span className="text-[10px] text-neutral-500 font-mono block lowercase">connected as</span>
                       <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
+                      {githubUser.token ? (
+                        <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 lowercase mt-0.5">
+                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                          </svg>
+                          pat connected (5k/hr)
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-amber-500 font-mono flex items-center gap-1 lowercase mt-0.5">
+                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          public only (60/hr)
+                        </span>
+                      )}
                     </div>
                     <button
                       onClick={() => {
@@ -316,6 +340,13 @@ export const SecurifyNavbar = ({
               sandbox scanner
             </a>
             <a
+              href="#auditor"
+              onClick={(e) => handleLinkClick(e, 'auditor')}
+              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+            >
+              dependency auditor
+            </a>
+            <a
               href="#contact"
               onClick={(e) => handleLinkClick(e, 'contact')}
               className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
@@ -331,6 +362,9 @@ export const SecurifyNavbar = ({
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] text-neutral-500 font-mono block lowercase">connected as</span>
                   <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
+                  {githubUser.token && (
+                    <span className="text-[8px] text-emerald-400 font-mono block lowercase mt-0.5">✓ pat enabled</span>
+                  )}
                 </div>
                 <button
                   onClick={() => {
