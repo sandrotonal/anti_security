@@ -16,6 +16,7 @@ import { CookieBanner } from './components/CookieBanner';
 import { FooterModal } from './components/FooterModal';
 import { SecurifyShortcuts } from './components/SecurifyShortcuts';
 import { GithubAuthModal } from './components/GithubAuthModal';
+import { SecurifyAuditor } from './components/SecurifyAuditor';
 
 function App() {
   const [activeView, setActiveView] = useState<ViewType>(() => {
@@ -28,7 +29,7 @@ function App() {
 
   // GitHub integration states
   const [isGithubModalOpen, setIsGithubModalOpen] = useState<boolean>(false);
-  const [githubUser, setGithubUser] = useState<{ username: string; avatarUrl: string } | null>(() => {
+  const [githubUser, setGithubUser] = useState<{ username: string; avatarUrl: string; token?: string } | null>(() => {
     try {
       const stored = localStorage.getItem('securify_github_user');
       return stored ? JSON.parse(stored) : null;
@@ -39,6 +40,7 @@ function App() {
 
   const handleGithubLogout = () => {
     localStorage.removeItem('securify_github_user');
+    localStorage.removeItem('securify_github_pat');
     setGithubUser(null);
   };
 
@@ -103,6 +105,9 @@ function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (key === '6') {
         setActiveView('contact');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (key === '7') {
+        setActiveView('auditor');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
@@ -281,6 +286,7 @@ function App() {
             <SecurifyDashboard 
               githubUser={githubUser}
               onGithubLogin={() => setIsGithubModalOpen(true)}
+              onViewChange={setActiveView}
             />
           </div>
         )}
@@ -300,6 +306,12 @@ function App() {
         {activeView === 'contact' && (
           <div className="animate-page-entrance">
             <SecurifyContact />
+          </div>
+        )}
+
+        {activeView === 'auditor' && (
+          <div className="animate-page-entrance">
+            <SecurifyAuditor />
           </div>
         )}
       </main>

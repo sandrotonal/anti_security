@@ -45,6 +45,72 @@ const globToRegex = (glob: string): RegExp => {
   return new RegExp(`(^|\\/)${regexStr}(\\/|$)`, 'i');
 };
 
+const parseDependenciesJson = (text: string) => {
+  try {
+    const data = JSON.parse(text);
+    const deps: { name: string; version: string }[] = [];
+    const cleanVersion = (v: string) => v.replace(/^[\^~>=<]+/g, '').trim();
+    if (data.dependencies) {
+      Object.entries(data.dependencies).forEach(([name, ver]) => {
+        deps.push({ name, version: cleanVersion(ver as string) });
+      });
+    }
+    if (data.devDependencies) {
+      Object.entries(data.devDependencies).forEach(([name, ver]) => {
+        deps.push({ name, version: cleanVersion(ver as string) });
+      });
+    }
+    return deps;
+  } catch {
+    return [];
+  }
+};
+
+const parseDependenciesRequirements = (text: string) => {
+  const lines = text.split('\n');
+  const deps: { name: string; version: string }[] = [];
+  const regex = /^([a-zA-Z0-9_\-\[\]]+)\s*(?:==|>=|<=|>|<|~=)\s*([0-9a-zA-Z\.\-\+]+)/;
+  lines.forEach(line => {
+    const cleanLine = line.trim();
+    if (!cleanLine || cleanLine.startsWith('#')) return;
+    const match = cleanLine.match(regex);
+    if (match) {
+      deps.push({ name: match[1], version: match[2] });
+    }
+  });
+  return deps;
+};
+
+const parseDependenciesCargo = (text: string) => {
+  const lines = text.split('\n');
+  const deps: { name: string; version: string }[] = [];
+  let inDepsSection = false;
+  const simpleRegex = /^\s*([a-zA-Z0-9_\-]+)\s*=\s*"([^"]+)"/;
+  const complexRegex = /^\s*([a-zA-Z0-9_\-]+)\s*=\s*\{\s*version\s*=\s*"([^"]+)"/;
+
+  lines.forEach(line => {
+    const cleanLine = line.trim();
+    if (cleanLine.startsWith('[') && cleanLine.endsWith(']')) {
+      const section = cleanLine.toLowerCase();
+      inDepsSection = section.includes('dependencies') || section.includes('dev-dependencies');
+      return;
+    }
+    if (inDepsSection) {
+      if (!cleanLine || cleanLine.startsWith('#')) return;
+      let match = cleanLine.match(simpleRegex);
+      if (match) {
+        deps.push({ name: match[1], version: match[2] });
+        return;
+      }
+      match = cleanLine.match(complexRegex);
+      if (match) {
+        deps.push({ name: match[1], version: match[2] });
+      }
+    }
+  });
+  return deps;
+};
+
 const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
   const [imgSrc, setImgSrc] = useState<string>(avatarUrl);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -81,11 +147,12 @@ const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { u
 };
 
 interface SecurifyDashboardProps {
-  githubUser: { username: string; avatarUrl: string } | null;
+  githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
+  onViewChange?: (view: any) => void;
 }
 
-export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboardProps) => {
+export const SecurifyDashboard = ({ githubUser, onGithubLogin, onViewChange }: SecurifyDashboardProps) => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
   const [stats, setStats] = useState({
@@ -117,10 +184,19 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       setGithubRepos(defaultRepos);
       setSelectedGithubRepo(`${githubUser.username}/anti_security`);
 
-      // Fetch real public repositories from GitHub
+      // Fetch real public and private repositories from GitHub
       const fetchRealRepos = async () => {
         try {
-          const res = await fetch(`https://api.github.com/users/${githubUser.username}/repos?per_page=100&sort=updated`);
+          const url = githubUser.token 
+            ? 'https://api.github.com/user/repos?per_page=100&sort=updated'
+            : `https://api.github.com/users/${githubUser.username}/repos?per_page=100&sort=updated`;
+          
+          const headers: HeadersInit = {};
+          if (githubUser.token) {
+            headers['Authorization'] = `token ${githubUser.token}`;
+          }
+
+          const res = await fetch(url, { headers });
           if (!res.ok) throw new Error('Failed to fetch repositories');
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0 && active) {
@@ -168,6 +244,8 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       status: 'clean' | 'compromised';
       leakType?: string;
     }>;
+    speedMBs?: number;
+    totalBytes?: number;
   } | null>(null);
 
   interface ScanHistoryEntry {
@@ -477,6 +555,14 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     setLogs([]);
     setCustomScanResults(null);
 
+    const getGithubHeaders = (): HeadersInit => {
+      const headers: HeadersInit = {};
+      if (githubUser?.token) {
+        headers['Authorization'] = `token ${githubUser.token}`;
+      }
+      return headers;
+    };
+
     const addLog = (msg: string, status: 'passed' | 'failed' = 'passed', details?: string) => {
       setLogs(prev => [
         {
@@ -494,20 +580,47 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     let commitsCount = 104;
     let repoFindings: Finding[] = [];
 
+    const fetchFileContent = async (path: string): Promise<string> => {
+      if (githubUser?.token) {
+        try {
+          const apiRes = await fetch(`https://api.github.com/repos/${repoName}/contents/${path}?ref=${defaultBranch}`, {
+            headers: getGithubHeaders()
+          });
+          if (apiRes.ok) {
+            const json = await apiRes.json();
+            if (json.content && json.encoding === 'base64') {
+              const cleanB64 = json.content.replace(/\s/g, '');
+              return decodeURIComponent(escape(atob(cleanB64)));
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch file content via API for ${path}:`, e);
+        }
+      }
+      
+      const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${path}`);
+      if (rawRes.ok) {
+        return await rawRes.text();
+      }
+      throw new Error(`Failed to load file content`);
+    };
+
     try {
       // Step 1: Connect and fetch repository details
       setScanProgress({ current: 1, total: 10, filename: `connecting to github api...` });
       addLog(`connecting to github api for ${repoName}...`);
       await new Promise(r => setTimeout(r, 600));
 
-      const repoRes = await fetch(`https://api.github.com/repos/${repoName}`);
+      const repoRes = await fetch(`https://api.github.com/repos/${repoName}`, {
+        headers: getGithubHeaders()
+      });
       if (!repoRes.ok) throw new Error('Repository is private or rate-limited');
       
       const repoData = await repoRes.json();
       defaultBranch = repoData.default_branch || 'main';
       
-      setScanProgress({ current: 2, total: 10, filename: `verifying public_repo scopes...` });
-      addLog(`verifying public_repo scopes and permissions...`);
+      setScanProgress({ current: 2, total: 10, filename: `verifying repo scopes...` });
+      addLog(githubUser?.token ? `verifying authenticated repo scopes...` : `verifying public_repo scopes and permissions...`);
       await new Promise(r => setTimeout(r, 500));
 
       // Step 2: Klonlama simülasyonu
@@ -516,7 +629,9 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       await new Promise(r => setTimeout(r, 700));
 
       // Fetch commits count from API
-      const commitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=1`);
+      const commitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=1`, {
+        headers: getGithubHeaders()
+      });
       if (commitsRes.ok) {
         const linkHeader = commitsRes.headers.get('Link');
         if (linkHeader) {
@@ -526,7 +641,9 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       }
 
       // Wave 7: Fetch recent 10 commits for Git Sentinel Timeline
-      const recentCommitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=10`);
+      const recentCommitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=10`, {
+        headers: getGithubHeaders()
+      });
       let commitsData: GithubCommitInfo[] = [];
       if (recentCommitsRes.ok) {
         const cData = await recentCommitsRes.json();
@@ -584,7 +701,9 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       setScanProgress({ current: 5, total: 10, filename: `fetching filesystem tree...` });
       addLog(`analyzing repository filesystem tree...`);
       
-      const treeRes = await fetch(`https://api.github.com/repos/${repoName}/git/trees/${defaultBranch}?recursive=1`);
+      const treeRes = await fetch(`https://api.github.com/repos/${repoName}/git/trees/${defaultBranch}?recursive=1`, {
+        headers: getGithubHeaders()
+      });
       if (!treeRes.ok) throw new Error('Failed to fetch file tree');
       const treeData = await treeRes.json();
       
@@ -612,10 +731,8 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
 
     for (const wfPath of workflowFiles) {
       try {
-        const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${wfPath}`);
-        if (rawRes.ok) {
-          const content = await rawRes.text();
-          
+        const content = await fetchFileContent(wfPath);
+        if (content) {
           // Rule 1: check pull_request_target
           if (content.includes('pull_request_target:')) {
             tempWorkflowFindings.push({
@@ -688,9 +805,8 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     // Actually fetch raw contents and scan them
     for (const filePath of filesToAudit) {
       try {
-        const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${filePath}`);
-        if (rawRes.ok) {
-          const content = await rawRes.text();
+        const content = await fetchFileContent(filePath);
+        if (content) {
           const rules = [
             { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
             { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
@@ -902,7 +1018,9 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     setGithubCommits(prev => prev.map((c, i) => i === idx ? { ...c, loading: true } : c));
 
     try {
-      const res = await fetch(`https://api.github.com/repos/${repoName}/commits/${sha}`);
+      const res = await fetch(`https://api.github.com/repos/${repoName}/commits/${sha}`, {
+        headers: githubUser?.token ? { 'Authorization': `token ${githubUser.token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         const findings: Finding[] = [...(githubCommits[idx].findings || [])];
@@ -1157,9 +1275,10 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     setScanning(true);
     setLogs([]);
     
-    // Clear severity stats for new folder scan
-    const localSeverity = { critical: 0, high: 0, warning: 0 };
+    // Clear previously scanned dependencies
+    localStorage.removeItem('securify_detected_dependencies');
 
+    const localSeverity = { critical: 0, high: 0, warning: 0 };
     const startTime = performance.now();
     const totalFiles = filesList.length;
     let leaksFound = 0;
@@ -1192,140 +1311,188 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
     }
 
     const tempLogs: ScanLog[] = [];
+    const targetFiles: { file: File; index: number }[] = [];
+    let totalBytesScanned = 0;
 
-    // Scan files sequentially
+    // Filter valid files to scan
     for (let i = 0; i < totalFiles; i++) {
       const file = filesList[i];
-      setScanProgress({ current: i + 1, total: totalFiles, filename: file.name });
-
-      // Check if file relative path matches ignore patterns
       const filePath = file.webkitRelativePath || file.name;
       const isIgnored = ignorePatterns.some((pattern) => pattern.test(filePath));
-      if (isIgnored) {
-        continue;
-      }
+      if (isIgnored) continue;
 
-      // Scan target extension list
       const isTextFile = /\.(js|ts|tsx|jsx|json|py|go|rs|env|yml|yaml|md|txt|config|ini|toml|sh|bat)$/i.test(file.name) || file.name.startsWith('.');
-      const isTooBig = file.size > 3 * 1024 * 1024; // 3MB limit to prevent browser hanging
+      if (!isTextFile) continue;
 
-      if (isTooBig || !isTextFile) {
-        continue;
-      }
-
-      try {
-        const text = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (event) => resolve((event.target?.result as string) || '');
-          reader.onerror = () => resolve('');
-          reader.readAsText(file);
-        });
-
-        const lines = text.split('\n');
-        const fileLeaks: string[] = [];
-        const fileFindings: Finding[] = [];
-
-        lines.forEach((lineText, lineIdx) => {
-          rulesList.forEach((rule) => {
-            rule.regex.lastIndex = 0;
-            const match = rule.regex.exec(lineText);
-            if (match) {
-              leaksFound++;
-              fileLeaks.push(`line ${lineIdx + 1}: found ${rule.name}`);
-              
-              // Increment severity count dynamically
-              if (rule.name.toLowerCase().includes('aws') || rule.name.toLowerCase().includes('supabase') || rule.name.toLowerCase().includes('stripe')) {
-                localSeverity.critical++;
-              } else if (rule.name.toLowerCase().includes('github') || rule.name.toLowerCase().includes('google') || rule.name.toLowerCase().includes('slack')) {
-                localSeverity.high++;
-              } else {
-                localSeverity.warning++;
-              }
-
-              // Build context lines: 2 lines before, 2 lines after
-              const contextLines: { lineNum: number; content: string }[] = [];
-              const startIdx = Math.max(0, lineIdx - 2);
-              const endIdx = Math.min(lines.length - 1, lineIdx + 2);
-              for (let c = startIdx; c <= endIdx; c++) {
-                contextLines.push({
-                  lineNum: c + 1,
-                  content: lines[c]
-                });
-              }
-
-              // Determine remediation based on the rule
-              let safeFix = '';
-              let explanation = '';
-              let remediation = '';
-              if (rule.name.includes('AWS Access Key ID')) {
-                safeFix = 'AWS_ACCESS_KEY_ID=env.AWS_ACCESS_KEY_ID # load from environment variables';
-                explanation = 'aws access key id is hardcoded in plain text. anyone with read access to this repository can compromise your aws account resources.';
-                remediation = 'move the key to a safe .env file (add to .gitignore) and reference it via process.env or system environment variables.';
-              } else if (rule.name.includes('AWS Secret Access Key')) {
-                safeFix = 'AWS_SECRET_ACCESS_KEY=env.AWS_SECRET_ACCESS_KEY # load from secrets manager';
-                explanation = 'aws secret access key is exposed. this gives full programmatic access to your cloud infrastructure.';
-                remediation = 'revoke the compromised credentials immediately in the aws console, generate new credentials, and store them securely.';
-              } else if (rule.name.includes('Supabase Service Role JWT')) {
-                safeFix = 'const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // keep on server-side!';
-                explanation = 'supabase service role jwt bypasses all row-level security (rls) policies. exposing this allows anyone to modify or download your entire database.';
-                remediation = 'rotate the service role key immediately in the supabase dashboard. never expose it in client-side code; restrict it to secure serverless functions or backends.';
-              } else if (rule.name.includes('Stripe Secret API Key')) {
-                safeFix = 'const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);';
-                explanation = 'stripe secret api key exposed. malicious actors can use this to execute transactions, refund charges, or access customer data.';
-                remediation = 'go to Stripe Dashboard -> Developers -> API Keys and roll the secret key. transition code to use environment variables.';
-              } else if (rule.name.includes('GitHub Personal Access Token')) {
-                safeFix = 'const github_pat = process.env.GH_PAT_TOKEN;';
-                explanation = 'github personal access token (pat) exposed. this can allow unauthorized access, modification, or deletion of repositories.';
-                remediation = 'immediately delete/revoke this pat in your GitHub settings (developer settings -> personal access tokens) and recreate it with narrow scopes if required.';
-              } else if (rule.name.includes('Google Cloud API Key')) {
-                safeFix = 'const gMapsKey = process.env.GOOGLE_MAPS_API_KEY;';
-                explanation = 'google cloud api key is hardcoded. attackers can hijack this key, leading to quota exhaustion or massive billing changes.';
-                remediation = 'restrict the api key scope (ip, referrer, or api restrictions) in the google cloud console, and rotate the key.';
-              } else if (rule.name.includes('Slack Webhook')) {
-                safeFix = 'const webhook = process.env.SLACK_WEBHOOK_URL;';
-                explanation = 'slack webhook url exposed. allows spammers or attackers to send messages, forge notifications, or gather workspace information.';
-                remediation = 'revoke/delete the exposed webhook url in slack app management, recreate it, and store it as a secure secret variable.';
-              } else if (rule.name.includes('SSH/RSA Private Key')) {
-                safeFix = '# Load private key securely from ssh-agent or system environment variables';
-                explanation = 'ssh private key is exposed. this gives attackers direct access to authenticate as the owner on remote servers, git platforms, or networks.';
-                remediation = 'immediately rotate the key pair, revoke the old public key from authorized_keys on all target systems, and use key-agent or environment injection.';
-              } else {
-                safeFix = 'DB_PASSWORD=process.env.DATABASE_PASSWORD';
-                explanation = 'exposed sensitive credential or high-entropy value in codebase.';
-                remediation = 'always store secrets in external environment files (.env) or secret management systems like Vault or AWS Secrets Manager. Never commit secrets to version control.';
-              }
-
-              fileFindings.push({
-                file: `${folderName}/${file.name}`,
-                line: lineIdx + 1,
-                type: rule.name,
-                codeMatch: lineText.trim(),
-                details: rule.name,
-                contextLines,
-                safeFix,
-                explanation,
-                remediation
-              });
-            }
-          });
-        });
-
-        if (fileLeaks.length > 0) {
-          tempLogs.push({
-            timestamp: new Date().toLocaleTimeString(),
-            repo: `${folderName}/${file.name}`,
-            status: 'failed',
-            details: `❌ credential detected: \n   ${fileLeaks.join('\n   ')}`,
-            findings: fileFindings
-          });
-        }
-      } catch (err) {
-        // Skip read failures
-      }
+      targetFiles.push({ file, index: i });
     }
+
+    let fileIndex = 0;
+
+    // Process files in batches of 8 using concurrent workers
+    const worker = async () => {
+      while (fileIndex < targetFiles.length) {
+        const { file, index } = targetFiles[fileIndex++];
+        totalBytesScanned += file.size;
+
+        setScanProgress({
+          current: index + 1,
+          total: totalFiles,
+          filename: `${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+        });
+
+        try {
+          const text = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve((event.target?.result as string) || '');
+            reader.onerror = () => resolve('');
+            reader.readAsText(file);
+          });
+
+          // Detect dependency configuration files
+          if (file.name === 'package.json') {
+            localStorage.setItem('securify_detected_dependencies', JSON.stringify({
+              ecosystem: 'npm',
+              deps: parseDependenciesJson(text),
+              rawText: text
+            }));
+          } else if (file.name === 'Cargo.toml') {
+            localStorage.setItem('securify_detected_dependencies', JSON.stringify({
+              ecosystem: 'crates.io',
+              deps: parseDependenciesCargo(text),
+              rawText: text
+            }));
+          } else if (file.name.includes('requirements') && file.name.endsWith('.txt')) {
+            localStorage.setItem('securify_detected_dependencies', JSON.stringify({
+              ecosystem: 'PyPI',
+              deps: parseDependenciesRequirements(text),
+              rawText: text
+            }));
+          }
+
+          const lines = text.split('\n');
+          const fileLeaks: string[] = [];
+          const fileFindings: Finding[] = [];
+          const lineBlockSize = 5000;
+
+          // Scan line by line yielding block-by-block
+          for (let l = 0; l < lines.length; l += lineBlockSize) {
+            const chunkLines = lines.slice(l, l + lineBlockSize);
+
+            chunkLines.forEach((lineText, lineIdx) => {
+              const actualLineIdx = l + lineIdx;
+              rulesList.forEach((rule) => {
+                rule.regex.lastIndex = 0;
+                const match = rule.regex.exec(lineText);
+                if (match) {
+                  leaksFound++;
+                  fileLeaks.push(`line ${actualLineIdx + 1}: found ${rule.name}`);
+                  
+                  // Increment severity count dynamically
+                  if (rule.name.toLowerCase().includes('aws') || rule.name.toLowerCase().includes('supabase') || rule.name.toLowerCase().includes('stripe')) {
+                    localSeverity.critical++;
+                  } else if (rule.name.toLowerCase().includes('github') || rule.name.toLowerCase().includes('google') || rule.name.toLowerCase().includes('slack')) {
+                    localSeverity.high++;
+                  } else {
+                    localSeverity.warning++;
+                  }
+
+                  // Build context lines: 2 lines before, 2 lines after
+                  const contextLines: { lineNum: number; content: string }[] = [];
+                  const startIdx = Math.max(0, actualLineIdx - 2);
+                  const endIdx = Math.min(lines.length - 1, actualLineIdx + 2);
+                  for (let c = startIdx; c <= endIdx; c++) {
+                    contextLines.push({
+                      lineNum: c + 1,
+                      content: lines[c]
+                    });
+                  }
+
+                  // Determine remediation based on the rule
+                  let safeFix = '';
+                  let explanation = '';
+                  let remediation = '';
+                  if (rule.name.includes('AWS Access Key ID')) {
+                    safeFix = 'AWS_ACCESS_KEY_ID=env.AWS_ACCESS_KEY_ID # load from environment variables';
+                    explanation = 'aws access key id is hardcoded in plain text. anyone with read access to this repository can compromise your aws account resources.';
+                    remediation = 'move the key to a safe .env file (add to .gitignore) and reference it via process.env or system environment variables.';
+                  } else if (rule.name.includes('AWS Secret Access Key')) {
+                    safeFix = 'AWS_SECRET_ACCESS_KEY=env.AWS_SECRET_ACCESS_KEY # load from secrets manager';
+                    explanation = 'aws secret access key is exposed. this gives full programmatic access to your cloud infrastructure.';
+                    remediation = 'revoke the compromised credentials immediately in the aws console, generate new credentials, and store them securely.';
+                  } else if (rule.name.includes('Supabase Service Role JWT')) {
+                    safeFix = 'const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // keep on server-side!';
+                    explanation = 'supabase service role jwt bypasses all row-level security (rls) policies. exposing this allows anyone to modify or download your entire database.';
+                    remediation = 'rotate the service role key immediately in the supabase dashboard. never expose it in client-side code; restrict it to secure serverless functions or backends.';
+                  } else if (rule.name.includes('Stripe Secret API Key')) {
+                    safeFix = 'const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);';
+                    explanation = 'stripe secret api key exposed. malicious actors can use this to execute transactions, refund charges, or access customer data.';
+                    remediation = 'go to Stripe Dashboard -> Developers -> API Keys and roll the secret key. transition code to use environment variables.';
+                  } else if (rule.name.includes('GitHub Personal Access Token')) {
+                    safeFix = 'const github_pat = process.env.GH_PAT_TOKEN;';
+                    explanation = 'github personal access token (pat) exposed. this can allow unauthorized access, modification, or deletion of repositories.';
+                    remediation = 'immediately delete/revoke this pat in your GitHub settings (developer settings -> personal access tokens) and recreate it with narrow scopes if required.';
+                  } else if (rule.name.includes('Google Cloud API Key')) {
+                    safeFix = 'const gMapsKey = process.env.GOOGLE_MAPS_API_KEY;';
+                    explanation = 'google cloud api key is hardcoded. attackers can hijack this key, leading to quota exhaustion or massive billing changes.';
+                    remediation = 'restrict the api key scope (ip, referrer, or api restrictions) in the google cloud console, and rotate the key.';
+                  } else if (rule.name.includes('Slack Webhook')) {
+                    safeFix = 'const webhook = process.env.SLACK_WEBHOOK_URL;';
+                    explanation = 'slack webhook url exposed. allows spammers or attackers to send messages, forge notifications, or gather workspace information.';
+                    remediation = 'revoke/delete the exposed webhook url in slack app management, recreate it, and store it as a secure secret variable.';
+                  } else if (rule.name.includes('SSH/RSA Private Key')) {
+                    safeFix = '# Load private key securely from ssh-agent or system environment variables';
+                    explanation = 'ssh private key is exposed. this gives attackers direct access to authenticate as the owner on remote servers, git platforms, or networks.';
+                    remediation = 'immediately rotate the key pair, revoke the old public key from authorized_keys on all target systems, and use key-agent or environment injection.';
+                  } else {
+                    safeFix = 'DB_PASSWORD=process.env.DATABASE_PASSWORD';
+                    explanation = 'exposed sensitive credential or high-entropy value in codebase.';
+                    remediation = 'always store secrets in external environment files (.env) or secret management systems like Vault or AWS Secrets Manager. Never commit secrets to version control.';
+                  }
+
+                  fileFindings.push({
+                    file: `${folderName}/${file.name}`,
+                    line: actualLineIdx + 1,
+                    type: rule.name,
+                    codeMatch: lineText.trim(),
+                    details: rule.name,
+                    contextLines,
+                    safeFix,
+                    explanation,
+                    remediation
+                  });
+                }
+              });
+            });
+
+            // Yield control back to UI thread
+            if (lines.length > lineBlockSize) {
+              await new Promise(r => setTimeout(r, 0));
+            }
+          }
+
+          if (fileLeaks.length > 0) {
+            tempLogs.push({
+              timestamp: new Date().toLocaleTimeString(),
+              repo: `${folderName}/${file.name}`,
+              status: 'failed',
+              details: `❌ credential detected: \n   ${fileLeaks.join('\n   ')}`,
+              findings: fileFindings
+            });
+          }
+        } catch (err) {
+          // Skip read failures
+        }
+      }
+    };
+
+    // Run up to 8 workers concurrently
+    const workers = Array.from({ length: Math.min(8, targetFiles.length || 1) }, () => worker());
+    await Promise.all(workers);
 
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
+    const speedMBs = durationMs > 0 ? (totalBytesScanned / (1024 * 1024)) / (durationMs / 1000) : 0;
 
     setStats({
       totalScanned: totalFiles,
@@ -1339,7 +1506,9 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin }: SecurifyDashboa
       folderName,
       totalFiles,
       leaksFound,
-      durationMs
+      durationMs,
+      speedMBs,
+      totalBytes: totalBytesScanned
     });
 
     if (tempLogs.length === 0) {
@@ -1832,7 +2001,8 @@ audit performed client-side using Securify Interactive Portal.
             )}
 
             {scanTab === 'local' || activeGithubSubTab === 'code' ? (
-              <div className="flex flex-col lg:flex-row gap-8 items-stretch animate-in fade-in duration-200">
+              <>
+                <div className="flex flex-col lg:flex-row gap-8 items-stretch animate-in fade-in duration-200">
                 
                 {/* Security Grade Circular Gauge */}
                 <div className="flex flex-col items-center justify-center text-center p-6 bg-neutral-950/40 rounded-2xl border border-white/5 lg:w-1/4 min-w-[200px]">
@@ -1894,6 +2064,11 @@ audit performed client-side using Securify Interactive Portal.
                     <span className="block text-xs font-mono font-medium text-white lowercase">
                       {customScanResults.leaksFound === 0 ? "repository safe" : `${customScanResults.leaksFound} credentials leaked`}
                     </span>
+                    {customScanResults.speedMBs !== undefined && customScanResults.speedMBs > 0 && (
+                      <span className="block text-[10px] text-emerald-400 font-mono lowercase">
+                        speed: {customScanResults.speedMBs.toFixed(2)} mb/s
+                      </span>
+                    )}
                     <span className="block text-[10px] text-neutral-400 lowercase">
                       branch: {customScanResults.branch || 'main'} ({customScanResults.commitHash || 'latest'})
                     </span>
@@ -1995,6 +2170,33 @@ audit performed client-side using Securify Interactive Portal.
                 </div>
 
               </div>
+
+              {localStorage.getItem('securify_detected_dependencies') && (
+                <div className="bg-gradient-to-r from-emerald-950/20 to-sky-950/20 border border-emerald-500/20 rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4 mt-6 animate-page-entrance text-left select-none">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 lowercase block">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                      project dependencies detected!
+                    </span>
+                    <p className="text-neutral-400 text-xs lowercase font-light leading-relaxed max-w-xl">
+                      we detected package files (e.g. package.json, requirements.txt, cargo.toml) in your project. click here to run a real-time vulnerability scan against google osv database.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onViewChange) {
+                        onViewChange('auditor');
+                      }
+                    }}
+                    className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none"
+                  >
+                    audit dependencies (osv api)
+                  </button>
+                </div>
+              )}
+            </>
             ) : activeGithubSubTab === 'sentinel' ? (
               /* Wave 7 Sentinel Timeline */
               <div className="space-y-6 w-full animate-in fade-in duration-200">
