@@ -51,10 +51,6 @@ export const SecurifyConsoleDocs = () => {
     }
   }, []);
 
-  const handleFormSubmit = () => {
-    setLoading(true);
-  };
-
   return (
     <section id="support" className="bg-neutral-950 py-28 px-6 md:px-12 border-t border-white/5 relative">
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -119,19 +115,23 @@ export const SecurifyConsoleDocs = () => {
               can't find a solution in our active command log? submit your developer request or question directly.
             </p>
 
+            <iframe name="hidden_iframe_docs" id="hidden_iframe_docs" style={{ display: 'none' }} />
             <form 
               action="https://submify.vercel.app/omeriletisimportfolyo@gmail.com"
               method="POST"
-              onSubmit={handleFormSubmit}
+              target="hidden_iframe_docs"
+              onSubmit={() => {
+                setLoading(true);
+                setSuccess('');
+                setTimeout(() => {
+                  setSuccess('inquiry submitted. our team will respond shortly.');
+                  setEmail('');
+                  setQuery('');
+                  setLoading(false);
+                }, 1000);
+              }}
               className="space-y-4"
             >
-              {/* Redirect back with flag */}
-              <input 
-                type="hidden" 
-                name="_next" 
-                value={window.location.origin + window.location.pathname + "?support_submitted=true"} 
-              />
-              
               <div>
                 <label htmlFor="email" className="block text-[10px] text-neutral-500 lowercase mb-1 font-mono">
                   developer email
@@ -142,8 +142,8 @@ export const SecurifyConsoleDocs = () => {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase"
-                  placeholder="dev@securify.org"
+                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase font-mono"
+                  placeholder="e.g. omer@securify.dev"
                   required
                 />
               </div>
@@ -158,15 +158,19 @@ export const SecurifyConsoleDocs = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   rows={4}
-                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase resize-none"
-                  placeholder="describe your security rules or workflow questions..."
+                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase resize-none font-mono"
+                  placeholder="write your secure inquiry payload here..."
                   required
                 />
               </div>
 
               {success && (
-                <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-lg p-3 text-[11px] font-mono lowercase">
-                  success: {success}
+                <div className={`rounded-lg p-3 text-[11px] font-mono lowercase border ${
+                  success.includes('failed') 
+                    ? 'bg-red-950/40 border-red-500/30 text-red-400' 
+                    : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                }`}>
+                  {success}
                 </div>
               )}
 

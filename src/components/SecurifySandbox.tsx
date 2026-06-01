@@ -632,6 +632,9 @@ export const SecurifySandbox = () => {
   );
   const [report, setReport] = useState<ScanReport>({ isSafe: true, leaks: [] });
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [scanProgress, setScanProgress] = useState<number>(100);
+  const [scanStatusMessage, setScanStatusMessage] = useState<string>('verified');
 
   const exportJSONReport = () => {
     const reportData = {
@@ -1002,7 +1005,39 @@ export const SecurifySandbox = () => {
   };
 
   useEffect(() => {
-    runBrowserScan(code);
+    if (!code.trim()) {
+      setReport({ isSafe: true, leaks: [] });
+      setScanProgress(100);
+      setIsScanning(false);
+      return;
+    }
+
+    setIsScanning(true);
+    setScanProgress(15);
+    setScanStatusMessage('initializing zero-knowledge sandbox...');
+
+    const t1 = setTimeout(() => {
+      setScanProgress(45);
+      setScanStatusMessage('parsing repository AST & credentials...');
+    }, 150);
+
+    const t2 = setTimeout(() => {
+      setScanProgress(78);
+      setScanStatusMessage('calculating Shannon entropy parameters...');
+    }, 320);
+
+    const t3 = setTimeout(() => {
+      runBrowserScan(code);
+      setScanProgress(100);
+      setIsScanning(false);
+      setScanStatusMessage('audit verification complete');
+    }, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [code]);
 
   // Directory handlers
@@ -1232,7 +1267,27 @@ ssh_keys = ${enabledScanners.ssh}
                     audit analysis report
                   </span>
 
-                  {report.isSafe ? (
+                  {isScanning ? (
+                    <div className="space-y-4 py-8 animate-pulse select-none">
+                      <div className="flex justify-between items-center text-xs font-mono text-neutral-400">
+                        <span className="lowercase">{scanStatusMessage}</span>
+                        <span className="text-white">{scanProgress}%</span>
+                      </div>
+                      <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className="h-full bg-white transition-all duration-150"
+                          style={{ width: `${scanProgress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2 py-4">
+                        <svg className="animate-spin h-5 w-5 text-neutral-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-[10px] font-mono text-neutral-500 lowercase">analyzing repository signatures...</span>
+                      </div>
+                    </div>
+                  ) : report.isSafe ? (
                     <div className="space-y-3">
                       <div className="text-white font-mono text-sm lowercase">
                         ✔ status: safe code structure

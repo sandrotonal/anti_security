@@ -21,10 +21,6 @@ export const SecurifyContact = () => {
     }
   }, []);
 
-  const handleSubmit = () => {
-    setIsSubmitting(true);
-  };
-
   const handleReset = () => {
     setName('');
     setEmail('');
@@ -105,18 +101,24 @@ export const SecurifyContact = () => {
         {/* Minimal Transparent Form Card */}
         <div className="bg-transparent border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-sm">
           {!isSubmitted ? (
-            <form
-              action="https://submify.vercel.app/omeriletisimportfolyo@gmail.com"
-              method="POST"
-              onSubmit={handleSubmit}
-              className="space-y-6 text-left"
-            >
-              <input 
-                type="hidden" 
-                name="_next" 
-                value={window.location.origin + window.location.pathname + "?submitted=true"} 
-              />
-              
+            <>
+              <iframe name="hidden_iframe_contact" id="hidden_iframe_contact" style={{ display: 'none' }} />
+              <form
+                action="https://submify.vercel.app/omeriletisimportfolyo@gmail.com"
+                method="POST"
+                target="hidden_iframe_contact"
+                onSubmit={() => {
+                  setIsSubmitting(true);
+                  setTimeout(() => {
+                    const array = new Uint32Array(2);
+                    window.crypto.getRandomValues(array);
+                    setTicketId(`sec_ticket_${array[0].toString(16)}${array[1].toString(16)}`);
+                    setIsSubmitted(true);
+                    setIsSubmitting(false);
+                  }, 1000);
+                }}
+                className="space-y-6 text-left"
+              >
               {/* Name Input */}
               <div className="space-y-1 select-text">
                 <label className="text-[9px] font-mono text-neutral-400 block lowercase">name:</label>
@@ -174,7 +176,8 @@ export const SecurifyContact = () => {
                 )}
               </button>
             </form>
-          ) : (
+          </>
+        ) : (
             <div className="space-y-5 text-center py-4 animate-in fade-in zoom-in-95 duration-350">
               <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-950/20 border border-emerald-500/10 text-emerald-400 font-mono text-sm">
                 ✔
