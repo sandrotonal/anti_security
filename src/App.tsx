@@ -404,6 +404,12 @@ function App() {
               githubUser={githubUser}
               onGithubLogin={() => setIsGithubModalOpen(true)}
               onViewChange={setActiveView}
+              premiumStatus={premiumStatus}
+              onPurchaseTrigger={(planId, planName, billingPeriod) => {
+                setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+                setCheckoutEmail('');
+                setCheckoutError('');
+              }}
             />
           </div>
         )}
@@ -578,9 +584,9 @@ function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
             onClick={() => setCheckoutPlan(null)}
           />
-          <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
             
             <button
               onClick={() => setCheckoutPlan(null)}
@@ -594,7 +600,7 @@ function App() {
 
             <div className="relative z-10 space-y-6">
               <div className="text-center space-y-2">
-                <span className="text-[10px] text-emerald-400 border border-emerald-500/20 bg-emerald-950/20 px-2.5 py-0.5 rounded-full uppercase font-mono">
+                <span className="text-[10px] text-white border border-white/20 bg-white/5 px-2.5 py-0.5 rounded-full uppercase font-mono">
                   {checkoutPlan.name} plan
                 </span>
                 <h3 className="text-lg font-medium text-white lowercase">enter your email</h3>

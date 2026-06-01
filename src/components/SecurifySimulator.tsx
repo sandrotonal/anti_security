@@ -238,9 +238,9 @@ export const SecurifySimulator = () => {
             {/* Code Panel (lg:col-span-7) */}
             <div className="lg:col-span-7 p-6 border-b lg:border-b-0 lg:border-r border-white/5 font-mono text-[12px] md:text-xs leading-relaxed bg-black/40 flex flex-col min-w-0">
               <div className="text-neutral-500 text-[10px] lowercase mb-4 select-none pb-2 border-b border-white/5 flex justify-between items-center shrink-0">
-                <span>{activeFile.path}</span>
-                <span className="text-yellow-500/80 font-mono flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-ping"></span>
+                 <span>{activeFile.path}</span>
+                <span className="text-neutral-400 font-mono flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-ping"></span>
                   edit code below to test
                 </span>
               </div>
@@ -253,7 +253,7 @@ export const SecurifySimulator = () => {
                       key={idx}
                       className={
                         idx + 1 === pendingScanResult.leakLine && scanState === 'blocked'
-                          ? 'text-red-500 font-bold'
+                          ? 'text-white font-bold underline decoration-white/30'
                           : ''
                       }
                     >
@@ -315,10 +315,10 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [14ms]</span>
-                    <span className="block text-red-500 font-medium font-sans text-sm mt-3 select-text">
+                    <span className="block text-white font-medium font-sans text-sm mt-3 select-text">
                       [securify] ❌ commit blocked
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-red-400/90 whitespace-pre-wrap select-text">
+                    <pre className="block bg-neutral-950 border border-white/10 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text">
                       {pendingScanResult.output}
                     </pre>
                   </div>
@@ -328,10 +328,10 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [18ms]</span>
-                    <span className="block text-amber-500 font-medium font-sans text-sm mt-3 select-text">
+                    <span className="block text-neutral-300 font-medium font-sans text-sm mt-3 select-text">
                       [securify] ⚠️ bypass active (passed with warnings)
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-amber-400/90 whitespace-pre-wrap select-text">
+                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-neutral-400 whitespace-pre-wrap select-text">
                       {pendingScanResult.output}
                     </pre>
                   </div>
@@ -341,10 +341,10 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [12ms]</span>
-                    <span className="block text-emerald-500 font-medium font-sans text-sm mt-3 select-text">
+                    <span className="block text-white font-medium font-sans text-sm mt-3 select-text">
                       [securify] ✔ git commit passed
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-emerald-400/90 whitespace-pre-wrap select-text">
+                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text">
                       {pendingScanResult.output}
                     </pre>
                   </div>

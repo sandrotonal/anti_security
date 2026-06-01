@@ -180,18 +180,18 @@ export const SecurifyRules = () => {
   };
 
   return (
-    <section className="bg-black min-h-screen py-28 px-6 md:px-12 relative overflow-hidden select-none">
+    <section className="bg-black min-h-screen py-16 md:py-28 px-4 md:px-12 relative overflow-hidden select-none">
       {/* Grid line background */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         
         {/* Header */}
-        <div className="max-w-3xl mb-12">
+        <div className="max-w-3xl mb-12 text-left">
           <span className="inline-block bg-neutral-900 border border-white/10 rounded-full px-4 py-1 text-xs text-neutral-400 lowercase mb-4 tracking-wider">
             rules database
           </span>
-          <h2 className="hero-title text-4xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
+          <h2 className="hero-title text-3xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
             what securify detects.
           </h2>
           <p className="text-neutral-400 text-sm font-light lowercase leading-relaxed max-w-xl">
@@ -267,10 +267,10 @@ export const SecurifyRules = () => {
                       <span 
                         className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
                           rule.severity === 'critical'
-                            ? 'bg-red-950/40 text-red-400 border border-red-500/20'
+                            ? 'bg-neutral-900 border border-white/20 text-white'
                             : rule.severity === 'high'
-                            ? 'bg-orange-950/40 text-orange-400 border border-orange-500/20'
-                            : 'bg-yellow-950/40 text-yellow-400 border border-yellow-500/20'
+                            ? 'bg-neutral-900 border border-white/15 text-neutral-300'
+                            : 'bg-neutral-900 border border-white/5 text-neutral-400'
                         }`}
                       >
                         {rule.severity}
@@ -308,11 +308,11 @@ export const SecurifyRules = () => {
                     <div className="space-y-1 bg-black/40 border border-white/5 rounded-xl p-3">
                       <div className="flex justify-between items-center text-[10px] font-mono">
                         <span className="text-neutral-400 lowercase">CVSS Severity Rating</span>
-                        <span className={`${rule.cvss >= 9.0 ? 'text-red-400' : rule.cvss >= 7.0 ? 'text-orange-400' : 'text-yellow-400'}`}>{rule.cvss} / 10</span>
+                        <span className="text-white">{rule.cvss} / 10</span>
                       </div>
                       <div className="w-full bg-neutral-900 h-1 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full rounded-full transition-all duration-500 ${rule.cvss >= 9.0 ? 'bg-red-500' : rule.cvss >= 7.0 ? 'bg-orange-500' : 'bg-yellow-500'}`}
+                          className={`h-full rounded-full transition-all duration-500 ${rule.cvss >= 9.0 ? 'bg-white' : rule.cvss >= 7.0 ? 'bg-white/50' : 'bg-white/20'}`}
                           style={{ width: `${rule.cvss * 10}%` }}
                         />
                       </div>
@@ -353,6 +353,33 @@ export const SecurifyRules = () => {
               no scanning rules matched your search query.
             </div>
           )}
+        </div>
+
+        {/* Monochromatic Subscription Marketing Hook */}
+        <div className="mt-12 p-6 bg-neutral-900/30 border border-white/5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 text-left relative overflow-hidden select-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
+          <div className="relative z-10 space-y-2 max-w-xl">
+            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] text-neutral-400 uppercase font-mono">
+              securify professional
+            </span>
+            <h4 className="text-base font-medium text-white lowercase">build corporate detection policies.</h4>
+            <p className="text-neutral-500 text-xs font-light lowercase leading-relaxed">
+              standard accounts use public baseline configurations. upgrade to pro to define tailor-made rulesets, enforce secret scan bounds, and restrict API permissions globally.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const navItem = document.getElementById('nav-pricing') || document.querySelector('[data-view="pricing"]');
+              if (navItem) {
+                (navItem as HTMLButtonElement).click();
+              } else {
+                window.location.hash = '#pricing';
+              }
+            }}
+            className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+          >
+            view pro features
+          </button>
         </div>
 
       </div>
