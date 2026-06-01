@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { GlowCard } from './GlowCard';
+
 
 interface Finding {
   file: string;
@@ -3391,32 +3393,32 @@ ServerTokens Prod`}</pre>
 
         {/* Global Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-text print:grid-cols-3 print:gap-4 print:mb-6">
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "total files analyzed" : "total files scanned"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-white font-mono print:text-black print:text-xl">
               {stats.totalScanned.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
 
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "found credentials" : "blocked credential leaks"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-red-500 font-mono print:text-red-600 print:text-xl">
               {stats.blockedLeaks.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
 
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "scan duration" : "active local git hooks"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-neutral-300 font-mono print:text-black print:text-xl">
               {customScanResults ? `${customScanResults.durationMs}ms` : stats.activeHooks.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
         </div>
 
         {/* Multi-Column Layout: Visual Map & Compliance (Left) vs Log Output (Right) */}
