@@ -3,6 +3,7 @@ import { SecurifyNavbar } from './components/SecurifyNavbar';
 import type { ViewType } from './components/SecurifyNavbar';
 import { SecurifyHero } from './components/SecurifyHero';
 import { SecurifySimulator } from './components/SecurifySimulator';
+import { SecurifyFeatures } from './components/SecurifyFeatures';
 import { SecurifyIntegrations } from './components/SecurifyIntegrations';
 import { SecurifyConsoleDocs } from './components/SecurifyConsoleDocs';
 import { SecurifyRules } from './components/SecurifyRules';
@@ -386,6 +387,7 @@ function App() {
             <SecurifyHero />
             <div className="relative z-10 bg-black">
                <SecurifySimulator />
+               <SecurifyFeatures />
                <SecurifyIntegrations />
                <SecurifyConsoleDocs />
             </div>
