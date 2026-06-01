@@ -9,10 +9,15 @@ export default defineConfig({
       name: 'local-api-routing',
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
-          if (req.url && req.url.startsWith('/api/scan-site')) {
+          if (req.url && req.url.startsWith('/api/')) {
             try {
+              // Extract the endpoint name (e.g. /api/verify-token?id=123 -> verify-token)
+              const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+              const pathname = urlObj.pathname;
+              const endpoint = pathname.replace('/api/', '');
+
               // Dynamically load the TypeScript API handler using Vite's built-in transformer
-              const module = await server.ssrLoadModule('./api/scan-site.ts');
+              const module = await server.ssrLoadModule(`./api/${endpoint}.ts`);
               const handler = module.default;
 
               // Mock Vercel response API
@@ -30,10 +35,22 @@ export default defineConfig({
                 }
               });
 
+              // Parse body for POST/PUT requests
+              let body = null;
+              if (req.method === 'POST' || req.method === 'PUT') {
+                body = await new Promise<any>((resolve) => {
+                  let accum = '';
+                  req.on('data', chunk => { accum += chunk; });
+                  req.on('end', () => {
+                    try { resolve(JSON.parse(accum)); } catch { resolve({}); }
+                  });
+                });
+              }
+
               // Mock Vercel request API
               const vercelReq = Object.assign(req, {
-                query: Object.fromEntries(new URL(req.url, 'http://localhost').searchParams),
-                body: null
+                query: Object.fromEntries(urlObj.searchParams),
+                body
               });
 
               await handler(vercelReq, vercelRes);
@@ -41,7 +58,7 @@ export default defineConfig({
               console.error('Local API execution failed:', err);
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'failed to perform site scan', message: err.message }));
+              res.end(JSON.stringify({ error: 'failed to execute api routing', message: err.message }));
             }
           } else {
             next();
