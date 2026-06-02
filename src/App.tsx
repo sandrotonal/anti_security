@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
 import { SecurifyNavbar } from './components/SecurifyNavbar';
 import type { ViewType } from './components/SecurifyNavbar';
+import { SecurifyBanner } from './components/SecurifyBanner';
 import { SecurifyHero } from './components/SecurifyHero';
+import { SecurifyTrust } from './components/SecurifyTrust';
 import { SecurifySimulator } from './components/SecurifySimulator';
+import { SecurifyFeatures } from './components/SecurifyFeatures';
 import { SecurifyIntegrations } from './components/SecurifyIntegrations';
+import { SecurifyROI } from './components/SecurifyROI';
+import { SecurifyTestimonials } from './components/SecurifyTestimonials';
 import { SecurifyConsoleDocs } from './components/SecurifyConsoleDocs';
 import { SecurifyRules } from './components/SecurifyRules';
 import { SecurifyDashboard } from './components/SecurifyDashboard';
 import { SecurifySandbox } from './components/SecurifySandbox';
 import { SecurifyInstall } from './components/SecurifyInstall';
 import { SecurifyContact } from './components/SecurifyContact';
+import { SecurifyFAQ } from './components/SecurifyFAQ';
 import { SecurifyFooter } from './components/SecurifyFooter';
 import { TerminalModal } from './components/TerminalModal';
 import { CookieBanner } from './components/CookieBanner';
@@ -17,6 +23,7 @@ import { FooterModal } from './components/FooterModal';
 import { SecurifyShortcuts } from './components/SecurifyShortcuts';
 import { GithubAuthModal } from './components/GithubAuthModal';
 import { SecurifyAuditor } from './components/SecurifyAuditor';
+import { SecurifyPricing } from './components/SecurifyPricing';
 
 function App() {
   const [activeView, setActiveView] = useState<ViewType>(() => {
@@ -42,6 +49,118 @@ function App() {
     localStorage.removeItem('securify_github_user');
     localStorage.removeItem('securify_github_pat');
     setGithubUser(null);
+  };
+
+  // Premium / Subscription states
+  const [premiumToken, setPremiumToken] = useState<string | null>(() => {
+    return localStorage.getItem('securify_premium_token');
+  });
+  const [premiumStatus, setPremiumStatus] = useState<{ valid: boolean; email?: string; plan?: string; expiresAt?: number } | null>(null);
+  const [paymentModal, setPaymentModal] = useState<{ show: boolean; status: 'success' | 'failed'; plan?: string; email?: string; error?: string } | null>(null);
+
+  // Token Validation on Startup
+  useEffect(() => {
+    if (premiumToken) {
+      fetch(`/api/verify-token?token=${premiumToken}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.valid) {
+            setPremiumStatus(data);
+          } else {
+            localStorage.removeItem('securify_premium_token');
+            setPremiumStatus(null);
+            setPremiumToken(null);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to verify premium token status:', err);
+        });
+    }
+  }, [premiumToken]);
+
+  // Handle URL callback parameters from Shopier
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    const token = params.get('token');
+    const email = params.get('email');
+    const plan = params.get('plan');
+    const error = params.get('error');
+
+    if (payment === 'success' && token) {
+      localStorage.setItem('securify_premium_token', token);
+      setPremiumToken(token);
+      
+      setPaymentModal({
+        show: true,
+        status: 'success',
+        plan: plan || 'Pro',
+        email: email || '',
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (payment === 'failed') {
+      setPaymentModal({
+        show: true,
+        status: 'failed',
+        error: error || 'ödeme tamamlanamadı.',
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // Checkout Email Modal states
+  const [checkoutPlan, setCheckoutPlan] = useState<{ id: string; name: string; billing: 'monthly' | 'yearly' } | null>(null);
+  const [checkoutEmail, setCheckoutEmail] = useState<string>('');
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState<boolean>(false);
+  const [checkoutError, setCheckoutError] = useState<string>('');
+
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkoutEmail.trim() || !checkoutPlan) return;
+
+    setIsCheckoutLoading(true);
+    setCheckoutError('');
+
+    try {
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: checkoutEmail.trim().toLowerCase(),
+          plan: checkoutPlan.id,
+          billing: checkoutPlan.billing,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'ödeme başlatılamadı. lütfen tekrar deneyin.');
+      }
+
+      const { shopierUrl, fields } = await response.json();
+
+      // Submit form to redirect to Shopier
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = shopierUrl;
+
+      Object.entries(fields).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value as string;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+    } catch (error: any) {
+      console.error('Checkout creation failed:', error);
+      setCheckoutError(error.message || 'ödeme başlatılırken bir bağlantı hatası oluştu.');
+      setIsCheckoutLoading(false);
+    }
   };
 
   const [reportData, setReportData] = useState<{
@@ -108,6 +227,9 @@ function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (key === '7') {
         setActiveView('auditor');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (key === '8') {
+        setActiveView('pricing');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
@@ -252,6 +374,9 @@ function App() {
 
   return (
     <div className="relative min-h-screen w-full bg-black text-white">
+      {/* Announcement Banner — fixed, slides in after 800ms */}
+      <SecurifyBanner onViewChange={(view) => { setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+
       {/* Persistent Header Navbar */}
       <SecurifyNavbar
         activeView={activeView}
@@ -260,6 +385,7 @@ function App() {
         githubUser={githubUser}
         onGithubLogin={() => setIsGithubModalOpen(true)}
         onGithubLogout={handleGithubLogout}
+        premiumStatus={premiumStatus}
       />
 
       {/* Main Pages Content routing */}
@@ -267,10 +393,14 @@ function App() {
         {activeView === 'home' && (
           <div className="animate-page-entrance">
             <SecurifyHero />
+            <SecurifyTrust />
             <div className="relative z-10 bg-black">
                <SecurifySimulator />
+               <SecurifyFeatures />
                <SecurifyIntegrations />
                <SecurifyConsoleDocs />
+               <SecurifyROI />
+               <SecurifyTestimonials />
             </div>
           </div>
         )}
@@ -287,6 +417,12 @@ function App() {
               githubUser={githubUser}
               onGithubLogin={() => setIsGithubModalOpen(true)}
               onViewChange={setActiveView}
+              premiumStatus={premiumStatus}
+              onPurchaseTrigger={(planId, planName, billingPeriod) => {
+                setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+                setCheckoutEmail('');
+                setCheckoutError('');
+              }}
             />
           </div>
         )}
@@ -314,10 +450,27 @@ function App() {
             <SecurifyAuditor />
           </div>
         )}
+
+        {activeView === 'pricing' && (
+          <div className="animate-page-entrance">
+            <SecurifyPricing
+              onPurchase={(planId, planName, billingPeriod) => {
+                setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+                setCheckoutEmail('');
+                setCheckoutError('');
+              }}
+            />
+          </div>
+        )}
       </main>
 
+      {/* FAQ — before footer, always visible at bottom */}
+      {activeView === 'home' && <SecurifyFAQ />}
+
       {/* Persistent Footer */}
-      <SecurifyFooter onSelectModal={setActiveFooterModal} />
+      <SecurifyFooter
+        onSelectModal={setActiveFooterModal}
+      />
 
       {/* Global Terminal Modal Dialog */}
       <TerminalModal
@@ -351,6 +504,173 @@ function App() {
           localStorage.setItem('securify_github_user', JSON.stringify(user));
         }}
       />
+
+      {/* Payment Result Modal */}
+      {paymentModal && paymentModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+          <div 
+            className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
+            onClick={() => setPaymentModal(null)}
+          />
+          <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
+            
+            {paymentModal.status === 'success' ? (
+              <div className="relative z-10 space-y-6 text-center">
+                {/* Success Indicator */}
+                <div className="mx-auto w-16 h-16 bg-emerald-950/50 border border-emerald-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/5 relative animate-pulse">
+                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-medium text-white lowercase">payment successful</h3>
+                  <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
+                    congratulations! your <span className="text-emerald-400 font-mono font-medium">{paymentModal.plan}</span> plan has been successfully activated for <span className="text-white font-mono">{paymentModal.email}</span>.
+                  </p>
+                </div>
+
+                <div className="bg-neutral-900/50 border border-white/5 rounded-2xl p-4 space-y-2 font-mono text-[10px] text-neutral-500 text-left">
+                  <div className="flex justify-between">
+                    <span>plan status:</span>
+                    <span className="text-emerald-400">active</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>activated email:</span>
+                    <span className="text-white">{paymentModal.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>token format:</span>
+                    <span className="text-white">cryptographic jwt</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setPaymentModal(null);
+                    setActiveView('dashboard');
+                  }}
+                  className="w-full py-3 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl transition-all lowercase"
+                >
+                  go to dashboard
+                </button>
+              </div>
+            ) : (
+              <div className="relative z-10 space-y-6 text-center">
+                {/* Error Indicator */}
+                <div className="mx-auto w-16 h-16 bg-red-950/50 border border-red-500/30 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/5 relative">
+                  <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-medium text-white lowercase">payment failed</h3>
+                  <p className="text-red-400/80 text-xs font-light lowercase leading-relaxed">
+                    {paymentModal.error || 'we could not process your transaction. please verify your payment details.'}
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPaymentModal(null)}
+                    className="flex-1 py-3 bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-white text-xs font-mono rounded-xl transition-all lowercase"
+                  >
+                    dismiss
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPaymentModal(null);
+                      setActiveView('pricing');
+                    }}
+                    className="flex-1 py-3 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl transition-all lowercase"
+                  >
+                    try again
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Email Modal */}
+      {checkoutPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+          <div 
+            className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
+            onClick={() => setCheckoutPlan(null)}
+          />
+          <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <button
+              onClick={() => setCheckoutPlan(null)}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="relative z-10 space-y-6">
+              <div className="text-center space-y-2">
+                <span className="text-[10px] text-white border border-white/20 bg-white/5 px-2.5 py-0.5 rounded-full uppercase font-mono">
+                  {checkoutPlan.name} plan
+                </span>
+                <h3 className="text-lg font-medium text-white lowercase">enter your email</h3>
+                <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
+                  your premium activation token will be cryptographically linked and generated for this email.
+                </p>
+              </div>
+
+              <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-neutral-500 lowercase block pl-1">
+                    email address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={checkoutEmail}
+                    onChange={(e) => setCheckoutEmail(e.target.value)}
+                    disabled={isCheckoutLoading}
+                    className="w-full bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-white/25 transition-colors lowercase"
+                    placeholder="user@example.com"
+                  />
+                </div>
+
+                {checkoutError && (
+                  <p className="text-red-400 text-[10px] pl-1 lowercase">
+                    {checkoutError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isCheckoutLoading || !checkoutEmail.trim()}
+                  className="w-full py-3 bg-white text-black hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 text-xs font-mono font-medium rounded-xl transition-all lowercase flex items-center justify-center gap-2"
+                >
+                  {isCheckoutLoading ? (
+                    <>
+                      <svg className="animate-spin h-3.5 w-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      processing...
+                    </>
+                  ) : (
+                    'continue to payment'
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

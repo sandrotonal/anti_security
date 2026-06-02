@@ -353,30 +353,30 @@ export const SecurifyAuditor = () => {
   const getSeverityBadgeClass = (sev: string) => {
     switch (sev) {
       case 'critical':
-        return 'bg-red-950/50 text-red-400 border border-red-500/30';
+        return 'bg-neutral-900 text-white border border-white/20';
       case 'high':
-        return 'bg-orange-950/50 text-orange-400 border border-orange-500/30';
+        return 'bg-neutral-900 text-neutral-200 border border-white/15';
       case 'medium':
-        return 'bg-amber-950/50 text-amber-400 border border-amber-500/30';
+        return 'bg-neutral-900 text-neutral-400 border border-white/10';
       case 'low':
-        return 'bg-sky-950/50 text-sky-400 border border-sky-500/30';
+        return 'bg-neutral-900 text-neutral-500 border border-white/5';
       default:
         return 'bg-neutral-900 text-neutral-400 border border-white/5';
     }
   };
 
   return (
-    <section className="bg-black min-h-screen py-28 px-6 md:px-12 relative overflow-hidden select-none">
+    <section className="bg-black min-h-screen py-16 md:py-28 px-4 md:px-12 relative overflow-hidden select-none">
       {/* Visual background details */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
-        <div className="max-w-3xl mb-12">
+        <div className="max-w-3xl mb-12 text-left">
           <span className="inline-block bg-neutral-900 border border-white/10 rounded-full px-4 py-1 text-xs text-neutral-400 lowercase mb-4 tracking-wider">
             dependency auditor
           </span>
-          <h2 className="hero-title text-4xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
+          <h2 className="hero-title text-3xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
             open-source vulnerability audit.
           </h2>
           <p className="text-neutral-400 text-sm font-light lowercase leading-relaxed max-w-xl">
@@ -460,9 +460,9 @@ export const SecurifyAuditor = () => {
                 )}
 
                  {errorMsg && (
-                  <div className="bg-red-950/20 border border-red-500/20 text-red-400 rounded-xl p-4 text-xs font-mono lowercase text-left">
+                  <div className="bg-neutral-900/40 border border-white/10 text-neutral-300 rounded-xl p-4 text-xs font-mono lowercase text-left">
                     <div className="flex items-start gap-2">
-                      <svg className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <span>{errorMsg}</span>
@@ -543,7 +543,7 @@ export const SecurifyAuditor = () => {
                   </div>
                   <div className="bg-neutral-900/40 border border-white/5 p-5 rounded-2xl text-left">
                     <span className="block text-[9px] font-mono text-neutral-500 lowercase mb-1">vulnerable packages</span>
-                    <span className={`block text-2xl font-bold font-mono ${scanResults.vulnerableDeps > 0 ? 'text-red-500' : 'text-emerald-400'}`}>
+                    <span className="block text-2xl font-bold font-mono text-white">
                       {scanResults.vulnerableDeps}
                     </span>
                   </div>
@@ -564,7 +564,7 @@ export const SecurifyAuditor = () => {
 
                   {scanResults.findings.length === 0 ? (
                     <div className="text-center py-12 space-y-3">
-                      <div className="w-12 h-12 bg-emerald-950/20 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-lg">
+                      <div className="w-12 h-12 bg-neutral-950 border border-white/10 text-white rounded-full flex items-center justify-center mx-auto text-lg">
                         ✓
                       </div>
                       <div className="space-y-1">
@@ -601,7 +601,7 @@ export const SecurifyAuditor = () => {
                             {finding.fixedVersion ? (
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[8px] font-mono text-neutral-500 uppercase">remediation:</span>
-                                <span className="text-emerald-400 text-[10px] font-mono font-medium lowercase">
+                                <span className="text-white text-[10px] font-mono font-medium lowercase">
                                   upgrade to {finding.fixedVersion}
                                 </span>
                               </div>
@@ -639,6 +639,33 @@ export const SecurifyAuditor = () => {
             )}
           </div>
         </div>
+        {/* Monochromatic Subscription Marketing Hook */}
+        <div className="mt-12 p-6 bg-neutral-900/30 border border-white/5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 text-left relative overflow-hidden select-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
+          <div className="relative z-10 space-y-2 max-w-xl">
+            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] text-neutral-400 uppercase font-mono">
+              securify professional
+            </span>
+            <h4 className="text-base font-medium text-white lowercase">vulnerability checking at scale.</h4>
+            <p className="text-neutral-500 text-xs font-light lowercase leading-relaxed">
+              standard accounts run client-only audits. upgrade to pro to scan unlimited remote configurations, schedule automated security health checks, and generate signed audit logs for compliance validation.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const navItem = document.getElementById('nav-pricing') || document.querySelector('[data-view="pricing"]');
+              if (navItem) {
+                (navItem as HTMLButtonElement).click();
+              } else {
+                window.location.hash = '#pricing';
+              }
+            }}
+            className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+          >
+            view pro features
+          </button>
+        </div>
+
       </div>
     </section>
   );

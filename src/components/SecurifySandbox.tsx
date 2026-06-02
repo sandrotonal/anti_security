@@ -632,6 +632,9 @@ export const SecurifySandbox = () => {
   );
   const [report, setReport] = useState<ScanReport>({ isSafe: true, leaks: [] });
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [scanProgress, setScanProgress] = useState<number>(100);
+  const [scanStatusMessage, setScanStatusMessage] = useState<string>('verified');
 
   const exportJSONReport = () => {
     const reportData = {
@@ -1002,7 +1005,39 @@ export const SecurifySandbox = () => {
   };
 
   useEffect(() => {
-    runBrowserScan(code);
+    if (!code.trim()) {
+      setReport({ isSafe: true, leaks: [] });
+      setScanProgress(100);
+      setIsScanning(false);
+      return;
+    }
+
+    setIsScanning(true);
+    setScanProgress(15);
+    setScanStatusMessage('initializing zero-knowledge sandbox...');
+
+    const t1 = setTimeout(() => {
+      setScanProgress(45);
+      setScanStatusMessage('parsing repository AST & credentials...');
+    }, 150);
+
+    const t2 = setTimeout(() => {
+      setScanProgress(78);
+      setScanStatusMessage('calculating Shannon entropy parameters...');
+    }, 320);
+
+    const t3 = setTimeout(() => {
+      runBrowserScan(code);
+      setScanProgress(100);
+      setIsScanning(false);
+      setScanStatusMessage('audit verification complete');
+    }, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [code]);
 
   // Directory handlers
@@ -1077,18 +1112,18 @@ ssh_keys = ${enabledScanners.ssh}
   };
 
   return (
-    <section className="bg-black min-h-screen py-28 px-6 md:px-12 relative overflow-hidden select-none">
+    <section className="bg-black min-h-screen py-16 md:py-28 px-4 md:px-12 relative overflow-hidden select-none">
       {/* Background grids */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         
         {/* Header */}
-        <div className="max-w-3xl mb-10">
+        <div className="max-w-3xl mb-10 text-left">
           <span className="inline-block bg-neutral-900 border border-white/10 rounded-full px-4 py-1 text-xs text-neutral-400 lowercase mb-4 tracking-wider">
             developer playground
           </span>
-          <h2 className="hero-title text-4xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
+          <h2 className="hero-title text-3xl md:text-5xl font-medium tracking-tight text-white lowercase mb-4">
             interactive leak sandbox.
           </h2>
           <p className="text-neutral-400 text-sm font-light lowercase leading-relaxed max-w-xl">
@@ -1232,9 +1267,29 @@ ssh_keys = ${enabledScanners.ssh}
                     audit analysis report
                   </span>
 
-                  {report.isSafe ? (
+                  {isScanning ? (
+                    <div className="space-y-4 py-8 animate-pulse select-none">
+                      <div className="flex justify-between items-center text-xs font-mono text-neutral-400">
+                        <span className="lowercase">{scanStatusMessage}</span>
+                        <span className="text-white">{scanProgress}%</span>
+                      </div>
+                      <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className="h-full bg-white transition-all duration-150"
+                          style={{ width: `${scanProgress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-2 py-4">
+                        <svg className="animate-spin h-5 w-5 text-neutral-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-[10px] font-mono text-neutral-500 lowercase">analyzing repository signatures...</span>
+                      </div>
+                    </div>
+                  ) : report.isSafe ? (
                     <div className="space-y-3">
-                      <div className="text-emerald-400 font-mono text-sm lowercase">
+                      <div className="text-white font-mono text-sm lowercase">
                         ✔ status: safe code structure
                       </div>
                       <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">
@@ -1243,17 +1298,17 @@ ssh_keys = ${enabledScanners.ssh}
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="text-red-400 font-mono text-sm lowercase">
-                        ❌ status: leaks discovered ({report.leaks.length})
+                      <div className="text-neutral-200 font-mono text-sm lowercase">
+                        ⚠️ status: leaks discovered ({report.leaks.length})
                       </div>
 
                       <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 select-text">
                         {report.leaks.map((leak, idx) => (
                           <div
                             key={idx}
-                            className="bg-red-950/20 border border-red-500/20 rounded-xl p-3 space-y-1"
+                            className="bg-neutral-900/40 border border-white/10 rounded-xl p-3 space-y-1"
                           >
-                            <div className="flex justify-between items-center text-[10px] font-mono text-red-400">
+                            <div className="flex justify-between items-center text-[10px] font-mono text-neutral-300">
                               <span className="lowercase font-bold">{leak.type}</span>
                               <span>line {leak.line}</span>
                             </div>
@@ -1274,8 +1329,8 @@ ssh_keys = ${enabledScanners.ssh}
                                    line: leak.line,
                                    type: leak.type
                                  });
-                               }}
-                               className="mt-2 w-full text-[9px] font-mono text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 bg-emerald-950/30 px-2 py-1 rounded-md lowercase transition-colors select-none"
+                                }}
+                               className="mt-2 w-full text-[9px] font-mono text-white hover:text-neutral-200 border border-white/25 bg-white/5 px-2 py-1 rounded-md lowercase transition-colors select-none"
                              >
                                quick fix & show diff
                              </button>
@@ -1295,10 +1350,10 @@ ssh_keys = ${enabledScanners.ssh}
                         </button>
                       </div>
                       <div className="font-mono text-[10px] space-y-1 bg-black p-3 rounded-lg overflow-x-auto border border-white/5">
-                        <div className="text-red-400 bg-red-950/20 px-1.5 py-0.5 rounded break-all">
+                        <div className="text-neutral-400 bg-neutral-950 border border-white/5 px-1.5 py-0.5 rounded break-all">
                           - {activeDiffFix.original}
                         </div>
-                        <div className="text-emerald-400 bg-emerald-950/20 px-1.5 py-0.5 rounded break-all">
+                        <div className="text-white bg-white/10 px-1.5 py-0.5 rounded break-all">
                           + {activeDiffFix.fixed}
                         </div>
                       </div>
@@ -1327,7 +1382,7 @@ ssh_keys = ${enabledScanners.ssh}
                     </button>
                     <button
                       onClick={exportHTMLReport}
-                      className="flex-1 bg-emerald-950/40 hover:bg-emerald-950 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all select-none"
+                      className="flex-1 bg-white hover:bg-neutral-200 text-black border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all select-none"
                     >
                       print report
                     </button>
@@ -1587,7 +1642,7 @@ ssh_keys = ${enabledScanners.ssh}
                     <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden">
                       <div 
                         className={`h-full transition-all duration-300 ${
-                          calculateEntropy(entropyInput) > 4.5 ? 'bg-red-500' : 'bg-emerald-500'
+                          calculateEntropy(entropyInput) > 4.5 ? 'bg-white' : 'bg-white/40'
                         }`}
                         style={{ width: `${Math.min((calculateEntropy(entropyInput) / 8.0) * 100, 100)}%` }}
                       />
@@ -1618,25 +1673,25 @@ ssh_keys = ${enabledScanners.ssh}
                     <span className="text-[10px] font-mono text-neutral-500 block lowercase">character diversity:</span>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-neutral-400">
                       <div className="flex items-center gap-1.5">
-                        <span className={/[A-Z]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                        <span className={/[A-Z]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
                           {/[A-Z]/.test(entropyInput) ? '✔' : '✖'}
                         </span>
                         <span>uppercase letters</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/[a-z]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                        <span className={/[a-z]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
                           {/[a-z]/.test(entropyInput) ? '✔' : '✖'}
                         </span>
                         <span>lowercase letters</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/\d/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                        <span className={/\d/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
                           {/[0-9]/.test(entropyInput) ? '✔' : '✖'}
                         </span>
                         <span>numeric digits</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/[^A-Za-z0-9]/.test(entropyInput) ? 'text-emerald-500' : 'text-neutral-700'}>
+                        <span className={/[^A-Za-z0-9]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
                           {/[^A-Za-z0-9]/.test(entropyInput) ? '✔' : '✖'}
                         </span>
                         <span>special symbols</span>
@@ -1992,7 +2047,7 @@ ssh_keys = ${enabledScanners.ssh}
                         <span className="text-[10px] font-mono text-neutral-500 lowercase block">captured substring matches:</span>
                         <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                           {getRegexTestResults().matches.map((m, idx) => (
-                            <code key={idx} className="bg-red-950/30 border border-red-500/20 text-red-400 text-[10px] font-mono px-2 py-0.5 rounded break-all font-mono">
+                            <code key={idx} className="bg-neutral-900 border border-white/10 text-neutral-300 text-[10px] font-mono px-2 py-0.5 rounded break-all font-mono">
                               {m}
                             </code>
                           ))}
@@ -2019,7 +2074,7 @@ ssh_keys = ${enabledScanners.ssh}
                   disabled={!!getRegexTestResults().error}
                   className={`text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none ${
                     ruleCopied 
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/20' 
+                      ? 'bg-white text-black border border-white' 
                       : getRegexTestResults().error
                       ? 'bg-neutral-900 text-neutral-600 border border-white/5 cursor-not-allowed'
                       : 'bg-white hover:bg-neutral-200 text-black'
@@ -2107,13 +2162,13 @@ ssh_keys = ${enabledScanners.ssh}
                         </p>
                       </div>
                       <div className="flex gap-1.5">
-                        <span className="bg-red-950/40 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/20 text-white px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {misconfigResults.findings.filter(f => f.severity === 'critical').length} crit
                         </span>
-                        <span className="bg-amber-950/40 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/15 text-neutral-300 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {misconfigResults.findings.filter(f => f.severity === 'high').length} high
                         </span>
-                        <span className="bg-yellow-950/40 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/5 text-neutral-400 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {misconfigResults.findings.filter(f => f.severity === 'warning').length} warn
                         </span>
                       </div>
@@ -2122,8 +2177,8 @@ ssh_keys = ${enabledScanners.ssh}
                     {/* Results list */}
                     <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
                       {misconfigResults.findings.length === 0 ? (
-                        <div className="p-4 bg-emerald-950/20 border border-emerald-500/10 rounded-xl text-center">
-                          <span className="text-emerald-400 font-mono text-xs lowercase">✓ zero vulnerabilities flagged. manifest complies with baseline security guidelines.</span>
+                        <div className="p-4 bg-neutral-900/40 border border-white/10 rounded-xl text-center">
+                          <span className="text-white font-mono text-xs lowercase">✓ zero vulnerabilities flagged. manifest complies with security guidelines.</span>
                         </div>
                       ) : (
                         misconfigResults.findings.map((finding, idx) => (
@@ -2140,10 +2195,10 @@ ssh_keys = ${enabledScanners.ssh}
                               <span
                                 className={`px-2 py-0.5 rounded text-[9px] font-mono border lowercase shrink-0 ${
                                   finding.severity === 'critical'
-                                    ? 'bg-red-950/40 text-red-400 border-red-500/20'
+                                    ? 'bg-neutral-900 border border-white/20 text-white'
                                     : finding.severity === 'high'
-                                    ? 'bg-amber-950/40 text-amber-400 border-amber-500/20'
-                                    : 'bg-yellow-950/40 text-yellow-400 border-yellow-500/20'
+                                    ? 'bg-neutral-900 border border-white/15 text-neutral-300'
+                                    : 'bg-neutral-900 border border-white/5 text-neutral-400'
                                 }`}
                               >
                                 {finding.severity}
@@ -2152,7 +2207,7 @@ ssh_keys = ${enabledScanners.ssh}
                             <p className="text-neutral-400 text-[10px] lowercase font-light leading-relaxed">
                               {finding.description}
                             </p>
-                            <div className="text-[10px] font-mono text-emerald-400 bg-emerald-950/20 border border-emerald-500/10 rounded p-2 lowercase">
+                            <div className="text-[10px] font-mono text-neutral-300 bg-neutral-900/40 border border-white/10 rounded p-2 lowercase">
                               remedy: {finding.remediation}
                             </div>
                             <button
@@ -2167,7 +2222,7 @@ ssh_keys = ${enabledScanners.ssh}
                                   type: finding.ruleName
                                 });
                               }}
-                              className="w-full text-[9px] font-mono text-emerald-400 hover:text-emerald-300 border border-emerald-500/20 bg-emerald-950/30 px-2 py-1 rounded-md lowercase transition-colors select-none"
+                              className="w-full text-[9px] font-mono text-white hover:text-neutral-200 border border-white/25 bg-white/5 px-2 py-1 rounded-md lowercase transition-colors select-none"
                             >
                               quick fix & show diff
                             </button>
@@ -2186,10 +2241,10 @@ ssh_keys = ${enabledScanners.ssh}
                           </button>
                         </div>
                         <div className="font-mono text-[10px] space-y-1 bg-black p-3 rounded-lg overflow-x-auto border border-white/5">
-                          <div className="text-red-400 bg-red-950/20 px-1.5 py-0.5 rounded break-all">
+                          <div className="text-neutral-400 bg-neutral-950 border border-white/5 px-1.5 py-0.5 rounded break-all">
                             - {activeIaCDiffFix.original}
                           </div>
-                          <div className="text-emerald-400 bg-emerald-950/20 px-1.5 py-0.5 rounded break-all whitespace-pre-wrap">
+                          <div className="text-white bg-white/10 px-1.5 py-0.5 rounded break-all whitespace-pre-wrap">
                             + {activeIaCDiffFix.fixed}
                           </div>
                         </div>
@@ -2293,13 +2348,13 @@ ssh_keys = ${enabledScanners.ssh}
                         </p>
                       </div>
                       <div className="flex gap-1.5">
-                        <span className="bg-red-950/40 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/20 text-white px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {dependencyResults.findings.filter(f => f.severity === 'critical').length} crit
                         </span>
-                        <span className="bg-amber-950/40 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/15 text-neutral-300 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {dependencyResults.findings.filter(f => f.severity === 'high').length} high
                         </span>
-                        <span className="bg-yellow-950/40 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
+                        <span className="bg-neutral-900 border border-white/5 text-neutral-400 px-2 py-0.5 rounded text-[9px] font-mono lowercase">
                           {dependencyResults.findings.filter(f => f.severity === 'medium').length} med
                         </span>
                       </div>
@@ -2308,8 +2363,8 @@ ssh_keys = ${enabledScanners.ssh}
                     {/* Results list */}
                     <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
                       {dependencyResults.findings.length === 0 ? (
-                        <div className="p-4 bg-emerald-950/20 border border-emerald-500/10 rounded-xl text-center">
-                          <span className="text-emerald-400 font-mono text-xs lowercase">✓ zero vulnerabilities flagged. all dependencies comply with security baselines.</span>
+                        <div className="p-4 bg-neutral-900/40 border border-white/10 rounded-xl text-center">
+                          <span className="text-white font-mono text-xs lowercase">✓ zero vulnerabilities flagged. all dependencies comply with security baselines.</span>
                         </div>
                       ) : (
                         dependencyResults.findings.map((finding, idx) => (
@@ -2326,10 +2381,10 @@ ssh_keys = ${enabledScanners.ssh}
                               <span
                                 className={`px-2 py-0.5 rounded text-[9px] font-mono border lowercase shrink-0 ${
                                   finding.severity === 'critical'
-                                    ? 'bg-red-950/40 text-red-400 border-red-500/20'
+                                    ? 'bg-neutral-900 border border-white/20 text-white'
                                     : finding.severity === 'high'
-                                    ? 'bg-amber-950/40 text-amber-400 border-amber-500/20'
-                                    : 'bg-yellow-950/40 text-yellow-400 border-yellow-500/20'
+                                    ? 'bg-neutral-900 border border-white/15 text-neutral-300'
+                                    : 'bg-neutral-900 border border-white/5 text-neutral-400'
                                 }`}
                               >
                                 {finding.severity}
@@ -2339,7 +2394,7 @@ ssh_keys = ${enabledScanners.ssh}
                             <p className="text-neutral-400 text-[10px] lowercase font-light leading-relaxed">
                               {finding.description}
                             </p>
-                            <div className="text-[10px] font-mono text-emerald-400 bg-emerald-950/20 border border-emerald-500/10 rounded p-2 lowercase">
+                            <div className="text-[10px] font-mono text-neutral-300 bg-neutral-900/40 border border-white/10 rounded p-2 lowercase">
                               remedy: {finding.remediation}
                             </div>
                           </div>
@@ -2358,6 +2413,32 @@ ssh_keys = ${enabledScanners.ssh}
 
           </div>
         )}
+        {/* Monochromatic Subscription Marketing Hook */}
+        <div className="mt-12 p-6 bg-neutral-900/30 border border-white/5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 text-left relative overflow-hidden select-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
+          <div className="relative z-10 space-y-2 max-w-xl">
+            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] text-neutral-400 uppercase font-mono">
+              securify professional
+            </span>
+            <h4 className="text-base font-medium text-white lowercase">unlock custom security rulesets.</h4>
+            <p className="text-neutral-500 text-xs font-light lowercase leading-relaxed">
+              playground tiers limit scan configurations. upgrade to pro to scan unlimited lines, set custom webhook rules, get Slack alerts, and bypass git commit hooks securely with team access policies.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const navItem = document.getElementById('nav-pricing') || document.querySelector('[data-view="pricing"]');
+              if (navItem) {
+                (navItem as HTMLButtonElement).click();
+              } else {
+                window.location.hash = '#pricing';
+              }
+            }}
+            className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+          >
+            view pro features
+          </button>
+        </div>
 
       </div>
     </section>
@@ -2384,10 +2465,10 @@ const calculateEntropy = (str: string): number => {
 const getStrengthRating = (entropy: number, len: number) => {
   if (len === 0) return { label: 'none', color: 'text-neutral-500' };
   const totalBits = entropy * len;
-  if (totalBits < 40) return { label: 'very weak', color: 'text-red-500' };
-  if (totalBits < 60) return { label: 'weak', color: 'text-orange-500' };
-  if (totalBits < 80) return { label: 'medium strength', color: 'text-yellow-500' };
-  return { label: 'cryptographically strong', color: 'text-emerald-500' };
+  if (totalBits < 40) return { label: 'very weak', color: 'text-neutral-400' };
+  if (totalBits < 60) return { label: 'weak', color: 'text-neutral-300' };
+  if (totalBits < 80) return { label: 'medium strength', color: 'text-neutral-200' };
+  return { label: 'cryptographically strong', color: 'text-white' };
 };
 
 const estimateBruteForceTime = (entropy: number, len: number): string => {

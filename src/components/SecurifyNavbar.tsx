@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact' | 'auditor';
+export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact' | 'auditor' | 'pricing';
 
 interface NavbarProps {
   activeView: ViewType;
@@ -9,6 +9,7 @@ interface NavbarProps {
   githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
   onGithubLogout: () => void;
+  premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
 }
 
 const UserAvatar = ({ username, avatarUrl, sizeClass = "w-7 h-7" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
@@ -52,7 +53,8 @@ export const SecurifyNavbar = ({
   onOpenTerminal,
   githubUser,
   onGithubLogin,
-  onGithubLogout
+  onGithubLogout,
+  premiumStatus
 }: NavbarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -138,6 +140,8 @@ export const SecurifyNavbar = ({
             <div className="w-px h-4 bg-white/10 mx-2" />
             
             <a
+              id="nav-rules"
+              data-view="rules"
               href="#rules"
               onClick={(e) => handleLinkClick(e, 'rules')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -147,6 +151,8 @@ export const SecurifyNavbar = ({
               rules
             </a>
             <a
+              id="nav-dashboard"
+              data-view="dashboard"
               href="#dashboard"
               onClick={(e) => handleLinkClick(e, 'dashboard')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -156,6 +162,8 @@ export const SecurifyNavbar = ({
               dashboard
             </a>
             <a
+              id="nav-sandbox"
+              data-view="sandbox"
               href="#sandbox"
               onClick={(e) => handleLinkClick(e, 'sandbox')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -165,6 +173,8 @@ export const SecurifyNavbar = ({
               sandbox scanner
             </a>
             <a
+              id="nav-auditor"
+              data-view="auditor"
               href="#auditor"
               onClick={(e) => handleLinkClick(e, 'auditor')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -172,6 +182,17 @@ export const SecurifyNavbar = ({
               }`}
             >
               dependency auditor
+            </a>
+            <a
+              id="nav-pricing"
+              data-view="pricing"
+              href="#pricing"
+              onClick={(e) => handleLinkClick(e, 'pricing')}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
+                activeView === 'pricing' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+              }`}
+            >
+              pricing
             </a>
             <a
               href="#contact"
@@ -216,7 +237,14 @@ export const SecurifyNavbar = ({
                     <div className="px-3 py-2 border-b border-white/5 mb-1.5 text-left">
                       <span className="text-[10px] text-neutral-500 font-mono block lowercase">connected as</span>
                       <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
-                      {githubUser.token ? (
+                      {premiumStatus?.valid ? (
+                        <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 lowercase mt-1 bg-emerald-950/30 border border-emerald-500/20 px-1.5 py-0.5 rounded-full w-fit">
+                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                          </svg>
+                          {premiumStatus.plan} plan
+                        </span>
+                      ) : githubUser.token ? (
                         <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 lowercase mt-0.5">
                           <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -345,6 +373,15 @@ export const SecurifyNavbar = ({
               className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               dependency auditor
+            </a>
+            <a
+              href="#pricing"
+              onClick={(e) => handleLinkClick(e, 'pricing')}
+              className={`text-2xl font-light transition-colors lowercase ${
+                activeView === 'pricing' ? 'text-white' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              pricing
             </a>
             <a
               href="#contact"

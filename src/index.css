@@ -111,3 +111,60 @@ video::-webkit-media-controls-play-button {
     color: #000000 !important;
   }
 }
+
+/* Premium Glow Card Animations */
+@keyframes moveGlow {
+  0% {
+    top: 10%;
+    left: 10%;
+  }
+  25% {
+    top: 10%;
+    left: 80%;
+  }
+  50% {
+    top: 75%;
+    left: 80%;
+  }
+  75% {
+    top: 75%;
+    left: 10%;
+  }
+  100% {
+    top: 10%;
+    left: 10%;
+  }
+}
+
+@keyframes rotateRay {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-glow-halo {
+  animation: moveGlow 12s infinite linear;
+}
+
+.animate-rotate-ray {
+  animation: rotateRay 24s infinite linear;
+}
+
+.corner-square {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background-color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.group:hover .corner-square {
+  opacity: 0.85;
+}
+

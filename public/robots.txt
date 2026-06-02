@@ -1,5 +1,22 @@
-# https://www.robotstxt.org/robotstxt.html
+# Securify — robots.txt
+# https://securify.gucluyumhe.dev/
+
 User-agent: *
 Allow: /
 
+# Block sensitive directories
+Disallow: /api/
+Disallow: /cli/
+Disallow: /dist/
+Disallow: /*.env
+
+# Crawl delay for respectful bots
+Crawl-delay: 2
+
+# Googlebot specific
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Sitemaps
 Sitemap: https://securify.gucluyumhe.dev/sitemap.xml

@@ -27,6 +27,8 @@ export const SecurifyShortcuts = ({ isOpen, onClose }: SecurifyShortcutsProps) =
     { key: '4', description: 'switch to developer sandbox' },
     { key: '5', description: 'switch to cli installation' },
     { key: '6', description: 'switch to contact support' },
+    { key: '7', description: 'switch to dependency auditor' },
+    { key: '8', description: 'switch to pricing plans' },
     { key: 'T', description: 'open global interactive terminal' },
     { key: '?', description: 'toggle keyboard shortcuts overlay' },
     { key: 'Esc', description: 'close active modal / overlay' },

