@@ -97,6 +97,18 @@ npm run dev
 └── vite.config.ts
 ```
 
+## Security & Architecture Audit
+
+Securify is designed with a **Security-First** methodology, conforming to OWASP Top 10 guidelines and strict cryptographic validation patterns:
+
+1. **Zero-Knowledge Code Processing:** Your source code never leaves your local machine. Scanning, regular expression checks, and Shannon Entropy calculations run entirely client-side inside a secure browser context or via local CLI commands.
+2. **SSRF (Server-Side Request Forgery) Defenses:** The site auditor API ([scan-site.ts](api/scan-site.ts)) resolves target domains using dynamic DNS lookup and filters out all loopback (127.0.0.1, ::1) and private IP ranges (RFC 1918) before initiating requests, preventing internal network scanning exploits.
+3. **Payment Integrity & Cryptographic Validation:** All Shopier transactions are cryptographically signed. The checkout API ([create-checkout.ts](api/create-checkout.ts)) calculates HMAC-SHA256 signatures, and the webhook callback API ([shopier-callback.ts](api/shopier-callback.ts)) validates incoming payloads with the merchant `SHOPIER_WEBHOOK_TOKEN` to prevent fake order completion.
+4. **Access Control & Session Tokens:** Account activations utilize standard cryptographically signed JSON Web Tokens (JWT) signed with a securely generated `JWT_SECRET` environment variable, ensuring token integrity and preventing modification.
+5. **XSS & Injection Protection:** Output rendering is managed by React's native safe encoding layer, escaping potentially malicious strings.
+
+---
+
 ## License
 
 MIT
