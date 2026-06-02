@@ -7,7 +7,7 @@ interface TokenPayload {
   expiresAt: number;
 }
 
-const SHOPIER_API_SECRET = process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
+const SHOPIER_API_SECRET = process.env.SHOPIER_WEBHOOK_TOKEN || process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
 const JWT_SECRET = process.env.JWT_SECRET || 'securify-local-development-secret-key-2026';
 const SITE_URL = process.env.SITE_URL || 'https://securify.gucluyumhe.dev';
 
