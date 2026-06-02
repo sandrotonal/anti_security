@@ -11,16 +11,13 @@ export default defineConfig({
         server.middlewares.use(async (req, res, next) => {
           if (req.url && req.url.startsWith('/api/')) {
             try {
-              // Extract the endpoint name (e.g. /api/verify-token?id=123 -> verify-token)
               const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
               const pathname = urlObj.pathname;
               const endpoint = pathname.replace('/api/', '');
 
-              // Dynamically load the TypeScript API handler using Vite's built-in transformer
               const module = await server.ssrLoadModule(`./api/${endpoint}.ts`);
               const handler = module.default;
 
-              // Mock Vercel response API
               const vercelRes = Object.assign(res, {
                 status(code: number) {
                   res.statusCode = code;
@@ -35,7 +32,6 @@ export default defineConfig({
                 }
               });
 
-              // Parse body for POST/PUT requests
               let body = null;
               if (req.method === 'POST' || req.method === 'PUT') {
                 body = await new Promise<any>((resolve) => {
@@ -47,7 +43,6 @@ export default defineConfig({
                 });
               }
 
-              // Mock Vercel request API
               const vercelReq = Object.assign(req, {
                 query: Object.fromEntries(urlObj.searchParams),
                 body
@@ -67,4 +62,26 @@ export default defineConfig({
       }
     }
   ],
+
+  build: {
+    // Raise warning threshold to avoid noisy output
+    chunkSizeWarningLimit: 1000,
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // React core
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          // Separate large page components into lazy chunks
+          if (id.includes('SecurifyDashboard')) return 'page-dashboard';
+          if (id.includes('SecurifySandbox')) return 'page-sandbox';
+          if (id.includes('SecurifyAuditor')) return 'page-auditor';
+          if (id.includes('SecurifyInstall')) return 'page-install';
+        },
+      },
+    },
+  },
 })
+

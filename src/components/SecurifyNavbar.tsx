@@ -140,6 +140,8 @@ export const SecurifyNavbar = ({
             <div className="w-px h-4 bg-white/10 mx-2" />
             
             <a
+              id="nav-rules"
+              data-view="rules"
               href="#rules"
               onClick={(e) => handleLinkClick(e, 'rules')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -149,6 +151,8 @@ export const SecurifyNavbar = ({
               rules
             </a>
             <a
+              id="nav-dashboard"
+              data-view="dashboard"
               href="#dashboard"
               onClick={(e) => handleLinkClick(e, 'dashboard')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -158,6 +162,8 @@ export const SecurifyNavbar = ({
               dashboard
             </a>
             <a
+              id="nav-sandbox"
+              data-view="sandbox"
               href="#sandbox"
               onClick={(e) => handleLinkClick(e, 'sandbox')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -167,6 +173,8 @@ export const SecurifyNavbar = ({
               sandbox scanner
             </a>
             <a
+              id="nav-auditor"
+              data-view="auditor"
               href="#auditor"
               onClick={(e) => handleLinkClick(e, 'auditor')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
@@ -176,6 +184,8 @@ export const SecurifyNavbar = ({
               dependency auditor
             </a>
             <a
+              id="nav-pricing"
+              data-view="pricing"
               href="#pricing"
               onClick={(e) => handleLinkClick(e, 'pricing')}
               className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${

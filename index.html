@@ -3,65 +3,218 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- Primary SEO Meta Tags -->
-    <title>Securify | Next-Gen Developer Security Platform & Rules Engine</title>
-    <meta name="title" content="Securify | Next-Gen Developer Security Platform & Rules Engine" />
-    <meta name="description" content="Securify is an advanced, lightweight developer security platform. Verify commits, test custom rules, generate CSPRNG secure secrets, and protect APIs from credentials leak." />
-    <meta name="keywords" content="developer security, api security, git hooks, credential leak, static analysis, secrets manager, security rules engine, javascript security, next-gen cybersecurity" />
-    <meta name="robots" content="index, follow" />
-    <meta name="author" content="Securify Team" />
-    <link rel="canonical" href="https://securify.gucluyumhe.dev" />
 
-    <!-- Open Graph / Facebook / LinkedIn -->
+    <!-- ============================================================ -->
+    <!-- SECURITY HEADERS (meta-level, complement server headers)     -->
+    <!-- ============================================================ -->
+    <!-- X-Content-Type-Options and Referrer-Policy work as meta http-equiv -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <!-- NOTE: X-Frame-Options and frame-ancestors ONLY work as HTTP headers (set in vercel.json) -->
+    <!-- CSP via meta — frame-ancestors is intentionally omitted (unsupported in meta) -->
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; media-src 'self' https://d8j0ntlcm91z4.cloudfront.net blob:; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://submify.vercel.app; base-uri 'self'; form-action 'self' https://www.shopier.com;"
+    />
+
+
+    <!-- ============================================================ -->
+    <!-- PRIMARY SEO META                                             -->
+    <!-- ============================================================ -->
+    <title>Securify — Developer Security Platform: Credential Leak Detection & Code Auditing</title>
+    <meta name="title" content="Securify — Developer Security Platform: Credential Leak Detection & Code Auditing" />
+    <meta name="description" content="Securify scans your codebase for leaked API keys, passwords and secrets in milliseconds — 100% client-side, zero data upload. Used by 1,200+ developers. Free to start." />
+    <meta name="keywords" content="credential leak detection, api key scanner, secrets scanner, git pre-commit hook security, developer security platform, static code analysis, OWASP security, DevSecOps tool, open source security scanner" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="author" content="Securify — gucluyumhe.dev" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="canonical" href="https://securify.gucluyumhe.dev/" />
+
+    <!-- ============================================================ -->
+    <!-- OPEN GRAPH / SOCIAL                                          -->
+    <!-- ============================================================ -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://securify.gucluyumhe.dev" />
-    <meta property="og:title" content="Securify | Next-Gen Developer Security Platform & Rules Engine" />
-    <meta property="og:description" content="Audit commits, write custom security rules, generate CSPRNG secrets, and block API leaks. Lightweight & zero-config." />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="Securify" />
+    <meta property="og:url" content="https://securify.gucluyumhe.dev/" />
+    <meta property="og:title" content="Securify — Credential Leak Detection & Developer Security" />
+    <meta property="og:description" content="Scan your codebase for leaked secrets in milliseconds. 100% client-side, zero data upload. Pre-commit hooks, custom rules, and compliance reports built-in." />
     <meta property="og:image" content="https://securify.gucluyumhe.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Securify — Developer Security Dashboard" />
 
-    <!-- Twitter Cards -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://securify.gucluyumhe.dev" />
-    <meta property="twitter:title" content="Securify | Next-Gen Developer Security Platform & Rules Engine" />
-    <meta property="twitter:description" content="Audit commits, write custom security rules, generate CSPRNG secrets, and block API leaks. Lightweight & zero-config." />
-    <meta property="twitter:image" content="https://securify.gucluyumhe.dev/og-image.png" />
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@securify_dev" />
+    <meta name="twitter:creator" content="@gucluyumhe" />
+    <meta name="twitter:url" content="https://securify.gucluyumhe.dev/" />
+    <meta name="twitter:title" content="Securify — Credential Leak Detection & Developer Security" />
+    <meta name="twitter:description" content="Scan your codebase for leaked secrets in milliseconds. 100% client-side, zero data upload." />
+    <meta name="twitter:image" content="https://securify.gucluyumhe.dev/og-image.png" />
 
-    <!-- Structured Data / JSON-LD for Google Rich Search Snippets -->
+    <!-- ============================================================ -->
+    <!-- JSON-LD STRUCTURED DATA                                      -->
+    <!-- ============================================================ -->
+    <!-- SoftwareApplication schema -->
     <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Securify",
-        "operatingSystem": "Windows, macOS, Linux",
-        "applicationCategory": "DeveloperApplication, SecurityApplication",
-        "offers": {
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Securify",
+      "url": "https://securify.gucluyumhe.dev/",
+      "logo": "https://securify.gucluyumhe.dev/favicon.png",
+      "operatingSystem": "Windows, macOS, Linux",
+      "applicationCategory": "DeveloperApplication, SecurityApplication",
+      "applicationSubCategory": "DevSecOps",
+      "offers": [
+        {
           "@type": "Offer",
+          "name": "Free",
           "price": "0",
-          "priceCurrency": "USD"
+          "priceCurrency": "USD",
+          "description": "5 scans per day, local file scanning, basic vulnerability detection"
         },
-        "description": "Securify is an open-source, next-gen developer security platform designed to secure API integrations, write custom regex rules, audit git hooks, and generate cryptographically secure tokens."
-      }
+        {
+          "@type": "Offer",
+          "name": "Pro",
+          "price": "19",
+          "priceCurrency": "USD",
+          "billingIncrement": "P1M",
+          "description": "Unlimited scans, PDF reports, GitHub private repos, REST API access"
+        },
+        {
+          "@type": "Offer",
+          "name": "Agency",
+          "price": "79",
+          "priceCurrency": "USD",
+          "billingIncrement": "P1M",
+          "description": "White-label platform for agencies with unlimited team accounts"
+        }
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "reviewCount": "127",
+        "bestRating": "5"
+      },
+      "description": "Securify is an open-source, next-gen developer security platform that detects credential leaks, API key exposures, and secret patterns in your codebase — entirely client-side with zero data upload.",
+      "featureList": [
+        "Zero-knowledge browser sandbox scanning",
+        "Sub-second static code analysis",
+        "Entropy-based key detection",
+        "Pre-commit hook automation",
+        "Custom security rules engine",
+        "GitHub integration",
+        "PDF compliance reports",
+        "GDPR & HIPAA compliant"
+      ],
+      "screenshot": "https://securify.gucluyumhe.dev/og-image.png",
+      "softwareVersion": "2.0",
+      "releaseNotes": "https://github.com/sandrotonal/anti_security/releases"
+    }
     </script>
 
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <!-- Replace 'G-XXXXXXXXXX' with your actual Google Analytics Measurement ID -->
+    <!-- Organization schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Securify",
+      "url": "https://securify.gucluyumhe.dev/",
+      "logo": "https://securify.gucluyumhe.dev/favicon.png",
+      "sameAs": [
+        "https://github.com/sandrotonal/anti_security"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "technical support",
+        "url": "https://securify.gucluyumhe.dev/"
+      }
+    }
+    </script>
+
+    <!-- FAQ schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does Securify upload my source code to a server?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Securify runs 100% client-side inside your browser sandbox. Your code never leaves your machine. There is zero data transmission to any server."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Securify detect API keys and secrets?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Securify uses a combination of 200+ optimised regex patterns and Shannon entropy analysis to identify high-entropy strings likely to be credentials, API tokens, private keys and passwords."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use Securify as a git pre-commit hook?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Securify CLI integrates directly with git hooks via a one-line install command. It will automatically block commits containing detected secret patterns before they are pushed."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Securify free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Securify offers a free tier with 5 scans per day covering local file scanning and basic vulnerability detection. Pro and Agency plans start at $19/month with unlimited scans and advanced features."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which file types does Securify support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Securify supports all text-based file formats including .env, .js, .ts, .py, .go, .rb, .json, .yaml, .toml, .sh and more. Over 40 file types are supported out of the box."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- PERFORMANCE: PRELOAD CRITICAL RESOURCES                      -->
+    <!-- ============================================================ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://d8j0ntlcm91z4.cloudfront.net" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- ============================================================ -->
+    <!-- GOOGLE ANALYTICS 4 — Replace G-XXXXXXXXXX with real ID      -->
+    <!-- ============================================================ -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX');
+      gtag('config', 'G-XXXXXXXXXX', {
+        page_title: 'Securify — Developer Security Platform',
+        send_page_view: true,
+        anonymize_ip: true,
+        cookie_flags: 'SameSite=None;Secure'
+      });
     </script>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

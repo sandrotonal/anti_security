@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
 import { SecurifyNavbar } from './components/SecurifyNavbar';
 import type { ViewType } from './components/SecurifyNavbar';
+import { SecurifyBanner } from './components/SecurifyBanner';
 import { SecurifyHero } from './components/SecurifyHero';
+import { SecurifyTrust } from './components/SecurifyTrust';
 import { SecurifySimulator } from './components/SecurifySimulator';
 import { SecurifyFeatures } from './components/SecurifyFeatures';
 import { SecurifyIntegrations } from './components/SecurifyIntegrations';
+import { SecurifyROI } from './components/SecurifyROI';
+import { SecurifyTestimonials } from './components/SecurifyTestimonials';
 import { SecurifyConsoleDocs } from './components/SecurifyConsoleDocs';
 import { SecurifyRules } from './components/SecurifyRules';
 import { SecurifyDashboard } from './components/SecurifyDashboard';
 import { SecurifySandbox } from './components/SecurifySandbox';
 import { SecurifyInstall } from './components/SecurifyInstall';
 import { SecurifyContact } from './components/SecurifyContact';
+import { SecurifyFAQ } from './components/SecurifyFAQ';
 import { SecurifyFooter } from './components/SecurifyFooter';
 import { TerminalModal } from './components/TerminalModal';
 import { CookieBanner } from './components/CookieBanner';
@@ -369,6 +374,9 @@ function App() {
 
   return (
     <div className="relative min-h-screen w-full bg-black text-white">
+      {/* Announcement Banner — fixed, slides in after 800ms */}
+      <SecurifyBanner onViewChange={(view) => { setActiveView(view); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+
       {/* Persistent Header Navbar */}
       <SecurifyNavbar
         activeView={activeView}
@@ -385,11 +393,14 @@ function App() {
         {activeView === 'home' && (
           <div className="animate-page-entrance">
             <SecurifyHero />
+            <SecurifyTrust />
             <div className="relative z-10 bg-black">
                <SecurifySimulator />
                <SecurifyFeatures />
                <SecurifyIntegrations />
                <SecurifyConsoleDocs />
+               <SecurifyROI />
+               <SecurifyTestimonials />
             </div>
           </div>
         )}
@@ -453,8 +464,13 @@ function App() {
         )}
       </main>
 
+      {/* FAQ — before footer, always visible at bottom */}
+      {activeView === 'home' && <SecurifyFAQ />}
+
       {/* Persistent Footer */}
-      <SecurifyFooter onSelectModal={setActiveFooterModal} />
+      <SecurifyFooter
+        onSelectModal={setActiveFooterModal}
+      />
 
       {/* Global Terminal Modal Dialog */}
       <TerminalModal
