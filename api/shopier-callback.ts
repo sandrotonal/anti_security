@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { createHmac } from 'crypto';
 
-const SHOPIER_API_SECRET = process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
+const SHOPIER_API_SECRET = process.env.SHOPIER_WEBHOOK_TOKEN || process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
 
 async function parseBody(req: IncomingMessage): Promise<Record<string, string>> {
   return new Promise((resolve) => {
