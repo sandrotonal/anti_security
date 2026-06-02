@@ -64,7 +64,7 @@ export const SecurifyContact = () => {
       id="contact" 
       className="min-h-screen py-32 px-4 flex flex-col justify-center items-center select-none relative"
       style={{
-        backgroundImage: `radial-gradient(circle at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.98) 100%), url('/contact-bg.jpg')`,
+        backgroundImage: `radial-gradient(circle at center, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.88) 100%), url('/contact-bg.jpg')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
