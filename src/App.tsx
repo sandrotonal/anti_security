@@ -32,7 +32,7 @@ function App() {
   });
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
-  const [activeFooterModal, setActiveFooterModal] = useState<'license' | 'security' | 'pgp' | null>(null);
+  const [activeFooterModal, setActiveFooterModal] = useState<'license' | 'security' | 'pgp' | 'sales_contract' | 'return_policy' | 'privacy_policy' | 'company_info' | null>(null);
 
   // GitHub integration states
   const [isGithubModalOpen, setIsGithubModalOpen] = useState<boolean>(false);

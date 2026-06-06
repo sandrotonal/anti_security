@@ -109,13 +109,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let targetUrl = urlObj.searchParams.get('url') || '';
 
     if (!targetUrl && req.method === 'POST') {
-      const body = await new Promise<any>((resolve) => {
-        let accum = '';
-        req.on('data', chunk => { accum += chunk; });
-        req.on('end', () => {
-          try { resolve(JSON.parse(accum)); } catch { resolve({}); }
-        });
-      });
+      const body = (req as any).body && Object.keys((req as any).body).length > 0
+        ? (req as any).body
+        : await new Promise<any>((resolve) => {
+            let accum = '';
+            req.on('data', chunk => { accum += chunk; });
+            req.on('end', () => {
+              try { resolve(JSON.parse(accum)); } catch { resolve({}); }
+            });
+          });
       targetUrl = body.url || '';
     }
 

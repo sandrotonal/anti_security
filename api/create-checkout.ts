@@ -42,7 +42,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
-    const { email, plan, billing } = await parseJsonBody(req);
+    const body = (req as any).body && Object.keys((req as any).body).length > 0
+      ? (req as any).body
+      : await parseJsonBody(req);
+    const { email, plan, billing } = body;
 
     if (!email || !plan) {
       res.writeHead(400, { 'Content-Type': 'application/json' });

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-type FooterModalType = 'license' | 'security' | 'pgp';
+type FooterModalType = 'license' | 'security' | 'pgp' | 'sales_contract' | 'return_policy' | 'privacy_policy' | 'company_info';
 
 interface FooterModalProps {
   type: FooterModalType;
@@ -30,6 +30,14 @@ export const FooterModal = ({ type, onClose }: FooterModalProps) => {
         return 'security policy';
       case 'pgp':
         return 'pgp public key';
+      case 'sales_contract':
+        return 'distance sales agreement';
+      case 'return_policy':
+        return 'cancellation & refund policy';
+      case 'privacy_policy':
+        return 'privacy policy & gdpr';
+      case 'company_info':
+        return 'company & contact info';
     }
   };
 
@@ -91,6 +99,65 @@ MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMz
 MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMz
 =Secu
 -----END PGP PUBLIC KEY BLOCK-----`;
+
+      case 'sales_contract':
+        return `distance sales agreement
+
+1. parties
+this agreement is entered into between ömer özbay, the operator of the securify platform (hereinafter referred to as the "seller"), and the user who purchases a subscription through the platform (hereinafter referred to as the "buyer").
+
+2. subject of the agreement
+the subject of this agreement is the determination of the rights and obligations of the parties regarding the sale and delivery of the digital/saas service purchased by the buyer through the securify website, in accordance with applicable consumer protection laws and regulations for distance contracts.
+
+3. service and delivery
+the purchased service is provided as a digital subscription on the securify platform. the service is instantly activated upon successful payment by linking a cryptographic token to the buyer's email address, granting immediate access to the premium features.
+
+4. right of withdrawal
+since the purchased service consists of digital content and services delivered instantly in an electronic environment, the buyer does not have a right of withdrawal once the service has been initiated and delivery has commenced.`;
+
+      case 'return_policy':
+        return `cancellation & refund policy
+
+1. subscription cancellation
+users can cancel their premium subscriptions at any time through their membership dashboard or by contacting support at omeriletisimportfolyo@gmail.com. canceled subscriptions will remain active until the end of the current billing cycle and will not renew.
+
+2. refund policy
+since securify services are digital products and instantly active, refunds are generally not provided. however:
+- in case of duplicate charges due to system errors, the incorrectly processed transaction amount will be fully refunded to the buyer.
+- if the service is interrupted for more than 72 hours due to technical issues originating from the seller, the buyer can request a pro-rated refund for the unusable period.`;
+
+      case 'privacy_policy':
+        return `privacy policy & gdpr compliance
+
+at securify, we take the security and privacy of your personal data extremely seriously. we ensure all personal data is processed and stored in compliance with the general data protection regulation (gdpr) and local data protection regulations.
+
+1. data controller
+for the purposes of data protection regulations, your personal data is processed by ömer özbay as the data controller.
+
+2. data processed & purpose
+when you register or purchase a subscription, we collect your email address, name, phone number, and payment information to:
+- complete membership registration and verify subscriptions.
+- securely process payments via shopier.
+- resolve technical support requests.
+
+securify operates on a zero-knowledge architecture. your scanned code repositories and files are never uploaded to our servers; all scanning is performed locally in your browser.
+
+3. data sharing
+your personal data may only be shared with competent public authorities to fulfill legal obligations, and with our secure payment processor shopier to complete transaction processing. we do not share your data with other third parties.
+
+4. your rights
+under gdpr, you have the right to access, rectify, or erase your personal data, or restrict its processing. you may exercise these rights at any time by contacting us at omeriletisimportfolyo@gmail.com.`;
+
+      case 'company_info':
+        return `company & contact information
+
+securify services are operated and managed as an individual enterprise by ömer özbay.
+
+operator: ömer özbay
+address: istanbul, turkey
+email: omeriletisimportfolyo@gmail.com
+support hotline: +90 531 480 3809
+website: https://securify.gucluyumhe.dev`;
     }
   };
 
