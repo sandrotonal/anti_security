@@ -38,7 +38,23 @@ export default defineConfig({
                   let accum = '';
                   req.on('data', chunk => { accum += chunk; });
                   req.on('end', () => {
-                    try { resolve(JSON.parse(accum)); } catch { resolve({}); }
+                    const contentType = req.headers['content-type'] || '';
+                    if (contentType.includes('application/json')) {
+                      try { resolve(JSON.parse(accum)); } catch { resolve({}); }
+                    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+                      try {
+                        const params = new URLSearchParams(accum);
+                        const data: Record<string, string> = {};
+                        for (const [key, value] of params.entries()) {
+                          data[key] = value;
+                        }
+                        resolve(data);
+                      } catch {
+                        resolve({});
+                      }
+                    } else {
+                      resolve(accum);
+                    }
                   });
                 });
               }

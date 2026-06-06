@@ -1,5 +1,5 @@
 interface SecurifyFooterProps {
-  onSelectModal: (type: 'license' | 'security' | 'pgp') => void;
+  onSelectModal: (type: 'license' | 'security' | 'pgp' | 'sales_contract' | 'return_policy' | 'privacy_policy' | 'company_info') => void;
 }
 
 export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
@@ -68,6 +68,30 @@ export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             pgp key
+          </button>
+          <button
+            onClick={() => onSelectModal('sales_contract')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
+          >
+            distance sales
+          </button>
+          <button
+            onClick={() => onSelectModal('return_policy')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
+          >
+            cancellation & refund
+          </button>
+          <button
+            onClick={() => onSelectModal('privacy_policy')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
+          >
+            privacy & gdpr
+          </button>
+          <button
+            onClick={() => onSelectModal('company_info')}
+            className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
+          >
+            contact info
           </button>
         </div>
 

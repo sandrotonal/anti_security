@@ -185,7 +185,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                   </div>
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-medium text-neutral-200 block lowercase">
-                      {token.trim() ? 'repo (private & public)' : 'public_repo'}
+                      {token.trim() ? 'repo (private & public)' : 'public_repo'} <span className="text-neutral-500 text-[9px] font-mono">(required)</span>
                     </span>
                     <span className="text-[9px] text-neutral-500 block lowercase leading-relaxed">
                       {token.trim() 
@@ -200,7 +200,9 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                     ✓
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[11px] font-medium text-neutral-200 block lowercase">read:user</span>
+                    <span className="text-[11px] font-medium text-neutral-200 block lowercase">
+                      read:user <span className="text-neutral-500 text-[9px] font-mono">(required)</span>
+                    </span>
                     <span className="text-[9px] text-neutral-500 block lowercase leading-relaxed">access to profile details (profile image, bio, location)</span>
                   </div>
                 </div>

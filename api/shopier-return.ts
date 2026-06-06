@@ -45,17 +45,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   try {
-    const postData = await parseBody(req);
-    const { platform_order_id, random_nr, signature, status } = postData;
+    const postData = (req as any).body && Object.keys((req as any).body).length > 0
+      ? (req as any).body
+      : await parseBody(req);
+    const { platform_order_id, random_nr, signature, status, total_order_value, currency } = postData;
 
-    if (!platform_order_id || !random_nr || !signature || !status) {
+    if (!platform_order_id || !random_nr || !signature || !status || !total_order_value || !currency) {
       res.writeHead(302, { Location: `${SITE_URL}/?payment=failed&error=missing_params` });
       res.end();
       return;
     }
 
     // Verify signature
-    const data = random_nr + platform_order_id;
+    const data = random_nr + platform_order_id + total_order_value + currency;
     const expectedSignature = createHmac('sha256', SHOPIER_API_SECRET)
       .update(data)
       .digest('base64');
