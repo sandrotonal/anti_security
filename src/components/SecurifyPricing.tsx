@@ -49,8 +49,8 @@ const plans: PricingPlan[] = [
     id: 'pro',
     name: 'Pro',
     badge: 'Most popular',
-    monthlyPrice: 19,
-    yearlyPrice: 190,
+    monthlyPrice: 9,
+    yearlyPrice: 90,
     description: 'Advanced scanning capabilities for professional developers and small teams.',
     features: [
       { text: 'Unlimited scans', included: true },
@@ -72,8 +72,8 @@ const plans: PricingPlan[] = [
   {
     id: 'agency',
     name: 'Agency',
-    monthlyPrice: 79,
-    yearlyPrice: 790,
+    monthlyPrice: 39,
+    yearlyPrice: 390,
     description: 'White-label security platform for agencies managing multiple client projects.',
     features: [
       { text: 'Unlimited scans', included: true },

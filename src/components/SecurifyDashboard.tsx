@@ -2576,7 +2576,7 @@ Report generated cryptographically via Securify SaaS platform.
                   onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
                   className="bg-white hover:bg-neutral-100 text-black text-xs font-mono font-semibold px-6 py-3.5 rounded-xl lowercase transition-all select-none shrink-0 whitespace-nowrap"
                 >
-                  start pro plan — $19/mo
+                  start pro plan — $9/mo
                 </button>
               </div>
             )}
@@ -2841,7 +2841,7 @@ ServerTokens Prod`}</pre>
                   </p>
                 </div>
                 
-                {premiumStatus?.valid && (premiumStatus.plan === 'Pro' || premiumStatus.plan === 'Agency') ? (
+                {premiumStatus?.valid && (premiumStatus.plan?.toLowerCase() === 'pro' || premiumStatus.plan?.toLowerCase() === 'agency') ? (
                   <button
                     onClick={handleExportSiteReportMarkdown}
                     className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none"
@@ -2899,7 +2899,7 @@ ServerTokens Prod`}</pre>
                   </div>
                 </div>
                 
-                {premiumStatus?.valid && (premiumStatus.plan === 'Pro' || premiumStatus.plan === 'Agency') ? (
+                {premiumStatus?.valid && (premiumStatus.plan?.toLowerCase() === 'pro' || premiumStatus.plan?.toLowerCase() === 'agency') ? (
                   <div className="space-y-2 w-full text-left font-mono">
                     <label className="text-[9px] text-neutral-500 block">copy embed HTML code:</label>
                     <div className="relative">
