@@ -68,9 +68,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
+    // Auto-detect environment based on PADDLE_CLIENT_TOKEN prefix to prevent mismatch errors
+    let environment = PADDLE_ENV;
+    if (PADDLE_CLIENT_TOKEN.startsWith('live_')) {
+      environment = 'production';
+    } else if (PADDLE_CLIENT_TOKEN.startsWith('test_')) {
+      environment = 'sandbox';
+    }
+
     if (!priceId) {
       // In sandbox mode, we can provide a default mock value to ease local development/testing
-      if (PADDLE_ENV === 'sandbox') {
+      if (environment === 'sandbox') {
         priceId = `mock_${plan}_${billing || 'monthly'}`;
       } else {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -83,7 +91,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     res.end(JSON.stringify({
       priceId,
       clientToken: PADDLE_CLIENT_TOKEN,
-      environment: PADDLE_ENV,
+      environment,
       email: email.trim().toLowerCase(),
       plan,
       billing: billing || 'monthly'

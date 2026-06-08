@@ -9,7 +9,16 @@ interface TokenPayload {
 
 const PADDLE_ENV = process.env.PADDLE_ENV || 'sandbox';
 const PADDLE_API_KEY = process.env.PADDLE_API_KEY || '';
+const PADDLE_CLIENT_TOKEN = process.env.PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_CLIENT_TOKEN || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'securify-local-development-secret-key-2026';
+
+// Auto-detect environment based on key/token prefix to prevent mismatch errors
+let environment = PADDLE_ENV;
+if (PADDLE_API_KEY.startsWith('pdl_live_') || PADDLE_CLIENT_TOKEN.startsWith('live_')) {
+  environment = 'production';
+} else if (PADDLE_API_KEY.startsWith('pdl_test_') || PADDLE_CLIENT_TOKEN.startsWith('test_')) {
+  environment = 'sandbox';
+}
 
 async function parseJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -71,7 +80,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const trimmedEmail = email.trim().toLowerCase();
 
     // Local Sandbox environment fallback: Bypass API validation if PADDLE_API_KEY is not defined
-    if (PADDLE_ENV === 'sandbox' && !PADDLE_API_KEY) {
+    if (environment === 'sandbox' && !PADDLE_API_KEY) {
       console.log(`[Paddle Sandbox Bypass] Simulating transaction verification for: ${transaction_id}`);
       
       const duration = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -95,7 +104,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     // Call Paddle API to retrieve the transaction
-    const baseUrl = PADDLE_ENV === 'sandbox' ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
+    const baseUrl = environment === 'sandbox' ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
     const response = await fetch(`${baseUrl}/transactions/${transaction_id}`, {
       method: 'GET',
       headers: {
