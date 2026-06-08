@@ -14,9 +14,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'securify-local-development-secret-
 
 // Auto-detect environment based on key/token prefix to prevent mismatch errors
 let environment = PADDLE_ENV;
-if (PADDLE_API_KEY.startsWith('pdl_live_') || PADDLE_CLIENT_TOKEN.startsWith('live_')) {
+if (
+  PADDLE_API_KEY.startsWith('pdl_live_') ||
+  PADDLE_CLIENT_TOKEN.startsWith('live_') ||
+  PADDLE_CLIENT_TOKEN.startsWith('paddletoken_live_') ||
+  PADDLE_CLIENT_TOKEN.includes('_live_')
+) {
   environment = 'production';
-} else if (PADDLE_API_KEY.startsWith('pdl_test_') || PADDLE_CLIENT_TOKEN.startsWith('test_')) {
+} else if (
+  PADDLE_API_KEY.startsWith('pdl_test_') ||
+  PADDLE_CLIENT_TOKEN.startsWith('test_') ||
+  PADDLE_CLIENT_TOKEN.startsWith('paddletoken_test_') ||
+  PADDLE_CLIENT_TOKEN.includes('_test_')
+) {
   environment = 'sandbox';
 }
 
