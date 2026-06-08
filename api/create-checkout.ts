@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 
 const PADDLE_ENV = process.env.PADDLE_ENV || 'sandbox';
-const PADDLE_CLIENT_TOKEN = process.env.PADDLE_CLIENT_TOKEN || '';
+const PADDLE_CLIENT_TOKEN = process.env.PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_CLIENT_TOKEN || '';
 
-const PADDLE_PRICE_PRO_MONTHLY = process.env.PADDLE_PRICE_PRO_MONTHLY || '';
-const PADDLE_PRICE_PRO_YEARLY = process.env.PADDLE_PRICE_PRO_YEARLY || '';
-const PADDLE_PRICE_AGENCY_MONTHLY = process.env.PADDLE_PRICE_AGENCY_MONTHLY || '';
-const PADDLE_PRICE_AGENCY_YEARLY = process.env.PADDLE_PRICE_AGENCY_YEARLY || '';
+const PADDLE_PRICE_PRO_MONTHLY = process.env.PADDLE_PRICE_PRO_MONTHLY || process.env.PADDLE_PRO_MONTHLY || '';
+const PADDLE_PRICE_PRO_YEARLY = process.env.PADDLE_PRICE_PRO_YEARLY || process.env.PADDLE_PRO_YEARLY || '';
+const PADDLE_PRICE_AGENCY_MONTHLY = process.env.PADDLE_PRICE_AGENCY_MONTHLY || process.env.PADDLE_AGENCY_MONTHLY || '';
+const PADDLE_PRICE_AGENCY_YEARLY = process.env.PADDLE_PRICE_AGENCY_YEARLY || process.env.PADDLE_AGENCY_YEARLY || '';
 
 async function parseJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
