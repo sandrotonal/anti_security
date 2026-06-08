@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SecurifyNavbar } from './components/SecurifyNavbar';
 import type { ViewType } from './components/SecurifyNavbar';
 import { SecurifyBanner } from './components/SecurifyBanner';
@@ -26,6 +26,7 @@ import { SecurifyAuditor } from './components/SecurifyAuditor';
 import { SecurifyPricing } from './components/SecurifyPricing';
 
 function App() {
+  const paddleInitializedRef = useRef<boolean>(false);
   const [activeView, setActiveView] = useState<ViewType>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('submitted') === 'true' ? 'contact' : 'home';
@@ -114,6 +115,51 @@ function App() {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string>('');
 
+  const verifyPayment = async (transactionId: string, email: string, plan: string) => {
+    setIsCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const response = await fetch('/api/verify-paddle-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transaction_id: transactionId,
+          email: email,
+          plan: plan
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'ödeme doğrulaması başarısız oldu.');
+      }
+
+      const { token, email: verifiedEmail, plan: verifiedPlan } = await response.json();
+
+      // Save token to localStorage
+      localStorage.setItem('securify_premium_token', token);
+      setPremiumToken(token);
+
+      // Close the email checkout modal
+      setCheckoutPlan(null);
+
+      // Show success modal
+      setPaymentModal({
+        show: true,
+        status: 'success',
+        plan: verifiedPlan || 'Pro',
+        email: verifiedEmail || '',
+      });
+    } catch (error: any) {
+      console.error('Payment verification failed:', error);
+      setCheckoutError(error.message || 'ödeme doğrulanamadı. lütfen destekle iletişime geçin.');
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!checkoutEmail.trim() || !checkoutPlan) return;
@@ -139,23 +185,59 @@ function App() {
         throw new Error(errorData.error || 'ödeme başlatılamadı. lütfen tekrar deneyin.');
       }
 
-      const { shopierUrl, fields } = await response.json();
+      const { priceId, clientToken, environment, email: customerEmail, plan, billing } = await response.json();
 
-      // Submit form to redirect to Shopier
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = shopierUrl;
+      const paddle = (window as any).Paddle;
+      if (!paddle) {
+        throw new Error('ödeme altyapısı yüklenemedi. lütfen reklam engelleyicinizi (adblocker) kontrol edin.');
+      }
 
-      Object.entries(fields).forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = value as string;
-        form.appendChild(input);
+      // Initialize Paddle if not done already
+      if (!paddleInitializedRef.current) {
+        if (environment === 'sandbox') {
+          paddle.Environment.set('sandbox');
+        }
+        paddle.Initialize({
+          token: clientToken,
+          eventCallback: async (event: any) => {
+            if (event.name === 'checkout.completed') {
+              const transactionId = event.data.transaction_id;
+              await verifyPayment(transactionId, customerEmail, plan);
+            }
+          }
+        });
+        paddleInitializedRef.current = true;
+      } else {
+        // Update the event callback for the new checkout session details
+        paddle.Update({
+          eventCallback: async (event: any) => {
+            if (event.name === 'checkout.completed') {
+              const transactionId = event.data.transaction_id;
+              await verifyPayment(transactionId, customerEmail, plan);
+            }
+          }
+        });
+      }
+
+      // Launch the checkout overlay modal
+      paddle.Checkout.open({
+        items: [
+          {
+            priceId: priceId,
+            quantity: 1
+          }
+        ],
+        customer: {
+          email: customerEmail
+        },
+        customData: {
+          email: customerEmail,
+          plan: plan,
+          billing: billing
+        }
       });
-
-      document.body.appendChild(form);
-      form.submit();
+      
+      setIsCheckoutLoading(false);
     } catch (error: any) {
       console.error('Checkout creation failed:', error);
       setCheckoutError(error.message || 'ödeme başlatılırken bir bağlantı hatası oluştu.');

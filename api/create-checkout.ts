@@ -1,9 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { createHmac } from 'crypto';
 
-const SHOPIER_API_KEY = process.env.SHOPIER_API_KEY || 'your-shopier-api-key';
-const SHOPIER_API_SECRET = process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
-const SITE_URL = process.env.SITE_URL || 'https://securify.gucluyumhe.dev';
+const PADDLE_ENV = process.env.PADDLE_ENV || 'sandbox';
+const PADDLE_CLIENT_TOKEN = process.env.PADDLE_CLIENT_TOKEN || '';
+
+const PADDLE_PRICE_PRO_MONTHLY = process.env.PADDLE_PRICE_PRO_MONTHLY || '';
+const PADDLE_PRICE_PRO_YEARLY = process.env.PADDLE_PRICE_PRO_YEARLY || '';
+const PADDLE_PRICE_AGENCY_MONTHLY = process.env.PADDLE_PRICE_AGENCY_MONTHLY || '';
+const PADDLE_PRICE_AGENCY_YEARLY = process.env.PADDLE_PRICE_AGENCY_YEARLY || '';
 
 async function parseJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -53,65 +56,37 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
-    // Determine price based on plan and billing
-    let price = 19;
+    // Determine the Price ID based on plan and billing
+    let priceId = '';
     if (plan === 'pro') {
-      price = billing === 'yearly' ? 190 : 19;
+      priceId = billing === 'yearly' ? PADDLE_PRICE_PRO_YEARLY : PADDLE_PRICE_PRO_MONTHLY;
     } else if (plan === 'agency') {
-      price = billing === 'yearly' ? 790 : 79;
+      priceId = billing === 'yearly' ? PADDLE_PRICE_AGENCY_YEARLY : PADDLE_PRICE_AGENCY_MONTHLY;
     } else {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid plan' }));
       return;
     }
 
-    // Create unique platform_order_id: base64url(email:plan:timestamp)
-    const timestamp = Date.now();
-    const orderData = `${email}:${plan}:${timestamp}`;
-    const platform_order_id = Buffer.from(orderData).toString('base64url');
-
-    // Shopier checkout URL and params
-    const shopierUrl = 'https://www.shopier.com/ShowProduct/api_pay4.php';
-    
-    // We will generate the parameters that the frontend will submit via POST form
-    const formParams: Record<string, string> = {
-      API_key: SHOPIER_API_KEY,
-      website: 'securify.gucluyumhe.dev',
-      platform_order_id: platform_order_id,
-      product_name: `Securify ${plan === 'pro' ? 'Pro' : 'Agency'} (${billing || 'monthly'})`,
-      product_type: '0', // 0 = Digital product
-      buyer_name: 'Securify',
-      buyer_surname: 'User',
-      buyer_email: email,
-      buyer_phone: '05555555555',
-      total_order_value: price.toString(),
-      currency: '1', // 1 = TRY (You can adjust based on Shopier account currency settings)
-      current_language: 'tr',
-      callback_url: `${SITE_URL}/api/shopier-return`,
-    };
-
-    // Calculate Shopier hash signature for frontend form submission
-    // Shopier signature is created using key, website, order_id, product_name, price, currency, lang, and api_secret
-    const hashData = 
-      formParams.API_key + 
-      formParams.website + 
-      formParams.platform_order_id + 
-      formParams.product_name + 
-      formParams.total_order_value + 
-      formParams.currency + 
-      formParams.current_language + 
-      SHOPIER_API_SECRET;
-
-    const signature = createHmac('sha256', SHOPIER_API_SECRET)
-      .update(hashData)
-      .digest('base64');
-
-    formParams.sign = signature;
+    if (!priceId) {
+      // In sandbox mode, we can provide a default mock value to ease local development/testing
+      if (PADDLE_ENV === 'sandbox') {
+        priceId = `mock_${plan}_${billing || 'monthly'}`;
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payment gateway price ID is not configured' }));
+        return;
+      }
+    }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      shopierUrl,
-      fields: formParams
+      priceId,
+      clientToken: PADDLE_CLIENT_TOKEN,
+      environment: PADDLE_ENV,
+      email: email.trim().toLowerCase(),
+      plan,
+      billing: billing || 'monthly'
     }));
   } catch (error: any) {
     console.error('Error creating checkout:', error);

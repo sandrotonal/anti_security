@@ -15,8 +15,11 @@
     <!-- NOTE: X-Frame-Options and frame-ancestors ONLY work as HTTP headers (set in vercel.json) -->
     <!-- CSP via meta — frame-ancestors is intentionally omitted (unsupported in meta) -->
     <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; media-src 'self' https://d8j0ntlcm91z4.cloudfront.net blob:; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://submify.vercel.app; base-uri 'self'; form-action 'self' https://www.shopier.com;"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.paddle.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; media-src 'self' https://d8j0ntlcm91z4.cloudfront.net blob:; connect-src 'self' https://api.paddle.com https://sandbox-api.paddle.com https://checkout.paddle.com https://sandbox-checkout.paddle.com https://www.google-analytics.com https://analytics.google.com https://submify.vercel.app; frame-src 'self' https://checkout.paddle.com https://sandbox-checkout.paddle.com; base-uri 'self'; form-action 'self';"
     />
+
+    <!-- Paddle Checkout SDK -->
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 
 
     <!-- ============================================================ -->

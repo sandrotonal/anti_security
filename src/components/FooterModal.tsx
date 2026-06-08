@@ -137,13 +137,13 @@ for the purposes of data protection regulations, your personal data is processed
 2. data processed & purpose
 when you register or purchase a subscription, we collect your email address, name, phone number, and payment information to:
 - complete membership registration and verify subscriptions.
-- securely process payments via shopier.
+- securely process payments via paddle.
 - resolve technical support requests.
 
 securify operates on a zero-knowledge architecture. your scanned code repositories and files are never uploaded to our servers; all scanning is performed locally in your browser.
 
 3. data sharing
-your personal data may only be shared with competent public authorities to fulfill legal obligations, and with our secure payment processor shopier to complete transaction processing. we do not share your data with other third parties.
+your personal data may only be shared with competent public authorities to fulfill legal obligations, and with our secure payment processor paddle to complete transaction processing. we do not share your data with other third parties.
 
 4. your rights
 under gdpr, you have the right to access, rectify, or erase your personal data, or restrict its processing. you may exercise these rights at any time by contacting us at omeriletisimportfolyo@gmail.com.`;
