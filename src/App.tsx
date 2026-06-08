@@ -196,6 +196,10 @@ function App() {
         billing
       });
 
+      if (priceId && priceId.startsWith('mock_')) {
+        console.warn(`[Securify Paddle Warning] priceId is "${priceId}" (mock). This indicates that the Vercel environment variable PADDLE_PRICE_${plan.toUpperCase()}_${billing.toUpperCase()} is not set. Paddle Sandbox API will reject mock IDs with a 400 Bad Request. Please configure your Vercel Environment Variables and re-deploy.`);
+      }
+
       const paddle = (window as any).Paddle;
       if (!paddle) {
         throw new Error('ödeme altyapısı yüklenemedi. lütfen reklam engelleyicinizi (adblocker) kontrol edin.');

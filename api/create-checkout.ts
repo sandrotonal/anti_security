@@ -68,10 +68,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     // Determine the Price ID based on plan and billing
     let priceId = '';
-    if (plan === 'pro') {
-      priceId = billing === 'yearly' ? PADDLE_PRICE_PRO_YEARLY : PADDLE_PRICE_PRO_MONTHLY;
-    } else if (plan === 'agency') {
-      priceId = billing === 'yearly' ? PADDLE_PRICE_AGENCY_YEARLY : PADDLE_PRICE_AGENCY_MONTHLY;
+    const planLower = plan.toLowerCase();
+    const billingLower = (billing || 'monthly').toLowerCase();
+
+    if (planLower === 'pro') {
+      priceId = billingLower === 'yearly' ? PADDLE_PRICE_PRO_YEARLY : PADDLE_PRICE_PRO_MONTHLY;
+    } else if (planLower === 'agency') {
+      priceId = billingLower === 'yearly' ? PADDLE_PRICE_AGENCY_YEARLY : PADDLE_PRICE_AGENCY_MONTHLY;
     } else {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid plan' }));

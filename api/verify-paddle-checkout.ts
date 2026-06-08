@@ -160,7 +160,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const txnEmail = (customData.email || '').trim().toLowerCase();
     const txnPlan = customData.plan || '';
 
-    if (txnEmail !== trimmedEmail || txnPlan !== plan) {
+    if (txnEmail !== trimmedEmail || txnPlan.toLowerCase() !== plan.toLowerCase()) {
       console.error(`Paddle Transaction details mismatch! Expected email: ${trimmedEmail}, plan: ${plan}. Got email: ${txnEmail}, plan: ${txnPlan}`);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Transaction metadata mismatch' }));
