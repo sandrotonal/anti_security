@@ -1,9 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { createHmac } from 'crypto';
 
-const SHOPIER_API_KEY = process.env.SHOPIER_API_KEY || 'your-shopier-api-key';
-const SHOPIER_API_SECRET = process.env.SHOPIER_API_SECRET || 'your-shopier-api-secret';
-const SITE_URL = process.env.SITE_URL || 'https://securify.gucluyumhe.dev';
+const PADDLE_ENV = process.env.PADDLE_ENV || 'sandbox';
+const PADDLE_CLIENT_TOKEN = process.env.PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || process.env.NEXT_PUBLIC_CLIENT_TOKEN || '';
+
+const PADDLE_PRICE_PRO_MONTHLY = process.env.PADDLE_PRICE_PRO_MONTHLY || process.env.PADDLE_PRO_MONTHLY || '';
+const PADDLE_PRICE_PRO_YEARLY = process.env.PADDLE_PRICE_PRO_YEARLY || process.env.PADDLE_PRO_YEARLY || '';
+const PADDLE_PRICE_AGENCY_MONTHLY = process.env.PADDLE_PRICE_AGENCY_MONTHLY || process.env.PADDLE_AGENCY_MONTHLY || '';
+const PADDLE_PRICE_AGENCY_YEARLY = process.env.PADDLE_PRICE_AGENCY_YEARLY || process.env.PADDLE_AGENCY_YEARLY || '';
 
 async function parseJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -47,71 +50,74 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       : await parseJsonBody(req);
     const { email, plan, billing } = body;
 
+    console.log('[Paddle Create Checkout] Request body:', { email, plan, billing });
+    console.log('[Paddle Create Checkout] Environment Config:', {
+      PADDLE_ENV,
+      PADDLE_CLIENT_TOKEN_PREFIX: PADDLE_CLIENT_TOKEN ? `${PADDLE_CLIENT_TOKEN.substring(0, 18)}... (len: ${PADDLE_CLIENT_TOKEN.length})` : 'undefined',
+      PADDLE_PRICE_PRO_MONTHLY_PREFIX: PADDLE_PRICE_PRO_MONTHLY ? `${PADDLE_PRICE_PRO_MONTHLY.substring(0, 12)}... (len: ${PADDLE_PRICE_PRO_MONTHLY.length})` : 'undefined',
+      PADDLE_PRICE_PRO_YEARLY_PREFIX: PADDLE_PRICE_PRO_YEARLY ? `${PADDLE_PRICE_PRO_YEARLY.substring(0, 12)}... (len: ${PADDLE_PRICE_PRO_YEARLY.length})` : 'undefined',
+      PADDLE_PRICE_AGENCY_MONTHLY_PREFIX: PADDLE_PRICE_AGENCY_MONTHLY ? `${PADDLE_PRICE_AGENCY_MONTHLY.substring(0, 12)}... (len: ${PADDLE_PRICE_AGENCY_MONTHLY.length})` : 'undefined',
+      PADDLE_PRICE_AGENCY_YEARLY_PREFIX: PADDLE_PRICE_AGENCY_YEARLY ? `${PADDLE_PRICE_AGENCY_YEARLY.substring(0, 12)}... (len: ${PADDLE_PRICE_AGENCY_YEARLY.length})` : 'undefined',
+    });
+
     if (!email || !plan) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Email and plan are required' }));
       return;
     }
 
-    // Determine price based on plan and billing
-    let price = 19;
-    if (plan === 'pro') {
-      price = billing === 'yearly' ? 190 : 19;
-    } else if (plan === 'agency') {
-      price = billing === 'yearly' ? 790 : 79;
+    // Determine the Price ID based on plan and billing
+    let priceId = '';
+    const planLower = plan.toLowerCase();
+    const billingLower = (billing || 'monthly').toLowerCase();
+
+    if (planLower === 'pro') {
+      priceId = billingLower === 'yearly' ? PADDLE_PRICE_PRO_YEARLY : PADDLE_PRICE_PRO_MONTHLY;
+    } else if (planLower === 'agency') {
+      priceId = billingLower === 'yearly' ? PADDLE_PRICE_AGENCY_YEARLY : PADDLE_PRICE_AGENCY_MONTHLY;
     } else {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid plan' }));
       return;
     }
 
-    // Create unique platform_order_id: base64url(email:plan:timestamp)
-    const timestamp = Date.now();
-    const orderData = `${email}:${plan}:${timestamp}`;
-    const platform_order_id = Buffer.from(orderData).toString('base64url');
+    // Auto-detect environment based on PADDLE_CLIENT_TOKEN prefix to prevent mismatch errors
+    let environment = PADDLE_ENV;
+    if (
+      PADDLE_CLIENT_TOKEN.startsWith('live_') ||
+      PADDLE_CLIENT_TOKEN.startsWith('paddletoken_live_') ||
+      PADDLE_CLIENT_TOKEN.includes('_live_')
+    ) {
+      environment = 'production';
+    } else if (
+      PADDLE_CLIENT_TOKEN.startsWith('test_') ||
+      PADDLE_CLIENT_TOKEN.startsWith('paddletoken_test_') ||
+      PADDLE_CLIENT_TOKEN.includes('_test_')
+    ) {
+      environment = 'sandbox';
+    }
 
-    // Shopier checkout URL and params
-    const shopierUrl = 'https://www.shopier.com/ShowProduct/api_pay4.php';
-    
-    // We will generate the parameters that the frontend will submit via POST form
-    const formParams: Record<string, string> = {
-      API_key: SHOPIER_API_KEY,
-      website: 'securify.gucluyumhe.dev',
-      platform_order_id: platform_order_id,
-      product_name: `Securify ${plan === 'pro' ? 'Pro' : 'Agency'} (${billing || 'monthly'})`,
-      product_type: '0', // 0 = Digital product
-      buyer_name: 'Securify',
-      buyer_surname: 'User',
-      buyer_email: email,
-      buyer_phone: '05555555555',
-      total_order_value: price.toString(),
-      currency: '1', // 1 = TRY (You can adjust based on Shopier account currency settings)
-      current_language: 'tr',
-      callback_url: `${SITE_URL}/api/shopier-return`,
-    };
+    if (!priceId) {
+      // In sandbox mode, we can provide a default mock value to ease local development/testing
+      if (environment === 'sandbox') {
+        priceId = `mock_${plan}_${billing || 'monthly'}`;
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payment gateway price ID is not configured' }));
+        return;
+      }
+    }
 
-    // Calculate Shopier hash signature for frontend form submission
-    // Shopier signature is created using key, website, order_id, product_name, price, currency, lang, and api_secret
-    const hashData = 
-      formParams.API_key + 
-      formParams.website + 
-      formParams.platform_order_id + 
-      formParams.product_name + 
-      formParams.total_order_value + 
-      formParams.currency + 
-      formParams.current_language + 
-      SHOPIER_API_SECRET;
-
-    const signature = createHmac('sha256', SHOPIER_API_SECRET)
-      .update(hashData)
-      .digest('base64');
-
-    formParams.sign = signature;
+    console.log('[Paddle Create Checkout] Resolved values:', { priceId, environment });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      shopierUrl,
-      fields: formParams
+      priceId,
+      clientToken: PADDLE_CLIENT_TOKEN,
+      environment,
+      email: email.trim().toLowerCase(),
+      plan,
+      billing: billing || 'monthly'
     }));
   } catch (error: any) {
     console.error('Error creating checkout:', error);

@@ -20,7 +20,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "what is the difference between securify free and pro?",
-    answer: "the free plan provides 5 scans per day, local file scanning, and basic vulnerability detection — enough for individual developers and side projects. the pro plan ($19/month) unlocks unlimited scans, pdf compliance reports, github private repository integration, rest api access, and custom security rules. agency plan ($79/month) adds white-label features and unlimited team seats."
+    answer: "the free plan provides 5 scans per day, local file scanning, and basic vulnerability detection — enough for individual developers and side projects. the pro plan ($9/month) unlocks unlimited scans, pdf compliance reports, github private repository integration, rest api access, and custom security rules. agency plan ($39/month) adds white-label features and unlimited team seats."
   },
   {
     question: "which programming languages and file types are supported?",
