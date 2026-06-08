@@ -81,6 +81,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       : await parseJsonBody(req);
     const { transaction_id, email, plan } = body;
 
+    console.log('[Paddle Verify Checkout] Request body:', { transaction_id, email, plan });
+    console.log('[Paddle Verify Checkout] Config:', {
+      PADDLE_ENV,
+      environment,
+      PADDLE_API_KEY_PREFIX: PADDLE_API_KEY ? `${PADDLE_API_KEY.substring(0, 10)}... (len: ${PADDLE_API_KEY.length})` : 'undefined',
+      PADDLE_CLIENT_TOKEN_PREFIX: PADDLE_CLIENT_TOKEN ? `${PADDLE_CLIENT_TOKEN.substring(0, 18)}... (len: ${PADDLE_CLIENT_TOKEN.length})` : 'undefined',
+    });
+
     if (!transaction_id || !email || !plan) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'transaction_id, email, and plan are required' }));

@@ -186,6 +186,15 @@ function App() {
       }
 
       const { priceId, clientToken, environment, email: customerEmail, plan, billing } = await response.json();
+      
+      console.log('[Securify Paddle Checkout Initiating]', {
+        priceId,
+        clientTokenPrefix: clientToken ? clientToken.substring(0, 15) + '...' : 'none',
+        environment,
+        email: customerEmail,
+        plan,
+        billing
+      });
 
       const paddle = (window as any).Paddle;
       if (!paddle) {

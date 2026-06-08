@@ -50,6 +50,16 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       : await parseJsonBody(req);
     const { email, plan, billing } = body;
 
+    console.log('[Paddle Create Checkout] Request body:', { email, plan, billing });
+    console.log('[Paddle Create Checkout] Environment Config:', {
+      PADDLE_ENV,
+      PADDLE_CLIENT_TOKEN_PREFIX: PADDLE_CLIENT_TOKEN ? `${PADDLE_CLIENT_TOKEN.substring(0, 18)}... (len: ${PADDLE_CLIENT_TOKEN.length})` : 'undefined',
+      PADDLE_PRICE_PRO_MONTHLY_PREFIX: PADDLE_PRICE_PRO_MONTHLY ? `${PADDLE_PRICE_PRO_MONTHLY.substring(0, 12)}... (len: ${PADDLE_PRICE_PRO_MONTHLY.length})` : 'undefined',
+      PADDLE_PRICE_PRO_YEARLY_PREFIX: PADDLE_PRICE_PRO_YEARLY ? `${PADDLE_PRICE_PRO_YEARLY.substring(0, 12)}... (len: ${PADDLE_PRICE_PRO_YEARLY.length})` : 'undefined',
+      PADDLE_PRICE_AGENCY_MONTHLY_PREFIX: PADDLE_PRICE_AGENCY_MONTHLY ? `${PADDLE_PRICE_AGENCY_MONTHLY.substring(0, 12)}... (len: ${PADDLE_PRICE_AGENCY_MONTHLY.length})` : 'undefined',
+      PADDLE_PRICE_AGENCY_YEARLY_PREFIX: PADDLE_PRICE_AGENCY_YEARLY ? `${PADDLE_PRICE_AGENCY_YEARLY.substring(0, 12)}... (len: ${PADDLE_PRICE_AGENCY_YEARLY.length})` : 'undefined',
+    });
+
     if (!email || !plan) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Email and plan are required' }));
@@ -94,6 +104,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return;
       }
     }
+
+    console.log('[Paddle Create Checkout] Resolved values:', { priceId, environment });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
