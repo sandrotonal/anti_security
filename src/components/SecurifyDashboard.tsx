@@ -302,14 +302,8 @@ export const SecurifyDashboard = ({
   useEffect(() => {
     let active = true;
     if (githubUser) {
-      const defaultRepos = [
-        `${githubUser.username}/anti_security`,
-        `${githubUser.username}/istanbul_api`,
-        `${githubUser.username}/react-dashboard`,
-        `${githubUser.username}/personal-site`
-      ];
-      setGithubRepos(defaultRepos);
-      setSelectedGithubRepo(`${githubUser.username}/anti_security`);
+      setGithubRepos(['loading repositories...']);
+      setSelectedGithubRepo('');
 
       // Fetch real public and private repositories from GitHub
       const fetchRealRepos = async () => {
@@ -326,13 +320,22 @@ export const SecurifyDashboard = ({
           const res = await fetch(url, { headers });
           if (!res.ok) throw new Error('Failed to fetch repositories');
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0 && active) {
+          if (Array.isArray(data) && active) {
             const repoNames = data.map((r: any) => r.full_name);
-            setGithubRepos(repoNames);
-            setSelectedGithubRepo(repoNames[0]);
+            if (repoNames.length > 0) {
+              setGithubRepos(repoNames);
+              setSelectedGithubRepo(repoNames[0]);
+            } else {
+              setGithubRepos([]);
+              setSelectedGithubRepo('');
+            }
           }
         } catch (err) {
-          console.warn('Using fallback repositories due to API limit or error:', err);
+          console.error('API error while fetching repositories:', err);
+          if (active) {
+            setGithubRepos([]);
+            setSelectedGithubRepo('');
+          }
         }
       };
 
@@ -839,14 +842,19 @@ export const SecurifyDashboard = ({
           .filter((node: any) => node.type === 'blob')
           .map((node: any) => node.path);
       }
-    } catch (err) {
-      console.warn('API error during scan, using fallback simulation:', err);
-      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
-      defaultBranch = 'main';
+    } catch (err: any) {
+      console.error('API error during scan:', err);
+      addLog(`Failed to scan repository: ${err.message || err}`, 'failed');
+      setScanning(false);
+      setScanProgress(null);
+      return;
     }
 
     if (repoFiles.length === 0) {
-      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
+      addLog(`Repository contains no files or is empty.`, 'failed');
+      setScanning(false);
+      setScanProgress(null);
+      return;
     }
 
     // Wave 7: Scan CI/CD Actions Workflows
@@ -2155,14 +2163,20 @@ Report generated cryptographically via Securify SaaS platform.
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto sm:items-center">
                       <select
-                        disabled={scanning}
+                        disabled={scanning || githubRepos.length === 0 || githubRepos[0] === 'loading repositories...'}
                         value={selectedGithubRepo}
                         onChange={(e) => setSelectedGithubRepo(e.target.value)}
-                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase"
+                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase disabled:opacity-50"
                       >
-                        {githubRepos.map(repo => (
-                          <option key={repo} value={repo}>{repo}</option>
-                        ))}
+                        {githubRepos.length === 0 ? (
+                          <option value="">no repositories found</option>
+                        ) : githubRepos[0] === 'loading repositories...' ? (
+                          <option value="">loading repositories...</option>
+                        ) : (
+                          githubRepos.map(repo => (
+                            <option key={repo} value={repo}>{repo}</option>
+                          ))
+                        )}
                       </select>
                       <button
                         onClick={() => handleGithubScan(selectedGithubRepo)}
