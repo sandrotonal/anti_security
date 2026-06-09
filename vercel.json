@@ -25,5 +25,8 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/badge.svg", "destination": "/api/badge" }
   ]
 }

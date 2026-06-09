@@ -154,6 +154,8 @@ interface SecurifyDashboardProps {
   onViewChange?: (view: any) => void;
   premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
   onPurchaseTrigger?: (planId: string, planName: string, billing: 'monthly' | 'yearly') => void;
+  initialWebsiteUrl?: string;
+  onClearInitialWebsiteUrl?: () => void;
 }
 
 export const SecurifyDashboard = ({ 
@@ -161,7 +163,9 @@ export const SecurifyDashboard = ({
   onGithubLogin, 
   onViewChange,
   premiumStatus,
-  onPurchaseTrigger
+  onPurchaseTrigger,
+  initialWebsiteUrl,
+  onClearInitialWebsiteUrl
 }: SecurifyDashboardProps) => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
@@ -226,6 +230,66 @@ export const SecurifyDashboard = ({
   const [siteReportShared, setSiteReportShared] = useState<boolean>(false);
   const [solutionConfigTab, setSolutionConfigTab] = useState<'nginx' | 'nextjs' | 'express' | 'apache'>('nginx');
   const [selectedGithubRepo, setSelectedGithubRepo] = useState<string>('');
+
+  const performSiteScan = async (target: string) => {
+    setSiteScanning(true);
+    setSiteScanResults(null);
+    setSiteScanError(null);
+    setActiveSiteExploitSim(null);
+    setIsLiveStream(false);
+
+    // 1. Progress Step Simulation for premium UX
+    const steps = [
+      "resolving DNS chain and verifying IP address allocations (SSRF protection active)...",
+      "probing SSL/TLS certificate chain, cipher suites, and HTTPS enforcement...",
+      "analyzing Content-Security-Policy (CSP) directive quality and XSS mitigations...",
+      "verifying HSTS preload status, max-age, and subdomain enforcement...",
+      "inspecting Clickjacking protection, CORS configuration, and frame-ancestors...",
+      "scanning Permissions-Policy, MIME controls, and Referrer-Policy...",
+      "fingerprinting server banner, runtime stack disclosure, and tech signatures...",
+      "computing GDPR Art. 32 / KVKK compliance exposure and IBM breach cost model...",
+      "generating risk-weighted security grade and attack surface summary..."
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      setSiteScanProgress({
+        current: i + 1,
+        total: steps.length,
+        message: steps[i]
+      });
+      await new Promise(resolve => setTimeout(resolve, i === 0 ? 400 : i === 1 ? 600 : i === 2 ? 500 : i === 3 ? 400 : i === 4 ? 350 : i === 5 ? 350 : i === 6 ? 300 : i === 7 ? 500 : 400));
+    }
+
+    try {
+      // 2. Fetch live data from serverless function
+      const response = await fetch(`/api/scan-site?url=${encodeURIComponent(target)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Server responded with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSiteScanResults(data);
+    } catch (err: any) {
+      console.error("Real-time scan failed:", err);
+      setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
+    } finally {
+      setSiteScanning(false);
+      setSiteScanProgress(null);
+    }
+  };
+
+  useEffect(() => {
+    if (initialWebsiteUrl) {
+      setScanTab('website');
+      setSiteUrl(initialWebsiteUrl);
+      performSiteScan(initialWebsiteUrl);
+      if (onClearInitialWebsiteUrl) {
+        onClearInitialWebsiteUrl();
+      }
+    }
+  }, [initialWebsiteUrl]);
 
   const [githubRepos, setGithubRepos] = useState<string[]>([]);
   const [customRepoName, setCustomRepoName] = useState<string>('');
@@ -1645,55 +1709,7 @@ audit performed client-side using Securify Interactive Portal.
   const handleWebsiteScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!siteUrl.trim()) return;
-
-    setSiteScanning(true);
-    setSiteScanResults(null);
-    setSiteScanError(null);
-    setActiveSiteExploitSim(null);
-    setIsLiveStream(false);
-
-    const target = siteUrl.trim();
-
-    // 1. Progress Step Simulation for premium UX
-    const steps = [
-      "resolving DNS chain and verifying IP address allocations (SSRF protection active)...",
-      "probing SSL/TLS certificate chain, cipher suites, and HTTPS enforcement...",
-      "analyzing Content-Security-Policy (CSP) directive quality and XSS mitigations...",
-      "verifying HSTS preload status, max-age, and subdomain enforcement...",
-      "inspecting Clickjacking protection, CORS configuration, and frame-ancestors...",
-      "scanning Permissions-Policy, MIME controls, and Referrer-Policy...",
-      "fingerprinting server banner, runtime stack disclosure, and tech signatures...",
-      "computing GDPR Art. 32 / KVKK compliance exposure and IBM breach cost model...",
-      "generating risk-weighted security grade and attack surface summary..."
-    ];
-
-    for (let i = 0; i < steps.length; i++) {
-      setSiteScanProgress({
-        current: i + 1,
-        total: steps.length,
-        message: steps[i]
-      });
-      await new Promise(resolve => setTimeout(resolve, i === 0 ? 400 : i === 1 ? 600 : i === 2 ? 500 : i === 3 ? 400 : i === 4 ? 350 : i === 5 ? 350 : i === 6 ? 300 : i === 7 ? 500 : 400));
-    }
-
-    try {
-      // 2. Fetch live data from serverless function
-      const response = await fetch(`/api/scan-site?url=${encodeURIComponent(target)}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `Server responded with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      setSiteScanResults(data);
-    } catch (err: any) {
-      console.error("Real-time scan failed:", err);
-      setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
-    } finally {
-      setSiteScanning(false);
-      setSiteScanProgress(null);
-    }
+    await performSiteScan(siteUrl.trim());
   };
 
   const handleStartSiteExploitSimulation = (checkKey: string, checkName: string) => {
@@ -1818,7 +1834,86 @@ audit performed client-side using Securify Interactive Portal.
 
   const handleExportSiteReportMarkdown = () => {
     if (!siteScanResults) return;
-    const md = `# Securify Live Website Security Audit
+    
+    let md = '';
+    
+    if (premiumStatus?.valid) {
+      // Premium Enriched Audit Report with SOC2 / GDPR / KVKK checklists
+      md = `# SECURIFY VERIFIED · LIVE WEBSITE SECURITY AUDIT REPORT
+================================================================================
+Target Host: ${siteScanResults.domain}
+Scanned Via: Securify Automated Security Engine
+Timestamp: ${siteScanResults.scannedAt}
+Security Grade: ${siteScanResults.grade} (Score: ${siteScanResults.score}/100)
+Compliance Status: ${siteScanResults.score >= 82 ? 'COMPLIANT' : 'NON-COMPLIANT / RISK EXPOSURE'}
+================================================================================
+
+## 1. EXECUTIVE SUMMARY
+This report details the cryptographic security audit, HTTP header inspection, and regulatory compliance posture analysis of the domain "${siteScanResults.domain}". 
+
+Under GDPR Article 32, organizations are legally required to implement "appropriate technical and organizational measures to ensure a level of security appropriate to the risk". The presence of missing or weak HTTP security headers directly violates standard data protection criteria and exposes the application to severe web-based exploits.
+
+--------------------------------------------------------------------------------
+RISK EXPOSURE METRICS:
+- Potential Compliance Fines (GDPR/KVKK): ${siteScanResults.financialRisk.potentialFine}
+- Estimated Data Breach Impact: ${siteScanResults.financialRisk.dataBreachRisk}
+- Cyber Insurance Actuarial Surcharge: ${siteScanResults.financialRisk.cyberInsurancePenalty}
+- Active Vulnerability Count: ${siteScanResults.failedChecks} / ${siteScanResults.totalChecks}
+--------------------------------------------------------------------------------
+
+## 2. SOC 2 COMPLIANCE PREVIEW CHECKLIST
+The following checklist details how the audited headers map to the SOC 2 Trust Services Criteria (TSC) for Security (CC6.x System Operations) and Privacy.
+
+[${siteScanResults.checks.csp?.pass ? 'x' : ' '}] CC6.1 - Access Control and Perimeter Defense:
+    - Content-Security-Policy (CSP): ${siteScanResults.checks.csp?.pass ? 'PASSED' : 'FAILED - Missing or weak CSP allows XSS and data exfiltration.'}
+    - CORS Policy: ${siteScanResults.checks.cors?.pass ? 'PASSED' : 'FAILED - Overly permissive CORS allows unauthorized cross-origin access.'}
+
+[${siteScanResults.checks.hsts?.pass ? 'x' : ' '}] CC6.6 - Boundary Protection & Downgrade Prevention:
+    - HTTP Strict Transport Security (HSTS): ${siteScanResults.checks.hsts?.pass ? 'PASSED' : 'FAILED - Lacking transport layer protection. Vulnerable to MITM.'}
+
+[${siteScanResults.checks.xfo?.pass ? 'x' : ' '}] CC6.8 - Transmission Protection & Clickjacking:
+    - Clickjacking Defense (X-Frame-Options / frame-ancestors): ${siteScanResults.checks.xfo?.pass ? 'PASSED' : 'FAILED - UI redressing exploit active.'}
+
+[${siteScanResults.checks.serverLeak?.pass && siteScanResults.checks.xPoweredByLeak?.pass ? 'x' : ' '}] CC6.8 - Information Disclosure Prevention:
+    - Server Banner: ${siteScanResults.checks.serverLeak?.pass ? 'PASSED' : 'FAILED - Revealing server runtime version information.'}
+    - Runtime Technology Stack Disclosure: ${siteScanResults.checks.xPoweredByLeak?.pass ? 'PASSED' : 'FAILED - Revealing backend framework signatures.'}
+
+[${siteScanResults.checks.xcto?.pass ? 'x' : ' '}] CC6.3 - Input Validation and Injection Defense:
+    - MIME Sniffing Protection (nosniff): ${siteScanResults.checks.xcto?.pass ? 'PASSED' : 'FAILED - Browser can execute uploaded media files as scripts.'}
+
+[${siteScanResults.checks.referrer?.pass ? 'x' : ' '}] CC6.8 - Referrer Privacy Enforcement:
+    - Referrer Policy: ${siteScanResults.checks.referrer?.pass ? 'PASSED' : 'FAILED - Risk of leaking private tokens in referrer headers.'}
+
+## 3. REGULATORY COMPLIANCE CORRELATIONS (GDPR / KVKK / PCI-DSS v4)
+- GDPR Article 32 (Security of Processing): Failure to enforce HSTS and CSP indicates a lack of state-of-the-art security measures.
+- GDPR Article 5 (Data Minimization & Referrer Leakage): Leaving Referrer-Policy unconfigured can transmit private user parameters and password reset tokens in URL query strings to external parties.
+- PCI-DSS v4 Requirement 6.4.3: Mandates managing and auditing all client-side scripts. Absent CSP directly prevents compliance with this requirement.
+
+## 4. DETAILED SECURITY CHECKS & REMEDIATIONS
+${Object.values(siteScanResults.checks).map((chk: any) => `
+### [${chk.pass ? 'PASS' : 'FAIL'}] ${chk.name}
+- Severity: ${chk.severity.toUpperCase()}
+- CWE: ${chk.cwe || 'N/A'}
+- Observed Value: "${chk.value}"
+- Technical Impact: ${chk.impact}
+- Business Risk: ${chk.businessImpact || 'N/A'}
+- Remediation Strategy: ${chk.recommendation}
+--------------------------------------------------------------------------------
+`).join('\n')}
+
+## 5. RE-VERIFICATION & EDGE PATCHING
+To automate the verification of these vulnerabilities and deploy instant virtual patching at the edge:
+1. Log in to your Securify Dashboard.
+2. Navigate to "Live Site Scanner" for "${siteScanResults.domain}".
+3. Generate the required security configuration using the Interactive Policy Builder.
+4. Apply the Edge Patching rules to rewrite headers dynamically at your CDN / Proxy level.
+
+================================================================================
+Report cryptographically signed and generated by Securify Platform (https://securify.gucluyumhe.dev).
+`;
+    } else {
+      // Basic free user report
+      md = `# Securify Live Website Security Audit
 Domain: ${siteScanResults.domain}
 Audit Time: ${siteScanResults.scannedAt}
 Security Grade: ${siteScanResults.grade} (Score: ${siteScanResults.score}/100)
@@ -1840,6 +1935,7 @@ ${Object.values(siteScanResults.checks).map((chk: any) => `
 ---
 Report generated cryptographically via Securify SaaS platform.
 `;
+    }
 
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);

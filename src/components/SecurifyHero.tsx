@@ -1,7 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-export const SecurifyHero = () => {
+interface SecurifyHeroProps {
+  onScanSite: (url: string) => void;
+}
+
+export const SecurifyHero = ({ onScanSite }: SecurifyHeroProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [urlInput, setUrlInput] = useState('');
 
   useEffect(() => {
     // Attempt programmatic play to bypass mobile restrictions on mount
@@ -11,6 +16,13 @@ export const SecurifyHero = () => {
       });
     }
   }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (urlInput.trim()) {
+      onScanSite(urlInput.trim());
+    }
+  };
 
   return (
     <section className="relative h-screen w-full overflow-hidden bg-black select-none">
@@ -43,10 +55,30 @@ export const SecurifyHero = () => {
             data
           </h1>
 
-          {/* Description Paragraph */}
-          <p className="absolute left-6 md:left-10 top-[46%] max-w-[240px] text-[15px] leading-snug text-white/90 lowercase select-none font-light">
-            we can guarding your data with utmost care, empowering you with privacy everywhere
-          </p>
+          {/* Description & Scan Input (Grouped to avoid overlap and ensure clickability) */}
+          <div className="absolute left-6 md:left-10 top-[48%] md:top-[50%] max-w-[280px] md:max-w-[400px] pointer-events-auto space-y-4 text-left">
+            <p className="text-[13px] md:text-[15px] leading-snug text-white/95 lowercase font-light select-none">
+              we can guarding your data with utmost care, empowering you with privacy everywhere. scan your domain instantly.
+            </p>
+            
+            <form onSubmit={handleSubmit} className="flex gap-2 w-full">
+              <input
+                type="text"
+                required
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="e.g. example.com"
+                className="bg-black/55 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3.5 focus:outline-none focus:border-white/20 placeholder-neutral-600 w-full lowercase backdrop-blur-md transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!urlInput.trim()}
+                className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none disabled:opacity-50 shrink-0"
+              >
+                scan site
+              </button>
+            </form>
+          </div>
 
         </main>
       </div>

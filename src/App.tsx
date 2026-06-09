@@ -58,6 +58,7 @@ function App() {
   });
   const [premiumStatus, setPremiumStatus] = useState<{ valid: boolean; email?: string; plan?: string; expiresAt?: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ show: boolean; status: 'success' | 'failed'; plan?: string; email?: string; error?: string } | null>(null);
+  const [initialWebsiteUrl, setInitialWebsiteUrl] = useState<string>('');
 
   // Token Validation on Startup
   useEffect(() => {
@@ -487,7 +488,11 @@ function App() {
       <main className="transition-all duration-300">
         {activeView === 'home' && (
           <div className="animate-page-entrance">
-            <SecurifyHero />
+            <SecurifyHero onScanSite={(url) => {
+              setInitialWebsiteUrl(url);
+              setActiveView('dashboard');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }} />
             <SecurifyTrust />
             <div className="relative z-10 bg-black">
                <SecurifySimulator />
@@ -518,6 +523,8 @@ function App() {
                 setCheckoutEmail('');
                 setCheckoutError('');
               }}
+              initialWebsiteUrl={initialWebsiteUrl}
+              onClearInitialWebsiteUrl={() => setInitialWebsiteUrl('')}
             />
           </div>
         )}
