@@ -24,6 +24,7 @@ import { SecurifyShortcuts } from './components/SecurifyShortcuts';
 import { GithubAuthModal } from './components/GithubAuthModal';
 import { SecurifyAuditor } from './components/SecurifyAuditor';
 import { SecurifyPricing } from './components/SecurifyPricing';
+import { SecurifyHomeScanner } from './components/SecurifyHomeScanner';
 
 function App() {
   const paddleInitializedRef = useRef<boolean>(false);
@@ -488,11 +489,7 @@ function App() {
       <main className="transition-all duration-300">
         {activeView === 'home' && (
           <div className="animate-page-entrance">
-            <SecurifyHero onScanSite={(url) => {
-              setInitialWebsiteUrl(url);
-              setActiveView('dashboard');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }} />
+            <SecurifyHero />
             <SecurifyTrust />
             <div className="relative z-10 bg-black">
                <SecurifySimulator />
@@ -501,6 +498,11 @@ function App() {
                <SecurifyConsoleDocs />
                <SecurifyROI />
                <SecurifyTestimonials />
+               <SecurifyHomeScanner onScanSite={(url) => {
+                 setInitialWebsiteUrl(url);
+                 setActiveView('dashboard');
+                 window.scrollTo({ top: 0, behavior: 'smooth' });
+               }} />
             </div>
           </div>
         )}
