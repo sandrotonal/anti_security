@@ -15,13 +15,13 @@ export const SecurifyHomeScanner = ({ onScanSite }: SecurifyHomeScannerProps) =>
   };
 
   return (
-    <section className="bg-black py-24 px-6 md:px-12 border-t border-white/5 relative overflow-hidden select-none">
+    <section className="bg-black py-24 px-4 sm:px-6 md:px-12 border-t border-white/5 relative overflow-hidden select-none">
       {/* Background Decorative Gradient Glow */}
       <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -top-48 -right-48 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           
           {/* Left Text Block - Marketing and Conversion Angles */}
           <div className="lg:col-span-7 space-y-6 text-left">
@@ -62,7 +62,7 @@ export const SecurifyHomeScanner = ({ onScanSite }: SecurifyHomeScannerProps) =>
 
           {/* Right Input Form Block - Glassmorphic Call to Action */}
           <div className="lg:col-span-5 w-full">
-            <div className="bg-neutral-950/60 border border-white/5 backdrop-blur-sm rounded-3xl p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden group">
+            <div className="bg-neutral-950/40 border border-white/5 backdrop-blur-sm rounded-3xl p-5 sm:p-6 md:p-8 space-y-6 shadow-2xl relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-indigo-500/5 opacity-50 pointer-events-none" />
               
               <div className="space-y-1 text-left relative z-10">
@@ -73,27 +73,24 @@ export const SecurifyHomeScanner = ({ onScanSite }: SecurifyHomeScannerProps) =>
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-3 relative z-10 w-full">
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="e.g. yourdomain.com"
-                    className="w-full bg-black border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3.5 focus:outline-none focus:border-white/20 placeholder-neutral-600 w-full lowercase transition-colors"
-                  />
-                </div>
-                
+              <form onSubmit={handleSubmit} className="relative z-10 w-full flex flex-col sm:flex-row gap-2 bg-neutral-900/60 p-1.5 border border-white/10 focus-within:border-white/20 rounded-2xl transition-all shadow-[inset_0_1px_1px_rgba(255,255,255,0.01)]">
+                <input
+                  type="text"
+                  required
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="e.g. yourdomain.com"
+                  className="flex-1 bg-transparent text-white text-xs font-mono px-3.5 py-3 focus:outline-none placeholder-neutral-700 min-w-0 lowercase w-full sm:w-auto"
+                />
                 <button
                   type="submit"
                   disabled={!urlInput.trim()}
-                  className="w-full bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3.5 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 sm:py-2.5 lowercase transition-all select-none disabled:opacity-40 shrink-0 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <svg className="w-3.5 h-3.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  audit website compliance
+                  audit
                 </button>
               </form>
 

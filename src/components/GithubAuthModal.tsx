@@ -13,6 +13,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
   });
   const [step, setStep] = useState<'input' | 'authorizing' | 'success'>('input');
   const [progressMsg, setProgressMsg] = useState<string>('');
+  const [progressPercent, setProgressPercent] = useState<number>(0);
   
   // Interactive scopes
   const [publicRepo, setPublicRepo] = useState<boolean>(true);
@@ -26,6 +27,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     if (isOpen) {
       setStep('input');
       setProgressMsg('');
+      setProgressPercent(0);
       setAuthError('');
       const savedToken = localStorage.getItem('securify_github_pat') || '';
       setToken(savedToken);
@@ -58,6 +60,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
     }
 
     setStep('authorizing');
+    setProgressPercent(10);
     setProgressMsg('verifying credentials with github api...');
 
     try {
@@ -85,18 +88,29 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
         }
       }
 
+      setProgressPercent(30);
+
       const steps = [
-        'establishing secure oauth handshake...',
-        'requesting scopes...',
-        'generating secure access keys...',
-        'synchronizing user profile details...'
+        { msg: 'establishing secure oauth handshake...', pct: 45 },
+        { msg: 'requesting scopes...', pct: 65 },
+        { msg: 'generating secure access keys...', pct: 85 },
+        { msg: 'synchronizing user profile details...', pct: 95 }
       ];
 
       for (let i = 0; i < steps.length; i++) {
-        setProgressMsg(steps[i]);
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        setProgressMsg(steps[i].msg);
+        const startPct = i === 0 ? 30 : steps[i - 1].pct;
+        const endPct = steps[i].pct;
+        
+        // Smooth transition for progress bar
+        for (let p = startPct; p <= endPct; p += 2) {
+          setProgressPercent(p);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
+      setProgressPercent(100);
       setStep('success');
       await new Promise((resolve) => setTimeout(resolve, 800));
       
@@ -115,13 +129,14 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
       onClose();
     } catch (err: unknown) {
       setStep('input');
+      setProgressPercent(0);
       const errMsg = err instanceof Error ? err.message : 'connection failed';
       setAuthError(errMsg);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
@@ -227,20 +242,25 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
               </div>
 
               {/* Permissions scope checkboxes */}
-              <div className="bg-neutral-900/40 border border-white/5 rounded-2xl p-4 space-y-3">
+              <div className="bg-neutral-900/40 border border-white/5 rounded-2xl p-4 space-y-3 select-none">
                 <span className="text-[9px] font-mono text-neutral-500 block uppercase">requested permissions</span>
                 
                 {/* publicRepo Checkbox */}
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={publicRepo}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setPublicRepo(!publicRepo)}
-                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group"
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      setPublicRepo(!publicRepo);
+                    }
+                  }}
+                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
                   <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
                     publicRepo 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400' 
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
                   }`}>
                     ✓
@@ -253,13 +273,12 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                       read access to public repository structures, metadata, and contents
                     </span>
                   </div>
-                </button>
+                </div>
 
                 {/* privateRepo Checkbox */}
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={privateRepo}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     const newVal = !privateRepo;
                     setPrivateRepo(newVal);
@@ -269,11 +288,23 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                       }, 50);
                     }
                   }}
-                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group"
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      const newVal = !privateRepo;
+                      setPrivateRepo(newVal);
+                      if (newVal && !token.trim()) {
+                        setTimeout(() => {
+                          document.getElementById('github-pat-input')?.focus();
+                        }, 50);
+                      }
+                    }
+                  }}
+                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
                   <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
                     privateRepo 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400' 
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
                   }`}>
                     ✓
@@ -286,19 +317,24 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                       read access to private repository files, contents, and metadata via token
                     </span>
                   </div>
-                </button>
+                </div>
 
                 {/* readUser Checkbox */}
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={readUser}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setReadUser(!readUser)}
-                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group"
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      setReadUser(!readUser);
+                    }
+                  }}
+                  className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
                   <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
                     readUser 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400' 
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
                   }`}>
                     ✓
@@ -311,7 +347,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                       access to profile details (profile image, bio, username) to build dashboard identity
                     </span>
                   </div>
-                </button>
+                </div>
               </div>
 
               {/* Error Message */}
@@ -371,9 +407,14 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
             </div>
 
             <div className="space-y-3 max-w-xs">
-              <h3 className="text-sm font-medium text-white lowercase tracking-wide">authorizing connection</h3>
-              <div className="h-1.5 w-32 bg-neutral-900 border border-white/5 rounded-full mx-auto overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full animate-pulse" style={{ width: '60%' }} />
+              <h3 className="text-sm font-medium text-white lowercase tracking-wide">
+                authorizing connection ({progressPercent}%)
+              </h3>
+              <div className="h-1.5 w-32 bg-neutral-900 border border-white/5 rounded-full mx-auto overflow-hidden relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-150 ease-out" 
+                  style={{ width: `${progressPercent}%` }} 
+                />
               </div>
               <p className="text-neutral-400 font-mono text-[10px] lowercase animate-pulse mt-2 leading-relaxed min-h-[30px]">
                 {progressMsg}

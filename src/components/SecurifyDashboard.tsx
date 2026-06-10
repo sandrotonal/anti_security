@@ -327,6 +327,8 @@ export const SecurifyDashboard = ({
   useEffect(() => {
     let active = true;
     if (githubUser) {
+      setIsLiveStream(false);
+      setLogs([]); // Clear simulated mock logs when real user logs in
       setGithubRepos(['loading repositories...']);
       setSelectedGithubRepo('');
 
@@ -369,6 +371,7 @@ export const SecurifyDashboard = ({
       setGithubRepos([]);
       setSelectedGithubRepo('');
       setScanTab('local');
+      setIsLiveStream(true); // Enable simulation for guest users
     }
     return () => {
       active = false;
@@ -2841,11 +2844,7 @@ Report generated cryptographically via Securify SaaS platform.
                   return (
                     <div 
                       key={key} 
-                      className={`bg-neutral-900/20 border rounded-3xl transition-all duration-300 overflow-hidden ${
-                        check.pass 
-                          ? 'border-white/5 hover:border-emerald-500/10' 
-                          : 'border-white/5 hover:border-amber-500/10'
-                      }`}
+                      className="bg-neutral-900/10 border border-white/5 hover:border-white/10 rounded-3xl transition-all duration-300 overflow-hidden"
                     >
                       {/* Row Header (Clickable) */}
                       <button
@@ -2855,12 +2854,12 @@ Report generated cryptographically via Securify SaaS platform.
                       >
                         <div className="flex items-center gap-3 flex-wrap">
                           {/* Status Dot */}
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                             check.pass 
-                              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
+                              ? 'bg-emerald-500/60' 
                               : check.severity === 'critical' || check.severity === 'high'
-                                ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.3)]'
-                                : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                                ? 'bg-rose-500/70'
+                                : 'bg-amber-500/70'
                           }`} />
                           
                           <span className="text-xs font-semibold text-white lowercase font-sans">{check.name}</span>
@@ -2871,8 +2870,8 @@ Report generated cryptographically via Securify SaaS platform.
                           ) : (
                             <span className={`text-[9px] font-mono border px-2 py-0.5 rounded-md lowercase ${
                               check.severity === 'critical' || check.severity === 'high'
-                                ? 'bg-red-950/20 border-red-500/25 text-red-400 font-semibold'
-                                : 'bg-amber-950/20 border-amber-500/25 text-amber-500'
+                                ? 'bg-rose-950/30 border-rose-500/20 text-rose-400/90'
+                                : 'bg-amber-950/30 border-amber-500/20 text-amber-400/90'
                             }`}>
                               {check.severity} risk
                             </span>
@@ -2882,7 +2881,7 @@ Report generated cryptographically via Securify SaaS platform.
                         {/* Right Side: Chevron & Expand Indicator */}
                         <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
                           {!check.pass && (
-                            <span className="text-[9px] font-mono text-amber-500/70 lowercase hidden sm:inline">
+                            <span className="text-[9px] font-mono text-neutral-500 lowercase hidden sm:inline">
                               action required
                             </span>
                           )}
@@ -2899,7 +2898,7 @@ Report generated cryptographically via Securify SaaS platform.
 
                       {/* Expandable Details Area */}
                       {isExpanded && (
-                        <div className="border-t border-white/5 p-6 space-y-4 bg-black/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-white/5 p-6 space-y-4 bg-neutral-950/20 animate-in fade-in slide-in-from-top-2 duration-200">
                           {/* Badges in Details */}
                           <div className="flex gap-2 flex-wrap mb-2">
                             {check.cwe && (
@@ -2926,13 +2925,13 @@ Report generated cryptographically via Securify SaaS platform.
                             {/* Left Column: Threats */}
                             <div className="space-y-4 text-left">
                               <div>
-                                <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">technical threat impact</span>
+                                <span className="text-[10px] font-mono text-neutral-500 lowercase block mb-1">technical threat impact</span>
                                 <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
                               </div>
                               
                               {check.businessImpact && (
                                 <div>
-                                  <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">business & conversion risk</span>
+                                  <span className="text-[10px] font-mono text-neutral-500 lowercase block mb-1">business & conversion risk</span>
                                   <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
                                 </div>
                               )}
@@ -2942,13 +2941,13 @@ Report generated cryptographically via Securify SaaS platform.
                             <div className="space-y-4 flex flex-col justify-between">
                               {!check.pass && check.recommendation && (
                                 <div>
-                                  <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-wider block mb-1 font-semibold">remediation strategy</span>
+                                  <span className="text-[10px] font-mono text-neutral-400 lowercase block mb-1 font-semibold">remediation strategy</span>
                                   <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
                                 </div>
                               )}
 
                               <div className="space-y-3 mt-auto pt-4">
-                                <div className="font-mono text-[9px] bg-black/60 border border-white/5 rounded-2xl p-3 flex justify-between items-center gap-3">
+                                <div className="font-mono text-[9px] bg-neutral-950/60 border border-white/5 rounded-xl p-3 flex justify-between items-center gap-3">
                                   <div className="truncate">
                                     <span className="text-neutral-500 select-none">observed value:</span>{" "}
                                     <span className="select-all text-neutral-300 truncate font-mono">{check.value}</span>
@@ -2956,11 +2955,11 @@ Report generated cryptographically via Securify SaaS platform.
                                 </div>
 
                                 {!check.pass && (
-                                  <div className="bg-neutral-950/80 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-emerald-500/30 transition-colors">
+                                  <div className="bg-neutral-950/60 border border-white/5 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-white/10 transition-colors">
                                     <div className="space-y-0.5 text-left">
                                       <div className="flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                                        <span className="text-[9px] font-mono text-emerald-400 uppercase block font-bold tracking-wider">pro automatic edge patch</span>
+                                        <span className="w-1.5 h-1.5 bg-emerald-500/80 rounded-full shrink-0" />
+                                        <span className="text-[10px] font-mono text-emerald-400 lowercase block font-medium">pro automatic edge patch</span>
                                       </div>
                                       <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure security headers dynamically at CDN/edge level.</p>
                                     </div>
@@ -2969,9 +2968,9 @@ Report generated cryptographically via Securify SaaS platform.
                                     ) : (
                                       <button
                                         onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                                        className="bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-medium rounded-xl px-4 py-2 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
+                                        className="bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-medium rounded-xl px-4 py-2.5 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
                                       >
-                                        deploy edge patch
+                                        deploy patch
                                       </button>
                                     )}
                                   </div>
@@ -2982,7 +2981,7 @@ Report generated cryptographically via Securify SaaS platform.
                                   <div className="flex justify-end pt-2">
                                     <button
                                       onClick={() => handleStartSiteExploitSimulation(key, check.name)}
-                                      className="bg-neutral-950 hover:bg-neutral-900 border border-white/5 hover:border-red-500/20 text-neutral-400 hover:text-red-400 text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none w-full sm:w-auto text-center"
+                                      className="bg-neutral-950 hover:bg-neutral-900 border border-white/5 hover:border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none w-full sm:w-auto text-center"
                                     >
                                       simulate attack vector
                                     </button>
