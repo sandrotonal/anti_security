@@ -148,6 +148,18 @@ const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { u
   );
 };
 
+const parseFinancialRiskString = (str: string) => {
+  if (!str) return { value: '', details: '' };
+  const match = str.match(/^([^(]+)(?:\(([^)]+)\))?/);
+  if (match) {
+    return {
+      value: match[1].trim(),
+      details: match[2] ? match[2].trim() : ''
+    };
+  }
+  return { value: str, details: '' };
+};
+
 interface SecurifyDashboardProps {
   githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
@@ -230,6 +242,19 @@ export const SecurifyDashboard = ({
   const [siteReportShared, setSiteReportShared] = useState<boolean>(false);
   const [solutionConfigTab, setSolutionConfigTab] = useState<'nginx' | 'nextjs' | 'express' | 'apache'>('nginx');
   const [selectedGithubRepo, setSelectedGithubRepo] = useState<string>('');
+  const [expandedChecks, setExpandedChecks] = useState<{[key: string]: boolean}>({});
+
+  // Auto-expand failed checks on new scan results
+  useEffect(() => {
+    if (siteScanResults?.checks) {
+      const initialExpanded: {[key: string]: boolean} = {};
+      Object.entries(siteScanResults.checks).forEach(([key, check]) => {
+        // Expand failed checks, collapse passed checks by default
+        initialExpanded[key] = !check.pass;
+      });
+      setExpandedChecks(initialExpanded);
+    }
+  }, [siteScanResults]);
 
   const performSiteScan = async (target: string) => {
     setSiteScanning(true);
@@ -2408,19 +2433,23 @@ Report generated cryptographically via Securify SaaS platform.
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleExportSiteReportMarkdown}
-                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.md)
                 </button>
                 <button
                   onClick={handleExportSiteReportJSON}
-                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.json)
                 </button>
                 <button
                   onClick={handleShareSiteReport}
-                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className={`border text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none ${
+                    siteReportShared 
+                      ? 'bg-neutral-950 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-neutral-950 border-white/10 text-neutral-400 hover:text-white'
+                  }`}
                 >
                   {siteReportShared ? 'copied!' : 'share'}
                 </button>
@@ -2430,7 +2459,7 @@ Report generated cryptographically via Securify SaaS platform.
                     setSiteUrl('');
                     setActiveSiteExploitSim(null);
                   }}
-                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/10 hover:border-white/20 text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   clear
                 </button>
@@ -2458,16 +2487,19 @@ Report generated cryptographically via Securify SaaS platform.
                       cy="64"
                       r="54"
                       stroke={
-                        siteScanResults.grade === 'A+' 
+                        siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
                           ? '#10b981' 
-                          : siteScanResults.grade === 'A' 
-                            ? '#34d399'
-                            : siteScanResults.grade === 'B' 
-                              ? '#f59e0b' 
-                              : siteScanResults.grade === 'C' 
-                                ? '#f97316' 
-                                : '#ef4444'
+                          : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
+                            ? '#f59e0b' 
+                            : '#f43f5e'
                       }
+                      style={{
+                        filter: siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
+                          ? 'drop-shadow(0 0 4px rgba(16,185,129,0.4))'
+                          : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
+                            ? 'drop-shadow(0 0 4px rgba(245,158,11,0.4))'
+                            : 'drop-shadow(0 0 4px rgba(244,63,94,0.4))'
+                      }}
                       strokeWidth="8"
                       fill="transparent"
                       strokeDasharray="339.29"
@@ -2479,11 +2511,9 @@ Report generated cryptographically via Securify SaaS platform.
                     <span className={`text-4xl font-extrabold font-mono ${
                       siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
                         ? 'text-emerald-400' 
-                        : siteScanResults.grade === 'B' 
+                        : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
                           ? 'text-amber-400' 
-                          : siteScanResults.grade === 'C' 
-                            ? 'text-orange-400' 
-                            : 'text-red-500'
+                          : 'text-rose-400'
                     }`}>
                       {siteScanResults.grade}
                     </span>
@@ -2532,51 +2562,102 @@ Report generated cryptographically via Securify SaaS platform.
                         <p className="text-red-400 text-[10px] font-mono lowercase leading-relaxed">
                           {siteScanResults.financialRisk.failedCritical} critical-severity vulnerability detected.
                           {siteScanResults.financialRisk.failedHigh > 0 && ` ${siteScanResults.financialRisk.failedHigh} high-severity vulnerabilities detected.`}
-                          {' '}regulatory notification timelines under GDPR Art. 33 require breach disclosure within 72 hours of detection.
+                          {' '}regulatory notification timelines under GDPR Art. 33 require disclosure within 72 hours.
                         </p>
                       </div>
                     </div>
                   )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">regulatory fines (GDPR/KVKK)</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
-                        {siteScanResults.financialRisk.potentialFine}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">art. 32 mandates appropriate technical measures. missing security headers constitute a documented infringement.</span>
-                    </div>
-                    
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">estimated breach cost (IBM 2024)</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
-                        {siteScanResults.financialRisk.dataBreachRisk}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">includes: forensics, incident response, legal fees, customer notification, regulatory liaison, PR, and churn.</span>
-                    </div>
-                    
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">cyber insurance surcharge</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-amber-500 leading-snug">
-                        {siteScanResults.financialRisk.cyberInsurancePenalty}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">underwriters assess missing mandatory controls as elevated actuarial risk profile. may trigger coverage exclusions.</span>
-                    </div>
+                    {/* GDPR/KVKK Fines Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.potentialFine);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">regulatory fines (GDPR/KVKK)</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              art. 32 mandates appropriate technical measures. missing security headers constitute a documented infringement.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Estimated Breach Cost Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.dataBreachRisk);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">estimated breach cost (IBM)</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              includes: forensics, incident response, legal fees, customer notification, PR, and churn.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Cyber Insurance Surcharge Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.cyberInsurancePenalty);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">cyber insurance surcharge</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              underwriters assess missing controls as elevated actuarial risk, triggering possible coverage exclusions.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2598,7 +2679,7 @@ Report generated cryptographically via Securify SaaS platform.
                   ) : (
                     <button
                       onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                      className="bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-semibold px-5 py-2.5 rounded-xl lowercase transition-all select-none shrink-0"
+                      className="bg-neutral-900 hover:bg-neutral-850 border border-white/10 text-white text-[10px] font-mono font-medium rounded-xl px-5 py-2.5 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
                     >
                       enable automated daily checks
                     </button>
@@ -2650,44 +2731,88 @@ Report generated cryptographically via Securify SaaS platform.
 
             {/* Post-Scan Conversion CTA Banner */}
             {!premiumStatus?.valid && (
-              <div className="bg-gradient-to-r from-neutral-900/80 via-indigo-950/30 to-neutral-900/80 border border-indigo-500/20 backdrop-blur-sm rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-indigo-950/60 border border-indigo-500/30 rounded-2xl flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-gradient-to-br from-neutral-900/90 via-black to-neutral-950 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.02)] rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-stretch justify-between gap-6 select-none">
+                <div className="flex flex-col md:flex-row items-start gap-4">
+                  <div className="w-10 h-10 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <div className="space-y-1 text-left">
+                  <div className="space-y-2 text-left">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-white text-sm font-medium lowercase">
-                        {(siteScanResults.failedChecks || 0) > 4
-                          ? `${siteScanResults.failedChecks} critical attack vectors found on ${siteScanResults.domain}`
-                          : `security audit complete — ${siteScanResults.failedChecks || 0} issues need remediation`
-                        }
-                      </span>
-                      <span className="text-[9px] font-mono bg-indigo-950/60 border border-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded uppercase">
-                        upgrade to fix
+                      <span className="text-[10px] font-mono bg-emerald-950/40 border border-emerald-500/25 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-wider">
+                        Securify Shield Edge™ active defense
                       </span>
                     </div>
+                    <h3 className="text-white text-base font-semibold lowercase">
+                      {(siteScanResults.failedChecks || 0) > 0
+                        ? `patch all ${siteScanResults.failedChecks} detected vulnerabilities at the edge`
+                        : `enable continuous active protection for ${siteScanResults.domain}`
+                      }
+                    </h3>
                     <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
-                      securify pro continuously monitors {siteScanResults.domain} with daily automated scans, instant breach alerts (72h GDPR window compliance), signed PDF audit reports, and white-label reports for client delivery. includes infrastructure change detection and regression testing.
+                      deploy instant edge-level virtual patching, block automated exploit scanners, receive real-time discord/slack security event notifications, and generate signed SOC2 compliance reports.
                     </p>
-                    <div className="flex flex-wrap gap-3 mt-2">
-                      {['daily automated scans', 'gdpr 72h alert window', 'signed pdf reports', 'white-label delivery', 'api access'].map(feature => (
-                        <span key={feature} className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
-                          {feature}
-                        </span>
-                      ))}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">automated edge patching</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">inject headers at edge layer with 1 click</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">daily automatic auditing</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">never miss configuration regressions</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">certified compliance exports</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">generate signed SOC2/GDPR checklist PDFs</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">slack & webhooks alerts</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">get notified instantly of critical leaks</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                  className="bg-white hover:bg-neutral-100 text-black text-xs font-mono font-semibold px-6 py-3.5 rounded-xl lowercase transition-all select-none shrink-0 whitespace-nowrap"
-                >
-                  start pro plan — $9/mo
-                </button>
+
+                <div className="lg:w-64 shrink-0 bg-black/60 border border-white/5 rounded-2xl p-5 flex flex-col justify-between items-center text-center gap-4">
+                  <div className="w-full space-y-1.5 font-mono text-left">
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500 border-b border-white/5 pb-2">
+                      <span>defense status:</span>
+                      <span className="text-red-400 animate-pulse font-bold lowercase">inactive (trial)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500">
+                      <span>monitored host:</span>
+                      <span className="text-white truncate max-w-[120px]">{siteScanResults.domain}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500">
+                      <span>daily checks:</span>
+                      <span className="text-neutral-400">disabled</span>
+                    </div>
+                  </div>
+                  
+                  <div className="w-full space-y-2">
+                    <button
+                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      className="w-full bg-white hover:bg-neutral-100 text-black text-xs font-mono font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] text-center block select-none"
+                    >
+                      start pro plan — $9/mo
+                    </button>
+                    <span className="block text-[9px] font-mono text-neutral-600 lowercase">secure payment processing via Paddle</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2701,9 +2826,9 @@ Report generated cryptographically via Securify SaaS platform.
                     if (count === 0) return null;
                     return (
                       <span key={sev} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
-                        sev === 'critical' ? 'bg-red-950/40 border-red-500/20 text-red-400'
-                        : sev === 'high' ? 'bg-orange-950/40 border-orange-500/20 text-orange-400'
-                        : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
+                        sev === 'critical' ? 'bg-amber-950/40 border-amber-500/20 text-amber-500'
+                        : sev === 'high' ? 'bg-amber-900/30 border-amber-500/20 text-amber-500/90'
+                        : 'bg-neutral-900 border-white/5 text-neutral-400'
                       }`}>{count} {sev}</span>
                     );
                   })}
@@ -2711,126 +2836,167 @@ Report generated cryptographically via Securify SaaS platform.
               </div>
               
               <div className="space-y-4">
-                {Object.entries(siteScanResults.checks).map(([key, check]: any) => (
-                  <div key={key} className="bg-neutral-900/20 border border-white/5 hover:border-white/10 rounded-3xl p-6 transition-all flex flex-col md:flex-row md:items-start justify-between gap-6">
-                    <div className="space-y-3.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap select-none">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${
-                          check.pass ? 'bg-emerald-500' 
-                          : check.severity === 'critical' ? 'bg-red-500 animate-pulse'
-                          : check.severity === 'high' ? 'bg-orange-500'
-                          : 'bg-amber-500'
-                        }`} />
-                        <span className="text-xs font-semibold text-white lowercase">{check.name}</span>
-                        
-                        <span className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
-                          check.pass 
-                            ? 'bg-emerald-950/40 border border-emerald-500/20 text-emerald-400' 
-                            : 'bg-red-950/40 border border-red-500/20 text-red-400'
-                        }`}>
-                          {check.pass ? 'secure' : 'action required'}
-                        </span>
-                        
-                        {!check.pass && (
-                          <span className={`text-[9px] font-mono border px-2 py-0.5 rounded lowercase ${
-                            check.severity === 'critical'
-                              ? 'bg-red-950/40 border-red-500/30 text-red-400'
-                              : check.severity === 'high'
-                                ? 'bg-orange-950/40 border-orange-500/30 text-orange-400'
-                                : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
-                          }`}>
-                            {check.severity}
-                          </span>
-                        )}
-                        
-                        {check.cwe && (
-                          <span className="text-[9px] font-mono bg-neutral-900 border border-white/10 text-neutral-400 px-2 py-0.5 rounded lowercase">
-                            {check.cwe}
-                          </span>
-                        )}
-                        
-                        {check.compliance && (
-                          <span className="text-[9px] font-mono bg-indigo-950/20 border border-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded lowercase">
-                            {check.compliance}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Engine detail line */}
-                      {check.detail && (
-                        <p className="text-[10px] font-mono leading-relaxed text-neutral-400">
-                          → {check.detail}
-                        </p>
-                      )}
-                      
-                      {/* Structured threat analysis grid */}
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/5 pt-4">
-                        <div className="space-y-4 text-left">
-                          <div>
-                            <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">technical threat impact</span>
-                            <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
-                          </div>
+                {Object.entries(siteScanResults.checks).map(([key, check]: any) => {
+                  const isExpanded = !!expandedChecks[key];
+                  return (
+                    <div 
+                      key={key} 
+                      className={`bg-neutral-900/20 border rounded-3xl transition-all duration-300 overflow-hidden ${
+                        check.pass 
+                          ? 'border-white/5 hover:border-emerald-500/10' 
+                          : 'border-white/5 hover:border-amber-500/10'
+                      }`}
+                    >
+                      {/* Row Header (Clickable) */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedChecks(prev => ({ ...prev, [key]: !prev[key] }))}
+                        className="w-full text-left p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none hover:bg-white/[0.01] transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {/* Status Dot */}
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                            check.pass 
+                              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
+                              : check.severity === 'critical' || check.severity === 'high'
+                                ? 'bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.3)]'
+                                : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                          }`} />
                           
-                          {check.businessImpact && (
-                            <div>
-                              <span className="text-[9px] font-mono text-rose-500/50 uppercase tracking-wider block mb-1">business & conversion risk</span>
-                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
-                            </div>
+                          <span className="text-xs font-semibold text-white lowercase font-sans">{check.name}</span>
+                          
+                          {/* Muted Verified text for passed, single clean status badge for failed */}
+                          {check.pass ? (
+                            <span className="text-[10px] font-mono text-neutral-500 lowercase">verified</span>
+                          ) : (
+                            <span className={`text-[9px] font-mono border px-2 py-0.5 rounded-md lowercase ${
+                              check.severity === 'critical' || check.severity === 'high'
+                                ? 'bg-red-950/20 border-red-500/25 text-red-400 font-semibold'
+                                : 'bg-amber-950/20 border-amber-500/25 text-amber-500'
+                            }`}>
+                              {check.severity} risk
+                            </span>
                           )}
                         </div>
 
-                        <div className="space-y-4 flex flex-col justify-between">
-                          {!check.pass && check.recommendation && (
-                            <div>
-                              <span className="text-[9px] font-mono text-emerald-500/50 uppercase tracking-wider block mb-1 font-semibold">remediation strategy</span>
-                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
-                            </div>
+                        {/* Right Side: Chevron & Expand Indicator */}
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                          {!check.pass && (
+                            <span className="text-[9px] font-mono text-amber-500/70 lowercase hidden sm:inline">
+                              action required
+                            </span>
                           )}
+                          <svg 
+                            className={`w-4 h-4 text-neutral-500 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : ''}`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
 
-                          <div className="font-mono text-[9px] bg-black/60 border border-white/5 rounded-2xl p-3 flex justify-between items-center gap-3">
-                            <div className="truncate">
-                              <span className="text-neutral-500 select-none">observed value:</span>{" "}
-                              <span className="select-all text-neutral-300 truncate">{check.value}</span>
-                            </div>
+                      {/* Expandable Details Area */}
+                      {isExpanded && (
+                        <div className="border-t border-white/5 p-6 space-y-4 bg-black/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {/* Badges in Details */}
+                          <div className="flex gap-2 flex-wrap mb-2">
+                            {check.cwe && (
+                              <span className="text-[9px] font-mono bg-neutral-950 border border-white/5 text-neutral-400 px-2.5 py-1 rounded-md lowercase">
+                                cwe: {check.cwe}
+                              </span>
+                            )}
+                            {check.compliance && (
+                              <span className="text-[9px] font-mono bg-neutral-950 border border-white/5 text-neutral-400 px-2.5 py-1 rounded-md lowercase">
+                                standard: {check.compliance}
+                              </span>
+                            )}
                           </div>
 
-                          {!check.pass && (
-                            <div className="bg-indigo-950/20 border border-indigo-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                              <div className="space-y-0.5 text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" />
-                                  <span className="text-[9px] font-mono text-indigo-300 uppercase block font-bold tracking-wider">pro automatic patch</span>
-                                </div>
-                                <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure header rewrite rules instantly at the edge.</p>
+                          {check.detail && (
+                            <p className="text-[10px] font-mono leading-relaxed text-neutral-400 pl-1 py-2 border-b border-white/[0.02]">
+                              → {check.detail}
+                            </p>
+                          )}
+
+                          {/* Threat & Remediation Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            
+                            {/* Left Column: Threats */}
+                            <div className="space-y-4 text-left">
+                              <div>
+                                <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">technical threat impact</span>
+                                <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
                               </div>
-                              {premiumStatus?.valid ? (
-                                <span className="text-[9px] font-mono text-emerald-400 shrink-0">✓ active</span>
-                              ) : (
-                                <button
-                                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                                  className="bg-white hover:bg-neutral-200 text-black text-[9px] font-mono font-bold px-3 py-1.5 rounded-xl transition-all lowercase select-none shrink-0"
-                                >
-                                  deploy patch
-                                </button>
+                              
+                              {check.businessImpact && (
+                                <div>
+                                  <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">business & conversion risk</span>
+                                  <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="shrink-0 flex md:flex-col gap-2">
-                      {!check.pass && (
-                        <button
-                          onClick={() => handleStartSiteExploitSimulation(key, check.name)}
-                          className="bg-red-950/20 hover:bg-red-900/40 text-red-400/90 border border-red-500/10 text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none whitespace-nowrap"
-                        >
-                          simulate exploit
-                        </button>
+                            {/* Right Column: Remediation & Obs Value */}
+                            <div className="space-y-4 flex flex-col justify-between">
+                              {!check.pass && check.recommendation && (
+                                <div>
+                                  <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-wider block mb-1 font-semibold">remediation strategy</span>
+                                  <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
+                                </div>
+                              )}
+
+                              <div className="space-y-3 mt-auto pt-4">
+                                <div className="font-mono text-[9px] bg-black/60 border border-white/5 rounded-2xl p-3 flex justify-between items-center gap-3">
+                                  <div className="truncate">
+                                    <span className="text-neutral-500 select-none">observed value:</span>{" "}
+                                    <span className="select-all text-neutral-300 truncate font-mono">{check.value}</span>
+                                  </div>
+                                </div>
+
+                                {!check.pass && (
+                                  <div className="bg-neutral-950/80 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-emerald-500/30 transition-colors">
+                                    <div className="space-y-0.5 text-left">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                                        <span className="text-[9px] font-mono text-emerald-400 uppercase block font-bold tracking-wider">pro automatic edge patch</span>
+                                      </div>
+                                      <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure security headers dynamically at CDN/edge level.</p>
+                                    </div>
+                                    {premiumStatus?.valid ? (
+                                      <span className="text-[9px] font-mono text-emerald-400 shrink-0 font-bold">✓ active on edge</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                                        className="bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-medium rounded-xl px-4 py-2 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
+                                      >
+                                        deploy edge patch
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Simulation button inside details container */}
+                                {!check.pass && (
+                                  <div className="flex justify-end pt-2">
+                                    <button
+                                      onClick={() => handleStartSiteExploitSimulation(key, check.name)}
+                                      className="bg-neutral-950 hover:bg-neutral-900 border border-white/5 hover:border-red-500/20 text-neutral-400 hover:text-red-400 text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none w-full sm:w-auto text-center"
+                                    >
+                                      simulate attack vector
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -3033,19 +3199,34 @@ ServerTokens Prod`}</pre>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3 w-full">
-                    <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">
-                      <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      locked feature: requires Pro / Agency plan
+                  <div className="bg-neutral-950/60 border border-white/5 rounded-2xl p-5 flex flex-col justify-between items-center text-center gap-4 relative overflow-hidden group w-full">
+                    {/* Blurred badge visual mock in background to tempt user */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] blur-[2px] scale-95 transition-transform group-hover:scale-100 duration-500 select-none">
+                      <div className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        <span className="font-mono text-xs font-bold text-white">Securify Verified</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none w-full sm:w-auto"
-                    >
-                      unlock trust badge
-                    </button>
+                    
+                    <div className="relative z-10 w-full space-y-3">
+                      <div className="flex items-center justify-center gap-2 text-[10px] text-amber-500 font-mono">
+                        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>locked feature: requires Pro / Agency plan</span>
+                      </div>
+                      
+                      <p className="text-[10px] text-neutral-500 font-mono lowercase leading-relaxed max-w-sm mx-auto">
+                        embed a dynamic, live security verification badge on your README or homepage to prove compliance to clients and users.
+                      </p>
+                      
+                      <button
+                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                        className="bg-neutral-900 hover:bg-neutral-850 border border-white/10 hover:border-emerald-500/20 text-neutral-300 hover:text-white text-xs font-mono font-medium rounded-xl px-5 py-3 transition-all select-none w-full sm:w-auto text-center"
+                      >
+                        unlock live trust badge
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3070,25 +3251,29 @@ ServerTokens Prod`}</pre>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={exportReportMarkdown}
-                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.md)
                 </button>
                 <button
                   onClick={exportReportJSON}
-                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.json)
                 </button>
                 <button
                   onClick={shareAuditReport}
-                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className={`border text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none ${
+                    reportShared 
+                      ? 'bg-neutral-950 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-neutral-950 border-white/10 text-neutral-400 hover:text-white'
+                  }`}
                 >
                   {reportShared ? 'copied!' : 'share'}
                 </button>
                 <button
                   onClick={handleReset}
-                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/10 hover:border-white/20 text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   clear
                 </button>
@@ -3171,6 +3356,15 @@ ServerTokens Prod`}</pre>
                                 ? '#f97316' 
                                 : '#ef4444'
                         }
+                        style={{
+                          filter: customScanResults.grade === 'A+'
+                            ? 'drop-shadow(0 0 4px rgba(16,185,129,0.4))'
+                            : customScanResults.grade === 'B'
+                              ? 'drop-shadow(0 0 4px rgba(245,158,11,0.4))'
+                              : customScanResults.grade === 'C'
+                                ? 'drop-shadow(0 0 4px rgba(249,115,22,0.4))'
+                                : 'drop-shadow(0 0 4px rgba(239,68,68,0.4))'
+                        }}
                         strokeWidth="8"
                         fill="transparent"
                         strokeDasharray="339.29"
@@ -3560,26 +3754,26 @@ ServerTokens Prod`}</pre>
                   <path d="M 150 60 L 260 90" stroke="#fff" strokeWidth="1.2" className="animate-dash-slow" />
 
                   {/* Left Nodes */}
-                  <circle cx="40" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="40" cy="30" r="4" fill="#ef4444" className="animate-pulse" />
+                  <circle cx="40" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="40" cy="30" r="3" fill="#a3a3a3" className="animate-pulse" />
                   <text x="40" y="16" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">git hook</text>
 
-                  <circle cx="40" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="40" cy="90" r="4" fill="#a3a3a3" />
+                  <circle cx="40" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="40" cy="90" r="3" fill="#737373" />
                   <text x="40" y="112" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">local cli</text>
 
                   {/* Core Node */}
-                  <circle cx="150" cy="60" r="15" fill="#000" stroke="#fff" strokeWidth="1.5" className="animate-pulse-glow" />
-                  <circle cx="150" cy="60" r="6" fill="#fff" />
+                  <circle cx="150" cy="60" r="15" fill="#000" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" className="animate-pulse-glow" />
+                  <circle cx="150" cy="60" r="5" fill="#fff" />
                   <text x="150" y="38" fill="#fff" fontSize="9" fontFamily="monospace" textAnchor="middle" fontWeight="bold">securify</text>
 
                   {/* Right Nodes */}
-                  <circle cx="260" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="260" cy="30" r="4" fill="#10b981" />
+                  <circle cx="260" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="260" cy="30" r="3" fill="#10b981" />
                   <text x="260" y="16" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">slack alert</text>
 
-                  <circle cx="260" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="260" cy="90" r="4" fill="#3b82f6" className="animate-pulse" />
+                  <circle cx="260" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="260" cy="90" r="3" fill="#e5e7eb" className="animate-pulse" />
                   <text x="260" y="112" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">deploy api</text>
                 </svg>
               </div>
