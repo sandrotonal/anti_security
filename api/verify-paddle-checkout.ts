@@ -89,9 +89,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       PADDLE_CLIENT_TOKEN_PREFIX: PADDLE_CLIENT_TOKEN ? `${PADDLE_CLIENT_TOKEN.substring(0, 18)}... (len: ${PADDLE_CLIENT_TOKEN.length})` : 'undefined',
     });
 
-    if (!transaction_id || !email || !plan) {
+    if (!transaction_id || !email) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'transaction_id, email, and plan are required' }));
+      res.end(JSON.stringify({ error: 'transaction_id and email are required' }));
       return;
     }
 
@@ -101,16 +101,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (environment === 'sandbox' && !PADDLE_API_KEY) {
       console.log(`[Paddle Sandbox Bypass] Simulating transaction verification for: ${transaction_id}`);
       
+      const resolvedPlan = plan || 'Pro';
       const duration = 30 * 24 * 60 * 60 * 1000; // 30 days
       const expiresAt = Date.now() + duration;
-      const token = signToken({ email: trimmedEmail, plan, expiresAt }, JWT_SECRET);
+      const token = signToken({ email: trimmedEmail, plan: resolvedPlan, expiresAt }, JWT_SECRET);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
         token,
         email: trimmedEmail,
-        plan
+        plan: resolvedPlan
       }));
       return;
     }
@@ -160,8 +161,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const txnEmail = (customData.email || '').trim().toLowerCase();
     const txnPlan = customData.plan || '';
 
-    if (txnEmail !== trimmedEmail || txnPlan.toLowerCase() !== plan.toLowerCase()) {
-      console.error(`Paddle Transaction details mismatch! Expected email: ${trimmedEmail}, plan: ${plan}. Got email: ${txnEmail}, plan: ${txnPlan}`);
+    // Resolve plan dynamically
+    const resolvedPlan = plan ? plan : txnPlan;
+
+    if (!resolvedPlan) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Plan type could not be resolved from transaction metadata' }));
+      return;
+    }
+
+    if (txnEmail !== trimmedEmail || txnPlan.toLowerCase() !== resolvedPlan.toLowerCase()) {
+      console.error(`Paddle Transaction details mismatch! Expected email: ${trimmedEmail}, plan: ${resolvedPlan}. Got email: ${txnEmail}, plan: ${txnPlan}`);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Transaction metadata mismatch' }));
       return;
@@ -173,14 +183,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const expiresAt = Date.now() + duration;
 
     // Sign JWT token
-    const token = signToken({ email: trimmedEmail, plan, expiresAt }, JWT_SECRET);
+    const token = signToken({ email: trimmedEmail, plan: resolvedPlan, expiresAt }, JWT_SECRET);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
       token,
       email: trimmedEmail,
-      plan
+      plan: resolvedPlan
     }));
   } catch (error: any) {
     console.error('Error verifying Paddle checkout:', error);

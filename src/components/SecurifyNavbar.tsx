@@ -10,6 +10,7 @@ interface NavbarProps {
   onGithubLogin: () => void;
   onGithubLogout: () => void;
   premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
+  onRestoreSubscription?: () => void;
 }
 
 const UserAvatar = ({ username, avatarUrl, sizeClass = "w-7 h-7" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
@@ -47,14 +48,15 @@ const UserAvatar = ({ username, avatarUrl, sizeClass = "w-7 h-7" }: { username: 
   );
 };
 
-export const SecurifyNavbar = ({ 
-  activeView, 
-  onViewChange, 
+export const SecurifyNavbar = ({
+  activeView,
+  onViewChange,
   onOpenTerminal,
   githubUser,
   onGithubLogin,
   onGithubLogout,
-  premiumStatus
+  premiumStatus,
+  onRestoreSubscription
 }: NavbarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -71,7 +73,7 @@ export const SecurifyNavbar = ({
     e.preventDefault();
     setIsMobileMenuOpen(false);
     onViewChange(targetView);
-    
+
     if (anchor) {
       setTimeout(() => {
         const el = document.getElementById(anchor);
@@ -93,7 +95,7 @@ export const SecurifyNavbar = ({
     <>
       <header className="fixed z-50 px-4 md:px-10 pt-6 top-0 left-0 right-0 select-none">
         <nav className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
-          
+
           {/* Left - Logo (Link to Home) */}
           <a
             href="#home"
@@ -111,42 +113,38 @@ export const SecurifyNavbar = ({
             <a
               href="#platform"
               onClick={(e) => handleLinkClick(e, 'home', 'platform')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               sandbox demo
             </a>
             <a
               href="#solutions"
               onClick={(e) => handleLinkClick(e, 'home', 'solutions')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               pipeline
             </a>
             <a
               href="#support"
               onClick={(e) => handleLinkClick(e, 'home', 'support')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'home' ? 'text-neutral-300 hover:text-white' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               docs
             </a>
-            
+
             {/* View Links */}
             <div className="w-px h-4 bg-white/10 mx-2" />
-            
+
             <a
               id="nav-rules"
               data-view="rules"
               href="#rules"
               onClick={(e) => handleLinkClick(e, 'rules')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'rules' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'rules' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               rules
             </a>
@@ -155,9 +153,8 @@ export const SecurifyNavbar = ({
               data-view="dashboard"
               href="#dashboard"
               onClick={(e) => handleLinkClick(e, 'dashboard')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'dashboard' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'dashboard' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               dashboard
             </a>
@@ -166,9 +163,8 @@ export const SecurifyNavbar = ({
               data-view="sandbox"
               href="#sandbox"
               onClick={(e) => handleLinkClick(e, 'sandbox')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'sandbox' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'sandbox' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               sandbox scanner
             </a>
@@ -177,9 +173,8 @@ export const SecurifyNavbar = ({
               data-view="auditor"
               href="#auditor"
               onClick={(e) => handleLinkClick(e, 'auditor')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'auditor' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'auditor' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               dependency auditor
             </a>
@@ -188,18 +183,16 @@ export const SecurifyNavbar = ({
               data-view="pricing"
               href="#pricing"
               onClick={(e) => handleLinkClick(e, 'pricing')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'pricing' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'pricing' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               pricing
             </a>
             <a
               href="#contact"
               onClick={(e) => handleLinkClick(e, 'contact')}
-              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${
-                activeView === 'contact' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
-              }`}
+              className={`text-sm px-4 py-2 rounded-full lowercase transition-colors ${activeView === 'contact' ? 'bg-white text-black' : 'text-neutral-500 hover:text-white'
+                }`}
             >
               contact
             </a>
@@ -219,6 +212,17 @@ export const SecurifyNavbar = ({
             >
               terminal hook
             </button>
+            {!githubUser && !premiumStatus?.valid && onRestoreSubscription && (
+              <button
+                onClick={onRestoreSubscription}
+                title="restore subscription"
+                className="hidden sm:flex items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 rounded-full w-11 h-11 transition-all select-none"
+              >
+                <svg className="w-4 h-4 text-neutral-400 hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </button>
+            )}
 
             {githubUser ? (
               <div className="relative">
@@ -233,41 +237,54 @@ export const SecurifyNavbar = ({
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-neutral-950/95 border border-white/10 backdrop-blur-xl rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 text-left">
-                      <span className="text-[10px] text-neutral-500 font-mono block lowercase">connected as</span>
-                      <span className="text-xs text-white font-mono font-medium block truncate lowercase">@{githubUser.username}</span>
+                  <div className="absolute right-0 mt-3 w-52 bg-neutral-950/95 border border-white/10 backdrop-blur-xl rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-2.5 text-left">
+                      <span className="text-[9px] text-neutral-500 font-mono tracking-wider uppercase block">connected as</span>
+                      <span className="text-xs text-white font-mono font-medium block truncate lowercase mt-0.5">@{githubUser.username}</span>
+
                       {premiumStatus?.valid ? (
-                        <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 lowercase mt-1 bg-emerald-950/30 border border-emerald-500/20 px-1.5 py-0.5 rounded-full w-fit">
-                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                          </svg>
+                        <div className="text-[9px] text-neutral-300 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900 border border-white/10 px-2 py-1 rounded-lg w-fit">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           {premiumStatus.plan} plan
-                        </span>
+                        </div>
                       ) : githubUser.token ? (
-                        <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 lowercase mt-0.5">
-                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                          </svg>
-                          pat connected (5k/hr)
-                        </span>
+                        <div className="text-[9px] text-neutral-300 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900 border border-white/10 px-2 py-1 rounded-lg w-fit">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          pat (5k/hr)
+                        </div>
                       ) : (
-                        <span className="text-[9px] text-amber-500 font-mono flex items-center gap-1 lowercase mt-0.5">
-                          <svg className="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
+                        <div className="text-[9px] text-neutral-400 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900/60 border border-white/5 px-2 py-1 rounded-lg w-fit">
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 animate-pulse" />
                           public only (60/hr)
-                        </span>
+                        </div>
                       )}
                     </div>
+
+                    <div className="h-px bg-white/5 my-1.5" />
+
+                    {!premiumStatus?.valid && onRestoreSubscription && (
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          onRestoreSubscription();
+                        }}
+                        className="w-full text-left text-neutral-400 hover:text-white hover:bg-white/5 px-3 py-2.5 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2.5 mb-1"
+                      >
+                        <svg className="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        restore sub
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         setIsDropdownOpen(false);
                         onGithubLogout();
                       }}
-                      className="w-full text-left text-red-400 hover:text-red-300 hover:bg-red-950/20 px-3 py-2 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2"
+                      className="w-full text-left text-neutral-400 hover:text-red-450 hover:bg-red-950/20 px-3 py-2.5 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2.5"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-neutral-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                       </svg>
                       disconnect
@@ -286,7 +303,7 @@ export const SecurifyNavbar = ({
                 </svg>
               </button>
             )}
-            
+
             {/* Burger toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -295,19 +312,16 @@ export const SecurifyNavbar = ({
             >
               <div className="w-5 h-4 flex flex-col justify-between relative">
                 <span
-                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${
-                    isMobileMenuOpen ? 'rotate-45 translate-y-[7px]' : ''
-                  }`}
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${isMobileMenuOpen ? 'rotate-45 translate-y-[7px]' : ''
+                    }`}
                 />
                 <span
-                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 ${
-                    isMobileMenuOpen ? 'opacity-0 scale-x-0' : 'opacity-100'
-                  }`}
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0 scale-x-0' : 'opacity-100'
+                    }`}
                 />
                 <span
-                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${
-                    isMobileMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''
-                  }`}
+                  className={`w-5 h-0.5 bg-current rounded-full transition-all duration-300 transform origin-center ${isMobileMenuOpen ? '-rotate-45 -translate-y-[7px]' : ''
+                    }`}
                 />
               </div>
             </button>
@@ -343,7 +357,7 @@ export const SecurifyNavbar = ({
             >
               pipeline
             </a>
-            
+
             <div className="h-px bg-white/5 my-2" />
 
             <a
@@ -377,9 +391,8 @@ export const SecurifyNavbar = ({
             <a
               href="#pricing"
               onClick={(e) => handleLinkClick(e, 'pricing')}
-              className={`text-2xl font-light transition-colors lowercase ${
-                activeView === 'pricing' ? 'text-white' : 'text-neutral-400 hover:text-white'
-              }`}
+              className={`text-2xl font-light transition-colors lowercase ${activeView === 'pricing' ? 'text-white' : 'text-neutral-400 hover:text-white'
+                }`}
             >
               pricing
             </a>
@@ -425,6 +438,17 @@ export const SecurifyNavbar = ({
                   <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
                 </svg>
                 connect github
+              </button>
+            )}
+            {!premiumStatus?.valid && onRestoreSubscription && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onRestoreSubscription();
+                }}
+                className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
+              >
+                restore subscription
               </button>
             )}
             <button

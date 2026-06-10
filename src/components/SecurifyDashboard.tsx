@@ -436,6 +436,268 @@ export const SecurifyDashboard = ({
   const [githubCommits, setGithubCommits] = useState<GithubCommitInfo[]>([]);
   const [activeGithubSubTab, setActiveGithubSubTab] = useState<'code' | 'sentinel' | 'pipeline'>('code');
 
+  // Compliance Exporter States & Handlers
+  const [selectedReportType, setSelectedReportType] = useState<'soc2' | 'gdpr' | 'pci'>('soc2');
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+  const [logoFileName, setLogoFileName] = useState<string | null>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCustomLogo(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDownloadComplianceReport = (format: 'html' | 'md') => {
+    if (!siteScanResults) return;
+
+    const logoHtml = customLogo 
+      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${customLogo}" style="max-height: 60px; max-width: 200px; object-fit: contain;" /></div>` 
+      : `<div style="font-family: monospace; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #fff;">SECURIFY AUDITED</div>`;
+
+    const logoMd = customLogo 
+      ? `![Custom Brand Logo](${customLogo})\n\n` 
+      : `**SECURIFY AUDITED**\n\n`;
+
+    let reportTitle = '';
+    let reportContentHtml = '';
+    let reportContentMd = '';
+
+    if (selectedReportType === 'soc2') {
+      reportTitle = `SOC 2 Type II Security Readiness Checklist - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. SOC 2 Trust Services Criteria (Security & Confidentiality)</h2>
+        <p>This document attests to the readiness of <strong>${siteScanResults.domain}</strong> regarding SOC 2 Trust Services Criteria (TSC) Section CC6 (Logical Access and Boundary Protection).</p>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Criterion</th>
+              <th style="padding:10px;">Inspected Control</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px;">Audit Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.1 (Perimeter Defense)</strong></td>
+              <td style="padding:10px;">Content-Security-Policy (CSP)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.csp?.pass ? 'CSP headers active and configured.' : 'No CSP headers detected. High risk of script injection.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.3 (Input Validation)</strong></td>
+              <td style="padding:10px;">X-Content-Type-Options</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xcto?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xcto?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xcto?.pass ? 'nosniff header is active.' : 'Missing nosniff header. Vulnerable to MIME confusion.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.6 (Boundary Protection)</strong></td>
+              <td style="padding:10px;">Strict-Transport-Security (HSTS)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.hsts?.pass ? 'HSTS enabled.' : 'Missing HSTS. Connection downgrade attack vector present.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.8 (Transmission Security)</strong></td>
+              <td style="padding:10px;">X-Frame-Options</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xfo?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xfo?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xfo?.pass ? 'Clickjacking defense active.' : 'Missing frame-ancestors/XFO. Clickjacking vulnerability.'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# SOC 2 Type II Security Readiness Checklist
+**Audited Asset:** ${siteScanResults.domain}
+**Date:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. CC6.1 - Access Control & Perimeter Defense
+* **Content-Security-Policy (CSP):** ${siteScanResults.checks.csp?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.csp?.pass ? 'Secure CSP directives in place.' : 'Missing CSP header. Code injection risk.'}
+
+## 2. CC6.3 - Input Validation & Injection Defense
+* **X-Content-Type-Options:** ${siteScanResults.checks.xcto?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xcto?.pass ? 'MIME sniffing disabled.' : 'MIME sniffing enabled. High risk.'}
+
+## 3. CC6.6 - Boundary Protection & Downgrade Prevention
+* **Strict-Transport-Security (HSTS):** ${siteScanResults.checks.hsts?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.hsts?.pass ? 'HTTPS connection enforced.' : 'No HSTS configured.'}
+
+## 4. CC6.8 - Transmission Security & clickjacking
+* **X-Frame-Options:** ${siteScanResults.checks.xfo?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xfo?.pass ? 'Clickjacking defense configured.' : 'No clickjacking protection.'}
+      `;
+    } else if (selectedReportType === 'gdpr') {
+      reportTitle = `GDPR Article 32 Data Leak Prevention Audit - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. GDPR Article 32 (Security of Processing) Audit</h2>
+        <p>This audit evaluates compliance with GDPR Article 32, requiring technical measures to prevent personal data exposure and breaches.</p>
+        
+        <div style="background-color: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0; color: #ddd;">
+          <strong>Potential GDPR Fines:</strong> ${siteScanResults.financialRisk.potentialFine}<br/>
+          <strong>Estimated Data Breach Impact:</strong> ${siteScanResults.financialRisk.dataBreachRisk}<br/>
+          <strong>Cyber Insurance Impact:</strong> ${siteScanResults.financialRisk.cyberInsurancePenalty}
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Requirement</th>
+              <th style="padding:10px;">Observed Posture</th>
+              <th style="padding:10px;">Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Confidentiality (Referrer-Policy)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.referrer?.pass ? 'Pass - No data leakage' : 'Fail - Referrer headers leak query tokens'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.referrer?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.referrer?.pass ? 'LOW' : 'HIGH'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Integrity (CSP)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.csp?.pass ? 'Pass - Cross-site scripting mitigated' : 'Fail - Vulnerable to malicious script execution'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'LOW' : 'CRITICAL'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Secure Transport (HSTS)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.hsts?.pass ? 'Pass - Transport encryption enforced' : 'Fail - Plaintext HTTP downgrades possible'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'LOW' : 'HIGH'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# GDPR Article 32 Data Leak Protection Summary
+**Audited Domain:** ${siteScanResults.domain}
+**Audit Time:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. Compliance Financial Risk Metrics
+* **Potential Statutory Fines (up to 4% global revenue):** ${siteScanResults.financialRisk.potentialFine}
+* **Estimated Data Breach Clean-up Cost:** ${siteScanResults.financialRisk.dataBreachRisk}
+* **Cyber Insurance Premium Surcharge:** ${siteScanResults.financialRisk.cyberInsurancePenalty}
+
+## 2. Regulatory Breach Points
+* **Referrer Policy (Data Minimization):** ${siteScanResults.checks.referrer?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.referrer?.pass ? 'Private tokens and query variables are hidden.' : 'Referrer tokens exfiltrated in plain text to third-party endpoints.'}
+* **Content-Security-Policy (Data Integrity):** ${siteScanResults.checks.csp?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.csp?.pass ? 'Script source rules enforced.' : 'XSS vulnerabilities allow attackers to scrape client credentials.'}
+* **HSTS (Encryption enforcement):** ${siteScanResults.checks.hsts?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.hsts?.pass ? 'SSL/TLS enforced on all subdomains.' : 'Plaintext connection hijacking risk.'}
+      `;
+    } else {
+      reportTitle = `PCI-DSS v4.0 Compliance Certificate - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. PCI-DSS v4.0 Security Control Checklist</h2>
+        <p>Attestation of security measures regarding credit card data security standards (Requirement 6.4.3 & Requirement 4.1).</p>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Requirement</th>
+              <th style="padding:10px;">PCI Control Target</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px;">Auditor Evaluation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 6.4.3</strong></td>
+              <td style="padding:10px;">Manage and Audit Client-Side Script Execution (CSP)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.csp?.pass ? 'CSP strictly controls permitted scripts.' : 'Absence of CSP allows inline scripts, violating PCI 6.4.3.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 4.1</strong></td>
+              <td style="padding:10px;">Enforce Strong Cryptography over Open Networks (HSTS)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.hsts?.pass ? 'Transport security (HSTS) enforced.' : 'No HSTS. Plaintext authentication credentials could be sniffed.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 6.5.1</strong></td>
+              <td style="padding:10px;">Prevent clickjacking Attacks (X-Frame-Options)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xfo?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xfo?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xfo?.pass ? 'Clickjacking defended.' : 'Clickjacking possible. Credit card inputs are vulnerable.'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# PCI-DSS v4.0 Compliance Certificate
+**Audited Domain:** ${siteScanResults.domain}
+**Auditor Signature:** Securify Automated Scan Engine
+**Date:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. Compliance Control Audits
+* **PCI-DSS Requirement 6.4.3 (Script Security):** ${siteScanResults.checks.csp?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.csp?.pass ? 'Client-side scripts are audited and whitelisted via CSP.' : 'No CSP found. Violates Requirement 6.4.3.'}
+* **PCI-DSS Requirement 4.1 (Transmission Protection):** ${siteScanResults.checks.hsts?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.hsts?.pass ? 'HSTS forces HTTPS globally.' : 'No HSTS active. Vulnerable to interception over public WiFi.'}
+* **PCI-DSS Requirement 6.5.1 (UI clickjacking Defense):** ${siteScanResults.checks.xfo?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xfo?.pass ? 'X-Frame-Options/frame-ancestors present.' : 'Missing clickjacking headers.'}
+      `;
+    }
+
+    if (format === 'html') {
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${reportTitle}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #f3f4f6; margin: 0; padding: 40px; }
+    .container { max-width: 800px; margin: 0 auto; background-color: #121212; border: 1px solid #222; border-radius: 16px; padding: 40px; box-shadow: 0 4px 30px rgba(0,0,0,0.8); }
+    h1 { font-size: 20px; font-weight: bold; text-transform: lowercase; color: #fff; border-bottom: 1px solid #222; padding-bottom: 15px; margin-top: 0; text-align: center; }
+    h2 { font-size: 14px; font-weight: 600; text-transform: lowercase; color: #aaa; margin-top: 30px; }
+    p { font-size: 13px; font-weight: 300; line-height: 1.6; color: #9ca3af; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; color: #ddd; }
+    .footer { text-align: center; font-size: 10px; color: #4b5563; margin-top: 50px; border-top: 1px solid #222; padding-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${logoHtml}
+    <h1>${reportTitle}</h1>
+    <p><strong>audited asset:</strong> ${siteScanResults.domain}<br/><strong>time of scan:</strong> ${siteScanResults.scannedAt}<br/><strong>overall security grade:</strong> ${siteScanResults.grade} (score: ${siteScanResults.score}/100)</p>
+    ${reportContentHtml}
+    <div class="footer">
+      report generated by securify scanner engine. signed cryptographically.
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedReportType}_report_${siteScanResults.domain}.html`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const mdContent = `${logoMd}# ${reportTitle}\n\n${reportContentMd}\n\n---\n*Report generated by Securify Engine. Signed cryptographically.*`;
+      const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedReportType}_report_${siteScanResults.domain}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   interface WorkflowFinding {
     file: string;
     rule: string;
@@ -3106,23 +3368,100 @@ ServerTokens Prod`}</pre>
               
               {/* PDF report */}
               <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col justify-between items-start space-y-4">
-                <div className="space-y-1.5 text-left">
+                <div className="space-y-1.5 text-left w-full">
                   <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-neutral-500 uppercase">
                     executive reporting
                   </span>
-                  <h4 className="text-sm font-semibold text-white lowercase">download signed PDF report</h4>
+                  <h4 className="text-sm font-semibold text-white lowercase">download signed reports</h4>
                   <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
-                    export a detailed, multi-page security audit PDF showing compliance parameters, exploit timelines, and remediations. deliver to clients as agency white-label reports.
+                    export a detailed, compliance-mapped audit report showing compliance parameters, exploit timelines, and remediations.
                   </p>
                 </div>
                 
                 {premiumStatus?.valid && (premiumStatus.plan?.toLowerCase() === 'pro' || premiumStatus.plan?.toLowerCase() === 'agency') ? (
-                  <button
-                    onClick={handleExportSiteReportMarkdown}
-                    className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none"
-                  >
-                    download PDF document
-                  </button>
+                  <div className="w-full space-y-4 text-left">
+                    {/* Template Selector */}
+                    <div>
+                      <span className="block text-[10px] font-mono text-neutral-500 mb-1.5 lowercase">
+                        compliance template
+                      </span>
+                      <select
+                        value={selectedReportType}
+                        onChange={(e) => setSelectedReportType(e.target.value as any)}
+                        className="w-full bg-neutral-950 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono lowercase"
+                      >
+                        <option value="soc2">SOC2 Type II Readiness Checklist</option>
+                        <option value="gdpr">GDPR Data Leak Summary</option>
+                        <option value="pci">PCI-DSS v4 Compliance Attestation</option>
+                      </select>
+                    </div>
+
+                    {/* Logo upload (Agency only) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="block text-[10px] font-mono text-neutral-500 lowercase">
+                          white-label branding logo
+                        </span>
+                        {premiumStatus.plan?.toLowerCase() !== 'agency' && (
+                          <span className="text-[9px] font-mono text-amber-500 lowercase">
+                            requires agency plan
+                          </span>
+                        )}
+                      </div>
+                      
+                      {premiumStatus.plan?.toLowerCase() === 'agency' ? (
+                        <div className="flex gap-3 items-center w-full">
+                          <label className="flex-1 w-full flex flex-col items-center justify-center border border-dashed border-white/10 hover:border-white/20 rounded-xl p-3 cursor-pointer bg-black/20 hover:bg-black/40 transition-all">
+                            <span className="text-[10px] font-mono text-neutral-400">
+                              {logoFileName ? logoFileName : 'select image (JPEG/PNG)'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          {customLogo && (
+                            <div className="relative w-16 h-10 border border-white/10 rounded-lg overflow-hidden shrink-0 bg-neutral-950 flex items-center justify-center p-1">
+                              <img src={customLogo} className="max-h-full max-w-full object-contain" alt="Preview" />
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setCustomLogo(null);
+                                  setLogoFileName(null);
+                                }}
+                                className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-white/5 rounded-xl p-3 text-center bg-black/20">
+                          <p className="text-[10px] text-neutral-500 font-mono lowercase">
+                            custom logo upload is locked. upgrade to agency plan to white-label compliance reports.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 w-full pt-1">
+                      <button
+                        onClick={() => handleDownloadComplianceReport('html')}
+                        className="flex-1 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none text-center"
+                      >
+                        export HTML
+                      </button>
+                      <button
+                        onClick={() => handleDownloadComplianceReport('md')}
+                        className="flex-1 bg-neutral-950 hover:bg-neutral-900 text-neutral-300 border border-white/10 text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none text-center"
+                      >
+                        export markdown
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-3 w-full">
                     <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">

@@ -215,21 +215,19 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
           <div className="inline-flex items-center gap-1 bg-neutral-950 border border-white/10 rounded-2xl p-1">
             <button
               onClick={() => setBilling('monthly')}
-              className={`px-5 py-2 text-xs rounded-xl transition-all lowercase ${
-                billing === 'monthly'
+              className={`px-5 py-2 text-xs rounded-xl transition-all lowercase ${billing === 'monthly'
                   ? 'bg-white text-black font-medium'
                   : 'text-neutral-500 hover:text-white'
-              }`}
+                }`}
             >
               monthly
             </button>
             <button
               onClick={() => setBilling('yearly')}
-              className={`px-5 py-2 text-xs rounded-xl transition-all lowercase flex items-center gap-2 ${
-                billing === 'yearly'
+              className={`px-5 py-2 text-xs rounded-xl transition-all lowercase flex items-center gap-2 ${billing === 'yearly'
                   ? 'bg-white text-black font-medium'
                   : 'text-neutral-500 hover:text-white'
-              }`}
+                }`}
             >
               yearly
               <span className="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
@@ -244,9 +242,8 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`relative flex flex-col bg-neutral-950/60 border ${plan.accentColor} rounded-3xl p-6 transition-all duration-300 hover:border-white/20 ${
-                plan.featured ? 'ring-1 ring-white/20 shadow-2xl shadow-white/5' : ''
-              }`}
+              className={`relative flex flex-col bg-neutral-950/60 border ${plan.accentColor} rounded-3xl p-6 transition-all duration-300 hover:border-white/20 ${plan.featured ? 'ring-1 ring-white/20 shadow-2xl shadow-white/5' : ''
+                }`}
             >
               {/* Featured glow */}
               {plan.featured && (
@@ -305,13 +302,12 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
               {/* CTA */}
               <button
                 onClick={() => handlePurchaseClick(plan)}
-                className={`w-full py-3 rounded-xl text-xs font-mono lowercase transition-all ${
-                  plan.featured
+                className={`w-full py-3 rounded-xl text-xs font-mono lowercase transition-all ${plan.featured
                     ? 'bg-white hover:bg-neutral-200 text-black font-medium'
                     : plan.id === 'enterprise'
-                    ? 'bg-transparent border border-white/15 hover:border-white/30 text-white'
-                    : 'bg-neutral-900 hover:bg-neutral-800 border border-white/10 hover:border-white/20 text-white'
-                }`}
+                      ? 'bg-transparent border border-white/15 hover:border-white/30 text-white'
+                      : 'bg-neutral-900 hover:bg-neutral-800 border border-white/10 hover:border-white/20 text-white'
+                  }`}
               >
                 {plan.cta}
               </button>

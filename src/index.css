@@ -6,7 +6,10 @@
   html {
     scroll-behavior: smooth;
   }
-  html, body, #root {
+
+  html,
+  body,
+  #root {
     height: 100%;
     margin: 0;
     padding: 0;
@@ -28,13 +31,16 @@
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: #000;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #1c1917;
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #292524;
 }
@@ -45,6 +51,7 @@
     opacity: 0;
     transform: translateY(12px) scale(0.995);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -61,53 +68,82 @@ video::-webkit-media-controls-start-playback-button {
   display: none !important;
   -webkit-appearance: none;
 }
+
 video::-webkit-media-controls {
   display: none !important;
 }
+
 video::-webkit-media-controls-panel {
   display: none !important;
 }
+
 video::-webkit-media-controls-play-button {
   display: none !important;
 }
 
 /* Print Stylesheet for Official PDF Audits */
 @media print {
-  body, html, #root {
+
+  body,
+  html,
+  #root {
     background-color: #ffffff !important;
     background-image: none !important;
     color: #000000 !important;
   }
-  header, nav, footer, button, input, .print\:hidden {
+
+  header,
+  nav,
+  footer,
+  button,
+  input,
+  .print\:hidden {
     display: none !important;
   }
+
   section {
     padding-top: 20px !important;
     padding-bottom: 20px !important;
     background-color: #ffffff !important;
   }
-  .bg-neutral-950, .bg-neutral-900, .bg-neutral-900\/40, .bg-black {
+
+  .bg-neutral-950,
+  .bg-neutral-900,
+  .bg-neutral-900\/40,
+  .bg-black {
     background-color: #ffffff !important;
     border: 1px solid #e5e7eb !important;
     color: #000000 !important;
   }
-  .text-white, .text-neutral-300, .text-neutral-400 {
+
+  .text-white,
+  .text-neutral-300,
+  .text-neutral-400 {
     color: #000000 !important;
   }
-  .text-neutral-500, .text-neutral-600 {
+
+  .text-neutral-500,
+  .text-neutral-600 {
     color: #4b5563 !important;
   }
-  .border-white\/5, .border-white\/10 {
+
+  .border-white\/5,
+  .border-white\/10 {
     border-color: #e5e7eb !important;
   }
-  pre, code {
+
+  pre,
+  code {
     background-color: #f3f4f6 !important;
     color: #111827 !important;
     border: 1px solid #e5e7eb !important;
     white-space: pre-wrap !important;
     word-break: break-all !important;
   }
-  h2, h3, h4 {
+
+  h2,
+  h3,
+  h4 {
     color: #000000 !important;
   }
 }
@@ -118,18 +154,22 @@ video::-webkit-media-controls-play-button {
     top: 10%;
     left: 10%;
   }
+
   25% {
     top: 10%;
     left: 80%;
   }
+
   50% {
     top: 75%;
     left: 80%;
   }
+
   75% {
     top: 75%;
     left: 10%;
   }
+
   100% {
     top: 10%;
     left: 10%;
@@ -140,6 +180,7 @@ video::-webkit-media-controls-play-button {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -172,9 +213,8 @@ video::-webkit-media-controls-play-button {
   0% {
     left: -50%;
   }
+
   100% {
     left: 100%;
   }
 }
-
-

@@ -70,6 +70,57 @@ const scanRules = [
   { name: 'db-credentials-url', regex: /postgres(ql)?:\/\/([^:]+):([^@]+)@/ }
 ];
 
+const autoFixCode = (fileName: string, currentCode: string): string => {
+  switch (fileName) {
+    case 'supabase.ts':
+      return currentCode.replace(
+        "const supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service-role-key-xyz-123-abc';",
+        "// load from environment variables safely\nconst supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';"
+      );
+    case 'aws_config.py':
+      let fixedAws = currentCode.replace(
+        'aws_access_key_id="AKIAIOSFODNN7EXAMPLE",',
+        'aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),'
+      ).replace(
+        'aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"',
+        'aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY")'
+      );
+      if (!fixedAws.includes('import os')) {
+        fixedAws = 'import os\n' + fixedAws;
+      }
+      return fixedAws;
+    case 'stripe.json':
+      return currentCode.replace(
+        '"stripe_secret_key": "sk_test_51N34ghJkL90AcdSfErtYuiOp789QwAsDfGhJkLop1234"',
+        '"stripe_secret_key": "process.env.STRIPE_SECRET_KEY"'
+      );
+    case '.env':
+      return currentCode.replace(
+        'DATABASE_URL="postgresql://postgres:root_password_99xYz@db.example.com:5432/prod"',
+        '# use environment placeholders in committed files\nDATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"'
+      );
+    case 'main.go':
+      let fixedGo = currentCode.replace(
+        'const SlackWebhook = "https://hooks.slack.com/services/T00000000/B00000000/DUMMYSHORTKEY"',
+        'var SlackWebhook = os.Getenv("SLACK_WEBHOOK_URL")'
+      ).replace(
+        'http.Post(SlackWebhook',
+        'if SlackWebhook != "" {\n        http.Post(SlackWebhook, "application/json", nil)\n    }'
+      );
+      if (!fixedGo.includes('"os"')) {
+        fixedGo = fixedGo.replace('import "net/http"', 'import (\n\t"net/http"\n\t"os"\n)');
+      }
+      return fixedGo;
+    case 'deploy.yml':
+      return currentCode.replace(
+        'curl -H "Authorization: token ghp_abc123xyzPersonalAccessTokenKeyHere"',
+        'curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"'
+      );
+    default:
+      return currentCode;
+  }
+};
+
 export const SecurifySimulator = () => {
   const [selectedFile, setSelectedFile] = useState<number>(0);
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -177,6 +228,73 @@ export const SecurifySimulator = () => {
     setProgress(0);
     setPendingScanResult({ state: 'clean', output: '', leakLine: -1 });
     setEditableCodes(mockFiles.map(f => f.code));
+  };
+
+  const handleAutoFix = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (isScanning) return;
+
+    const currentCode = editableCodes[selectedFile];
+    const fixed = autoFixCode(activeFile.name, currentCode);
+
+    const updated = [...editableCodes];
+    updated[selectedFile] = fixed;
+    setEditableCodes(updated);
+
+    // Dynamic .env.example generation and download
+    let envContent = '';
+    switch (activeFile.name) {
+      case 'supabase.ts':
+        envContent = '# Supabase API Configuration\nSUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here\n';
+        break;
+      case 'aws_config.py':
+        envContent = '# AWS Credentials\nAWS_ACCESS_KEY_ID=your_aws_access_key_id_here\nAWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here\n';
+        break;
+      case 'stripe.json':
+        envContent = '# Stripe Secrets\nSTRIPE_SECRET_KEY=your_stripe_secret_key_here\n';
+        break;
+      case '.env':
+        envContent = '# Database Settings\nDB_USER=postgres\nDB_PASSWORD=your_database_password_here\nDB_HOST=db.example.com\nDB_PORT=5432\nDB_NAME=prod\n\n# JWT Auth\nJWT_SECRET=your_jwt_secret_here\n';
+        break;
+      case 'main.go':
+        envContent = '# Slack Integration\nSLACK_WEBHOOK_URL=your_slack_webhook_url_here\n';
+        break;
+      case 'deploy.yml':
+        envContent = '# GitHub Token\nGITHUB_TOKEN=your_github_token_here\n';
+        break;
+      default:
+        envContent = '# Environment Configurations\nAPI_KEY=your_api_key_here\n';
+    }
+
+    try {
+      const blob = new Blob([envContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '.env.example';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download .env.example', err);
+    }
+
+    const output = `[securify] ✔ git commit passed
+[status] scanned 1 files, 0 leaks identified.
+[auto-fix] replaced hardcoded credentials with safe environment bindings.
+[auto-fix] generated and downloaded .env.example.
+[engine] local hooks signature match finished.`;
+
+    setPendingScanResult({
+      state: 'clean',
+      output,
+      leakLine: -1
+    });
+
+    setIsScanning(true);
+    setScanState('scanning');
+    setProgress(0);
   };
 
   return (
@@ -302,7 +420,7 @@ export const SecurifySimulator = () => {
                   <div className="space-y-1 text-white">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block select-none animate-pulse">⠏ running pre-commit hook (securify)...</span>
-                    <div className="w-full bg-neutral-900 h-1.5 rounded overflow-hidden mt-3">
+                    <div className="w-full bg-neutral-950 h-1.5 rounded overflow-hidden mt-3">
                       <div 
                         className="bg-white h-full transition-all duration-200"
                         style={{ width: `${progress}%` }}
@@ -318,9 +436,15 @@ export const SecurifySimulator = () => {
                     <span className="block text-white font-medium font-sans text-sm mt-3 select-text">
                       [securify] ❌ commit blocked
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/10 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text">
+                    <pre className="block bg-neutral-950 border border-white/10 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text mb-3">
                       {pendingScanResult.output}
                     </pre>
+                    <button
+                      onClick={handleAutoFix}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-black hover:bg-neutral-200 border border-white/10 rounded-xl text-xs font-mono font-medium transition-colors lowercase"
+                    >
+                      ✨ auto-fix credentials
+                    </button>
                   </div>
                 )}
 
@@ -353,13 +477,22 @@ export const SecurifySimulator = () => {
 
               {/* Terminal Controls */}
               <div className="p-4 bg-neutral-900/30 border-t border-white/5 flex gap-3 select-none">
-                <button
-                  onClick={handleStartScan}
-                  disabled={isScanning}
-                  className="flex-1 bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-xs font-mono font-medium transition-colors disabled:opacity-50 lowercase"
-                >
-                  {isScanning ? 'scanning repos...' : 'git commit'}
-                </button>
+                {scanState === 'blocked' ? (
+                  <button
+                    onClick={handleAutoFix}
+                    className="flex-1 bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-xs font-mono font-medium transition-colors lowercase"
+                  >
+                    ✨ auto-fix secret
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStartScan}
+                    disabled={isScanning}
+                    className="flex-1 bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-xs font-mono font-medium transition-colors disabled:opacity-50 lowercase"
+                  >
+                    {isScanning ? 'scanning repos...' : 'git commit'}
+                  </button>
+                )}
                 <button
                   onClick={handleReset}
                   className="px-4 bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white py-3 rounded-xl text-xs font-mono transition-colors lowercase"
