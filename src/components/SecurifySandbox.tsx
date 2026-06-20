@@ -1137,8 +1137,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('scan'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'scan'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             leak scanner
@@ -1147,8 +1147,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('config'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'config'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             config generator (.toml)
@@ -1157,8 +1157,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('entropy'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'entropy'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             entropy meter
@@ -1167,8 +1167,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('secrets'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'secrets'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             secret generator
@@ -1177,8 +1177,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('custom-rule'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'custom-rule'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             custom rule tester
@@ -1187,8 +1187,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('misconfig'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'misconfig'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             IaC scanner
@@ -1197,8 +1197,8 @@ ssh_keys = ${enabledScanners.ssh}
             onClick={() => { setActiveTab('dependency'); setActiveDiffFix(null); setActiveIaCDiffFix(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-mono border transition-all lowercase shrink-0 ${
               activeTab === 'dependency'
-                ? 'bg-white text-black border-white'
-                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
+                ? 'bg-white text-black border-white shadow-[0_0_12px_rgba(255,255,255,0.2)]'
+                : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white hover:border-white/10'
             }`}
           >
             dependency SCA scanner
@@ -1207,7 +1207,7 @@ ssh_keys = ${enabledScanners.ssh}
 
         {activeTab === 'scan' ? (
           /* Tab 1: SCANNER WORKSPACE */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch animate-page-entrance">
             
             {/* Input Text Area (lg:col-span-7) */}
             <div
@@ -1363,9 +1363,23 @@ ssh_keys = ${enabledScanners.ssh}
                             navigator.clipboard.writeText(activeDiffFix.fixed);
                             alert('remediated code copied to clipboard!');
                           }}
-                          className="w-full bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
+                          className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
                         >
                           copy secure code
+                        </button>
+                        <button
+                          onClick={() => {
+                            const lines = code.split('\n');
+                            const targetIdx = activeDiffFix.line - 1;
+                            if (targetIdx >= 0 && targetIdx < lines.length) {
+                              lines[targetIdx] = lines[targetIdx].replace(activeDiffFix.original, activeDiffFix.fixed);
+                              setCode(lines.join('\n'));
+                              setActiveDiffFix(null);
+                            }
+                          }}
+                          className="flex-1 bg-white hover:bg-neutral-200 text-black text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
+                        >
+                          apply fix directly
                         </button>
                       </div>
                     </div>
@@ -1399,7 +1413,7 @@ ssh_keys = ${enabledScanners.ssh}
           </div>
         ) : activeTab === 'config' ? (
           /* Tab 2: CONFIG GENERATOR WORKSPACE */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text animate-page-entrance">
             
             {/* Options Panel (lg:col-span-6) */}
             <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
@@ -1579,7 +1593,7 @@ ssh_keys = ${enabledScanners.ssh}
           </div>
         ) : activeTab === 'entropy' ? (
           /* Tab 3: ENTROPY WORKSPACE */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text animate-page-entrance">
             {/* Left Side: Input area */}
             <div className="lg:col-span-7 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
               <div className="space-y-4">
@@ -1709,7 +1723,7 @@ ssh_keys = ${enabledScanners.ssh}
           </div>
         ) : activeTab === 'secrets' ? (
           /* Tab 4: SECRETS GENERATOR */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text animate-page-entrance">
             {/* Left Side: Controls */}
             <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
               <div className="space-y-5">
@@ -1932,7 +1946,7 @@ ssh_keys = ${enabledScanners.ssh}
           </div>
         ) : activeTab === 'custom-rule' ? (
           /* Tab 5: CUSTOM RULE TESTER */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch select-text animate-page-entrance">
             {/* Left Side: Rule details & Test text */}
             <div className="lg:col-span-6 bg-neutral-950 border border-white/5 rounded-2xl p-6 space-y-6 flex flex-col justify-between">
               <div className="space-y-4">
@@ -2254,9 +2268,23 @@ ssh_keys = ${enabledScanners.ssh}
                               navigator.clipboard.writeText(activeIaCDiffFix.fixed);
                               alert('remediated configuration copied to clipboard!');
                             }}
-                            className="w-full bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
+                            className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
                           >
-                            copy secure configuration
+                            copy secure config
+                          </button>
+                          <button
+                            onClick={() => {
+                              const lines = misconfigCode.split('\n');
+                              const targetIdx = activeIaCDiffFix.line - 1;
+                              if (targetIdx >= 0 && targetIdx < lines.length) {
+                                lines[targetIdx] = lines[targetIdx].replace(activeIaCDiffFix.original, activeIaCDiffFix.fixed);
+                                setMisconfigCode(lines.join('\n'));
+                                setActiveIaCDiffFix(null);
+                              }
+                            }}
+                            className="flex-1 bg-white hover:bg-neutral-200 text-black text-[10px] font-mono rounded-lg py-2.5 lowercase transition-all"
+                          >
+                            apply fix directly
                           </button>
                         </div>
                       </div>

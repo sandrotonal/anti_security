@@ -24,6 +24,8 @@ import { SecurifyShortcuts } from './components/SecurifyShortcuts';
 import { GithubAuthModal } from './components/GithubAuthModal';
 import { SecurifyAuditor } from './components/SecurifyAuditor';
 import { SecurifyPricing } from './components/SecurifyPricing';
+import { SecurifyHomeScanner } from './components/SecurifyHomeScanner';
+import { SubscriptionRestoreModal } from './components/SubscriptionRestoreModal';
 
 function App() {
   const paddleInitializedRef = useRef<boolean>(false);
@@ -34,6 +36,7 @@ function App() {
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [activeFooterModal, setActiveFooterModal] = useState<'license' | 'security' | 'pgp' | 'sales_contract' | 'return_policy' | 'privacy_policy' | 'company_info' | null>(null);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState<boolean>(false);
 
   // GitHub integration states
   const [isGithubModalOpen, setIsGithubModalOpen] = useState<boolean>(false);
@@ -58,6 +61,7 @@ function App() {
   });
   const [premiumStatus, setPremiumStatus] = useState<{ valid: boolean; email?: string; plan?: string; expiresAt?: number } | null>(null);
   const [paymentModal, setPaymentModal] = useState<{ show: boolean; status: 'success' | 'failed'; plan?: string; email?: string; error?: string } | null>(null);
+  const [initialWebsiteUrl, setInitialWebsiteUrl] = useState<string>('');
 
   // Token Validation on Startup
   useEffect(() => {
@@ -91,7 +95,7 @@ function App() {
     if (payment === 'success' && token) {
       localStorage.setItem('securify_premium_token', token);
       setPremiumToken(token);
-      
+
       setPaymentModal({
         show: true,
         status: 'success',
@@ -186,7 +190,7 @@ function App() {
       }
 
       const { priceId, clientToken, environment, email: customerEmail, plan, billing } = await response.json();
-      
+
       console.log('[Securify Paddle Checkout Initiating]', {
         priceId,
         clientTokenPrefix: clientToken ? clientToken.substring(0, 15) + '...' : 'none',
@@ -249,7 +253,7 @@ function App() {
           billing: billing
         }
       });
-      
+
       setIsCheckoutLoading(false);
     } catch (error: any) {
       console.error('Checkout creation failed:', error);
@@ -366,7 +370,7 @@ function App() {
               </span>
               <h1 className="text-xl font-medium text-white lowercase">securify compliance report</h1>
             </div>
-            
+
             <div className="flex gap-3 print:hidden">
               <button
                 onClick={() => window.print()}
@@ -387,7 +391,7 @@ function App() {
           <div className="bg-neutral-950 border border-white/5 p-6 md:p-8 rounded-2xl space-y-6 relative overflow-hidden print:border-neutral-300 print:text-black">
             {/* Watermark grid background */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none opacity-30 print:hidden" />
-            
+
             <div className="relative z-10 space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4 print:border-neutral-300">
                 <div className="space-y-1">
@@ -401,11 +405,10 @@ function App() {
               </div>
 
               {/* Status Banner */}
-              <div className={`p-4 rounded-xl border flex items-center justify-between ${
-                reportData.leaks === 0
+              <div className={`p-4 rounded-xl border flex items-center justify-between ${reportData.leaks === 0
                   ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 print:border-emerald-600 print:text-emerald-700'
                   : 'bg-red-950/20 border-red-500/20 text-red-400 print:border-red-600 print:text-red-700'
-              }`}>
+                }`}>
                 <div className="space-y-1">
                   <div className="text-sm font-semibold lowercase">
                     {reportData.leaks === 0 ? '✓ verified safe codebase' : '⚠️ security action required'}
@@ -459,7 +462,7 @@ function App() {
 
           {/* Footer note */}
           <div className="text-center text-[9px] text-neutral-500 lowercase leading-relaxed">
-            this security report is cryptographically signed and verified by securify local scanner engine. 
+            this security report is cryptographically signed and verified by securify local scanner engine.
             all scan procedures are run client-side on sandbox systems entirely offline.
           </div>
         </div>
@@ -481,6 +484,7 @@ function App() {
         onGithubLogin={() => setIsGithubModalOpen(true)}
         onGithubLogout={handleGithubLogout}
         premiumStatus={premiumStatus}
+        onRestoreSubscription={() => setIsRestoreModalOpen(true)}
       />
 
       {/* Main Pages Content routing */}
@@ -490,12 +494,17 @@ function App() {
             <SecurifyHero />
             <SecurifyTrust />
             <div className="relative z-10 bg-black">
-               <SecurifySimulator />
-               <SecurifyFeatures />
-               <SecurifyIntegrations />
-               <SecurifyConsoleDocs />
-               <SecurifyROI />
-               <SecurifyTestimonials />
+              <SecurifySimulator />
+              <SecurifyFeatures />
+              <SecurifyIntegrations />
+              <SecurifyConsoleDocs />
+              <SecurifyROI />
+              <SecurifyTestimonials />
+              <SecurifyHomeScanner onScanSite={(url) => {
+                setInitialWebsiteUrl(url);
+                setActiveView('dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} />
             </div>
           </div>
         )}
@@ -508,7 +517,7 @@ function App() {
 
         {activeView === 'dashboard' && (
           <div className="animate-page-entrance">
-            <SecurifyDashboard 
+            <SecurifyDashboard
               githubUser={githubUser}
               onGithubLogin={() => setIsGithubModalOpen(true)}
               onViewChange={setActiveView}
@@ -518,6 +527,8 @@ function App() {
                 setCheckoutEmail('');
                 setCheckoutError('');
               }}
+              initialWebsiteUrl={initialWebsiteUrl}
+              onClearInitialWebsiteUrl={() => setInitialWebsiteUrl('')}
             />
           </div>
         )}
@@ -600,16 +611,31 @@ function App() {
         }}
       />
 
+      {/* Subscription Restore Modal */}
+      <SubscriptionRestoreModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        onSuccess={(token, details) => {
+          setPremiumToken(token);
+          setPremiumStatus({
+            valid: true,
+            email: details.email,
+            plan: details.plan,
+            expiresAt: details.expiresAt
+          });
+        }}
+      />
+
       {/* Payment Result Modal */}
       {paymentModal && paymentModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
-          <div 
+          <div
             className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
             onClick={() => setPaymentModal(null)}
           />
           <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
-            
+
             {paymentModal.status === 'success' ? (
               <div className="relative z-10 space-y-6 text-center">
                 {/* Success Indicator */}
@@ -693,14 +719,14 @@ function App() {
       {/* Checkout Email Modal */}
       {checkoutPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
-          <div 
+          <div
             className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
             onClick={() => setCheckoutPlan(null)}
           />
           <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-            
+
             <button
               onClick={() => setCheckoutPlan(null)}
               className="absolute top-5 right-5 text-neutral-400 hover:text-white transition-colors"

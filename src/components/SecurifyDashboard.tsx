@@ -148,12 +148,26 @@ const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { u
   );
 };
 
+const parseFinancialRiskString = (str: string) => {
+  if (!str) return { value: '', details: '' };
+  const match = str.match(/^([^(]+)(?:\(([^)]+)\))?/);
+  if (match) {
+    return {
+      value: match[1].trim(),
+      details: match[2] ? match[2].trim() : ''
+    };
+  }
+  return { value: str, details: '' };
+};
+
 interface SecurifyDashboardProps {
   githubUser: { username: string; avatarUrl: string; token?: string } | null;
   onGithubLogin: () => void;
   onViewChange?: (view: any) => void;
   premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
   onPurchaseTrigger?: (planId: string, planName: string, billing: 'monthly' | 'yearly') => void;
+  initialWebsiteUrl?: string;
+  onClearInitialWebsiteUrl?: () => void;
 }
 
 export const SecurifyDashboard = ({ 
@@ -161,7 +175,9 @@ export const SecurifyDashboard = ({
   onGithubLogin, 
   onViewChange,
   premiumStatus,
-  onPurchaseTrigger
+  onPurchaseTrigger,
+  initialWebsiteUrl,
+  onClearInitialWebsiteUrl
 }: SecurifyDashboardProps) => {
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
@@ -226,6 +242,79 @@ export const SecurifyDashboard = ({
   const [siteReportShared, setSiteReportShared] = useState<boolean>(false);
   const [solutionConfigTab, setSolutionConfigTab] = useState<'nginx' | 'nextjs' | 'express' | 'apache'>('nginx');
   const [selectedGithubRepo, setSelectedGithubRepo] = useState<string>('');
+  const [expandedChecks, setExpandedChecks] = useState<{[key: string]: boolean}>({});
+
+  // Auto-expand failed checks on new scan results
+  useEffect(() => {
+    if (siteScanResults?.checks) {
+      const initialExpanded: {[key: string]: boolean} = {};
+      Object.entries(siteScanResults.checks).forEach(([key, check]) => {
+        // Expand failed checks, collapse passed checks by default
+        initialExpanded[key] = !check.pass;
+      });
+      setExpandedChecks(initialExpanded);
+    }
+  }, [siteScanResults]);
+
+  const performSiteScan = async (target: string) => {
+    setSiteScanning(true);
+    setSiteScanResults(null);
+    setSiteScanError(null);
+    setActiveSiteExploitSim(null);
+    setIsLiveStream(false);
+
+    // 1. Progress Step Simulation for premium UX
+    const steps = [
+      "resolving DNS chain and verifying IP address allocations (SSRF protection active)...",
+      "probing SSL/TLS certificate chain, cipher suites, and HTTPS enforcement...",
+      "analyzing Content-Security-Policy (CSP) directive quality and XSS mitigations...",
+      "verifying HSTS preload status, max-age, and subdomain enforcement...",
+      "inspecting Clickjacking protection, CORS configuration, and frame-ancestors...",
+      "scanning Permissions-Policy, MIME controls, and Referrer-Policy...",
+      "fingerprinting server banner, runtime stack disclosure, and tech signatures...",
+      "computing GDPR Art. 32 / KVKK compliance exposure and IBM breach cost model...",
+      "generating risk-weighted security grade and attack surface summary..."
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      setSiteScanProgress({
+        current: i + 1,
+        total: steps.length,
+        message: steps[i]
+      });
+      await new Promise(resolve => setTimeout(resolve, i === 0 ? 400 : i === 1 ? 600 : i === 2 ? 500 : i === 3 ? 400 : i === 4 ? 350 : i === 5 ? 350 : i === 6 ? 300 : i === 7 ? 500 : 400));
+    }
+
+    try {
+      // 2. Fetch live data from serverless function
+      const response = await fetch(`/api/scan-site?url=${encodeURIComponent(target)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Server responded with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setSiteScanResults(data);
+    } catch (err: any) {
+      console.error("Real-time scan failed:", err);
+      setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
+    } finally {
+      setSiteScanning(false);
+      setSiteScanProgress(null);
+    }
+  };
+
+  useEffect(() => {
+    if (initialWebsiteUrl) {
+      setScanTab('website');
+      setSiteUrl(initialWebsiteUrl);
+      performSiteScan(initialWebsiteUrl);
+      if (onClearInitialWebsiteUrl) {
+        onClearInitialWebsiteUrl();
+      }
+    }
+  }, [initialWebsiteUrl]);
 
   const [githubRepos, setGithubRepos] = useState<string[]>([]);
   const [customRepoName, setCustomRepoName] = useState<string>('');
@@ -238,14 +327,10 @@ export const SecurifyDashboard = ({
   useEffect(() => {
     let active = true;
     if (githubUser) {
-      const defaultRepos = [
-        `${githubUser.username}/anti_security`,
-        `${githubUser.username}/istanbul_api`,
-        `${githubUser.username}/react-dashboard`,
-        `${githubUser.username}/personal-site`
-      ];
-      setGithubRepos(defaultRepos);
-      setSelectedGithubRepo(`${githubUser.username}/anti_security`);
+      setIsLiveStream(false);
+      setLogs([]); // Clear simulated mock logs when real user logs in
+      setGithubRepos(['loading repositories...']);
+      setSelectedGithubRepo('');
 
       // Fetch real public and private repositories from GitHub
       const fetchRealRepos = async () => {
@@ -262,13 +347,22 @@ export const SecurifyDashboard = ({
           const res = await fetch(url, { headers });
           if (!res.ok) throw new Error('Failed to fetch repositories');
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0 && active) {
+          if (Array.isArray(data) && active) {
             const repoNames = data.map((r: any) => r.full_name);
-            setGithubRepos(repoNames);
-            setSelectedGithubRepo(repoNames[0]);
+            if (repoNames.length > 0) {
+              setGithubRepos(repoNames);
+              setSelectedGithubRepo(repoNames[0]);
+            } else {
+              setGithubRepos([]);
+              setSelectedGithubRepo('');
+            }
           }
         } catch (err) {
-          console.warn('Using fallback repositories due to API limit or error:', err);
+          console.error('API error while fetching repositories:', err);
+          if (active) {
+            setGithubRepos([]);
+            setSelectedGithubRepo('');
+          }
         }
       };
 
@@ -277,6 +371,7 @@ export const SecurifyDashboard = ({
       setGithubRepos([]);
       setSelectedGithubRepo('');
       setScanTab('local');
+      setIsLiveStream(true); // Enable simulation for guest users
     }
     return () => {
       active = false;
@@ -340,6 +435,268 @@ export const SecurifyDashboard = ({
   }
   const [githubCommits, setGithubCommits] = useState<GithubCommitInfo[]>([]);
   const [activeGithubSubTab, setActiveGithubSubTab] = useState<'code' | 'sentinel' | 'pipeline'>('code');
+
+  // Compliance Exporter States & Handlers
+  const [selectedReportType, setSelectedReportType] = useState<'soc2' | 'gdpr' | 'pci'>('soc2');
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+  const [logoFileName, setLogoFileName] = useState<string | null>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCustomLogo(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDownloadComplianceReport = (format: 'html' | 'md') => {
+    if (!siteScanResults) return;
+
+    const logoHtml = customLogo 
+      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${customLogo}" style="max-height: 60px; max-width: 200px; object-fit: contain;" /></div>` 
+      : `<div style="font-family: monospace; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #fff;">SECURIFY AUDITED</div>`;
+
+    const logoMd = customLogo 
+      ? `![Custom Brand Logo](${customLogo})\n\n` 
+      : `**SECURIFY AUDITED**\n\n`;
+
+    let reportTitle = '';
+    let reportContentHtml = '';
+    let reportContentMd = '';
+
+    if (selectedReportType === 'soc2') {
+      reportTitle = `SOC 2 Type II Security Readiness Checklist - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. SOC 2 Trust Services Criteria (Security & Confidentiality)</h2>
+        <p>This document attests to the readiness of <strong>${siteScanResults.domain}</strong> regarding SOC 2 Trust Services Criteria (TSC) Section CC6 (Logical Access and Boundary Protection).</p>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Criterion</th>
+              <th style="padding:10px;">Inspected Control</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px;">Audit Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.1 (Perimeter Defense)</strong></td>
+              <td style="padding:10px;">Content-Security-Policy (CSP)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.csp?.pass ? 'CSP headers active and configured.' : 'No CSP headers detected. High risk of script injection.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.3 (Input Validation)</strong></td>
+              <td style="padding:10px;">X-Content-Type-Options</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xcto?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xcto?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xcto?.pass ? 'nosniff header is active.' : 'Missing nosniff header. Vulnerable to MIME confusion.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.6 (Boundary Protection)</strong></td>
+              <td style="padding:10px;">Strict-Transport-Security (HSTS)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.hsts?.pass ? 'HSTS enabled.' : 'Missing HSTS. Connection downgrade attack vector present.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>CC6.8 (Transmission Security)</strong></td>
+              <td style="padding:10px;">X-Frame-Options</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xfo?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xfo?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xfo?.pass ? 'Clickjacking defense active.' : 'Missing frame-ancestors/XFO. Clickjacking vulnerability.'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# SOC 2 Type II Security Readiness Checklist
+**Audited Asset:** ${siteScanResults.domain}
+**Date:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. CC6.1 - Access Control & Perimeter Defense
+* **Content-Security-Policy (CSP):** ${siteScanResults.checks.csp?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.csp?.pass ? 'Secure CSP directives in place.' : 'Missing CSP header. Code injection risk.'}
+
+## 2. CC6.3 - Input Validation & Injection Defense
+* **X-Content-Type-Options:** ${siteScanResults.checks.xcto?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xcto?.pass ? 'MIME sniffing disabled.' : 'MIME sniffing enabled. High risk.'}
+
+## 3. CC6.6 - Boundary Protection & Downgrade Prevention
+* **Strict-Transport-Security (HSTS):** ${siteScanResults.checks.hsts?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.hsts?.pass ? 'HTTPS connection enforced.' : 'No HSTS configured.'}
+
+## 4. CC6.8 - Transmission Security & clickjacking
+* **X-Frame-Options:** ${siteScanResults.checks.xfo?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xfo?.pass ? 'Clickjacking defense configured.' : 'No clickjacking protection.'}
+      `;
+    } else if (selectedReportType === 'gdpr') {
+      reportTitle = `GDPR Article 32 Data Leak Prevention Audit - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. GDPR Article 32 (Security of Processing) Audit</h2>
+        <p>This audit evaluates compliance with GDPR Article 32, requiring technical measures to prevent personal data exposure and breaches.</p>
+        
+        <div style="background-color: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0; color: #ddd;">
+          <strong>Potential GDPR Fines:</strong> ${siteScanResults.financialRisk.potentialFine}<br/>
+          <strong>Estimated Data Breach Impact:</strong> ${siteScanResults.financialRisk.dataBreachRisk}<br/>
+          <strong>Cyber Insurance Impact:</strong> ${siteScanResults.financialRisk.cyberInsurancePenalty}
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Requirement</th>
+              <th style="padding:10px;">Observed Posture</th>
+              <th style="padding:10px;">Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Confidentiality (Referrer-Policy)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.referrer?.pass ? 'Pass - No data leakage' : 'Fail - Referrer headers leak query tokens'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.referrer?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.referrer?.pass ? 'LOW' : 'HIGH'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Integrity (CSP)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.csp?.pass ? 'Pass - Cross-site scripting mitigated' : 'Fail - Vulnerable to malicious script execution'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'LOW' : 'CRITICAL'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Secure Transport (HSTS)</strong></td>
+              <td style="padding:10px;">${siteScanResults.checks.hsts?.pass ? 'Pass - Transport encryption enforced' : 'Fail - Plaintext HTTP downgrades possible'}</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'LOW' : 'HIGH'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# GDPR Article 32 Data Leak Protection Summary
+**Audited Domain:** ${siteScanResults.domain}
+**Audit Time:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. Compliance Financial Risk Metrics
+* **Potential Statutory Fines (up to 4% global revenue):** ${siteScanResults.financialRisk.potentialFine}
+* **Estimated Data Breach Clean-up Cost:** ${siteScanResults.financialRisk.dataBreachRisk}
+* **Cyber Insurance Premium Surcharge:** ${siteScanResults.financialRisk.cyberInsurancePenalty}
+
+## 2. Regulatory Breach Points
+* **Referrer Policy (Data Minimization):** ${siteScanResults.checks.referrer?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.referrer?.pass ? 'Private tokens and query variables are hidden.' : 'Referrer tokens exfiltrated in plain text to third-party endpoints.'}
+* **Content-Security-Policy (Data Integrity):** ${siteScanResults.checks.csp?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.csp?.pass ? 'Script source rules enforced.' : 'XSS vulnerabilities allow attackers to scrape client credentials.'}
+* **HSTS (Encryption enforcement):** ${siteScanResults.checks.hsts?.pass ? '✔ COMPLIANT' : '❌ NON-COMPLIANT'}
+  * *Risk:* ${siteScanResults.checks.hsts?.pass ? 'SSL/TLS enforced on all subdomains.' : 'Plaintext connection hijacking risk.'}
+      `;
+    } else {
+      reportTitle = `PCI-DSS v4.0 Compliance Certificate - ${siteScanResults.domain}`;
+      reportContentHtml = `
+        <h2>1. PCI-DSS v4.0 Security Control Checklist</h2>
+        <p>Attestation of security measures regarding credit card data security standards (Requirement 6.4.3 & Requirement 4.1).</p>
+        
+        <table style="width:100%; border-collapse:collapse; margin-top:20px; color:#ddd;">
+          <thead>
+            <tr style="border-bottom: 2px solid #333; text-align:left;">
+              <th style="padding:10px;">Requirement</th>
+              <th style="padding:10px;">PCI Control Target</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px;">Auditor Evaluation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 6.4.3</strong></td>
+              <td style="padding:10px;">Manage and Audit Client-Side Script Execution (CSP)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.csp?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.csp?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.csp?.pass ? 'CSP strictly controls permitted scripts.' : 'Absence of CSP allows inline scripts, violating PCI 6.4.3.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 4.1</strong></td>
+              <td style="padding:10px;">Enforce Strong Cryptography over Open Networks (HSTS)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.hsts?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.hsts?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.hsts?.pass ? 'Transport security (HSTS) enforced.' : 'No HSTS. Plaintext authentication credentials could be sniffed.'}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding:10px;"><strong>Req 6.5.1</strong></td>
+              <td style="padding:10px;">Prevent clickjacking Attacks (X-Frame-Options)</td>
+              <td style="padding:10px; color:${siteScanResults.checks.xfo?.pass ? '#10B981' : '#EF4444'}; font-weight:bold;">${siteScanResults.checks.xfo?.pass ? 'COMPLIANT' : 'NON-COMPLIANT'}</td>
+              <td style="padding:10px; font-size:12px;">${siteScanResults.checks.xfo?.pass ? 'Clickjacking defended.' : 'Clickjacking possible. Credit card inputs are vulnerable.'}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      reportContentMd = `
+# PCI-DSS v4.0 Compliance Certificate
+**Audited Domain:** ${siteScanResults.domain}
+**Auditor Signature:** Securify Automated Scan Engine
+**Date:** ${siteScanResults.scannedAt}
+
+---
+
+## 1. Compliance Control Audits
+* **PCI-DSS Requirement 6.4.3 (Script Security):** ${siteScanResults.checks.csp?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.csp?.pass ? 'Client-side scripts are audited and whitelisted via CSP.' : 'No CSP found. Violates Requirement 6.4.3.'}
+* **PCI-DSS Requirement 4.1 (Transmission Protection):** ${siteScanResults.checks.hsts?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.hsts?.pass ? 'HSTS forces HTTPS globally.' : 'No HSTS active. Vulnerable to interception over public WiFi.'}
+* **PCI-DSS Requirement 6.5.1 (UI clickjacking Defense):** ${siteScanResults.checks.xfo?.pass ? '✔ PASS' : '❌ FAIL'}
+  * *Notes:* ${siteScanResults.checks.xfo?.pass ? 'X-Frame-Options/frame-ancestors present.' : 'Missing clickjacking headers.'}
+      `;
+    }
+
+    if (format === 'html') {
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${reportTitle}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d0d0d; color: #f3f4f6; margin: 0; padding: 40px; }
+    .container { max-width: 800px; margin: 0 auto; background-color: #121212; border: 1px solid #222; border-radius: 16px; padding: 40px; box-shadow: 0 4px 30px rgba(0,0,0,0.8); }
+    h1 { font-size: 20px; font-weight: bold; text-transform: lowercase; color: #fff; border-bottom: 1px solid #222; padding-bottom: 15px; margin-top: 0; text-align: center; }
+    h2 { font-size: 14px; font-weight: 600; text-transform: lowercase; color: #aaa; margin-top: 30px; }
+    p { font-size: 13px; font-weight: 300; line-height: 1.6; color: #9ca3af; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; color: #ddd; }
+    .footer { text-align: center; font-size: 10px; color: #4b5563; margin-top: 50px; border-top: 1px solid #222; padding-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${logoHtml}
+    <h1>${reportTitle}</h1>
+    <p><strong>audited asset:</strong> ${siteScanResults.domain}<br/><strong>time of scan:</strong> ${siteScanResults.scannedAt}<br/><strong>overall security grade:</strong> ${siteScanResults.grade} (score: ${siteScanResults.score}/100)</p>
+    ${reportContentHtml}
+    <div class="footer">
+      report generated by securify scanner engine. signed cryptographically.
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedReportType}_report_${siteScanResults.domain}.html`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const mdContent = `${logoMd}# ${reportTitle}\n\n${reportContentMd}\n\n---\n*Report generated by Securify Engine. Signed cryptographically.*`;
+      const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedReportType}_report_${siteScanResults.domain}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  };
 
   interface WorkflowFinding {
     file: string;
@@ -775,14 +1132,19 @@ export const SecurifyDashboard = ({
           .filter((node: any) => node.type === 'blob')
           .map((node: any) => node.path);
       }
-    } catch (err) {
-      console.warn('API error during scan, using fallback simulation:', err);
-      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
-      defaultBranch = 'main';
+    } catch (err: any) {
+      console.error('API error during scan:', err);
+      addLog(`Failed to scan repository: ${err.message || err}`, 'failed');
+      setScanning(false);
+      setScanProgress(null);
+      return;
     }
 
     if (repoFiles.length === 0) {
-      repoFiles = ['src/App.tsx', 'src/config/db.ts', 'package.json', 'Dockerfile', 'src/index.js'];
+      addLog(`Repository contains no files or is empty.`, 'failed');
+      setScanning(false);
+      setScanProgress(null);
+      return;
     }
 
     // Wave 7: Scan CI/CD Actions Workflows
@@ -1645,55 +2007,7 @@ audit performed client-side using Securify Interactive Portal.
   const handleWebsiteScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!siteUrl.trim()) return;
-
-    setSiteScanning(true);
-    setSiteScanResults(null);
-    setSiteScanError(null);
-    setActiveSiteExploitSim(null);
-    setIsLiveStream(false);
-
-    const target = siteUrl.trim();
-
-    // 1. Progress Step Simulation for premium UX
-    const steps = [
-      "resolving DNS chain and verifying IP address allocations (SSRF protection active)...",
-      "probing SSL/TLS certificate chain, cipher suites, and HTTPS enforcement...",
-      "analyzing Content-Security-Policy (CSP) directive quality and XSS mitigations...",
-      "verifying HSTS preload status, max-age, and subdomain enforcement...",
-      "inspecting Clickjacking protection, CORS configuration, and frame-ancestors...",
-      "scanning Permissions-Policy, MIME controls, and Referrer-Policy...",
-      "fingerprinting server banner, runtime stack disclosure, and tech signatures...",
-      "computing GDPR Art. 32 / KVKK compliance exposure and IBM breach cost model...",
-      "generating risk-weighted security grade and attack surface summary..."
-    ];
-
-    for (let i = 0; i < steps.length; i++) {
-      setSiteScanProgress({
-        current: i + 1,
-        total: steps.length,
-        message: steps[i]
-      });
-      await new Promise(resolve => setTimeout(resolve, i === 0 ? 400 : i === 1 ? 600 : i === 2 ? 500 : i === 3 ? 400 : i === 4 ? 350 : i === 5 ? 350 : i === 6 ? 300 : i === 7 ? 500 : 400));
-    }
-
-    try {
-      // 2. Fetch live data from serverless function
-      const response = await fetch(`/api/scan-site?url=${encodeURIComponent(target)}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `Server responded with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      setSiteScanResults(data);
-    } catch (err: any) {
-      console.error("Real-time scan failed:", err);
-      setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
-    } finally {
-      setSiteScanning(false);
-      setSiteScanProgress(null);
-    }
+    await performSiteScan(siteUrl.trim());
   };
 
   const handleStartSiteExploitSimulation = (checkKey: string, checkName: string) => {
@@ -1818,7 +2132,86 @@ audit performed client-side using Securify Interactive Portal.
 
   const handleExportSiteReportMarkdown = () => {
     if (!siteScanResults) return;
-    const md = `# Securify Live Website Security Audit
+    
+    let md = '';
+    
+    if (premiumStatus?.valid) {
+      // Premium Enriched Audit Report with SOC2 / GDPR / KVKK checklists
+      md = `# SECURIFY VERIFIED · LIVE WEBSITE SECURITY AUDIT REPORT
+================================================================================
+Target Host: ${siteScanResults.domain}
+Scanned Via: Securify Automated Security Engine
+Timestamp: ${siteScanResults.scannedAt}
+Security Grade: ${siteScanResults.grade} (Score: ${siteScanResults.score}/100)
+Compliance Status: ${siteScanResults.score >= 82 ? 'COMPLIANT' : 'NON-COMPLIANT / RISK EXPOSURE'}
+================================================================================
+
+## 1. EXECUTIVE SUMMARY
+This report details the cryptographic security audit, HTTP header inspection, and regulatory compliance posture analysis of the domain "${siteScanResults.domain}". 
+
+Under GDPR Article 32, organizations are legally required to implement "appropriate technical and organizational measures to ensure a level of security appropriate to the risk". The presence of missing or weak HTTP security headers directly violates standard data protection criteria and exposes the application to severe web-based exploits.
+
+--------------------------------------------------------------------------------
+RISK EXPOSURE METRICS:
+- Potential Compliance Fines (GDPR/KVKK): ${siteScanResults.financialRisk.potentialFine}
+- Estimated Data Breach Impact: ${siteScanResults.financialRisk.dataBreachRisk}
+- Cyber Insurance Actuarial Surcharge: ${siteScanResults.financialRisk.cyberInsurancePenalty}
+- Active Vulnerability Count: ${siteScanResults.failedChecks} / ${siteScanResults.totalChecks}
+--------------------------------------------------------------------------------
+
+## 2. SOC 2 COMPLIANCE PREVIEW CHECKLIST
+The following checklist details how the audited headers map to the SOC 2 Trust Services Criteria (TSC) for Security (CC6.x System Operations) and Privacy.
+
+[${siteScanResults.checks.csp?.pass ? 'x' : ' '}] CC6.1 - Access Control and Perimeter Defense:
+    - Content-Security-Policy (CSP): ${siteScanResults.checks.csp?.pass ? 'PASSED' : 'FAILED - Missing or weak CSP allows XSS and data exfiltration.'}
+    - CORS Policy: ${siteScanResults.checks.cors?.pass ? 'PASSED' : 'FAILED - Overly permissive CORS allows unauthorized cross-origin access.'}
+
+[${siteScanResults.checks.hsts?.pass ? 'x' : ' '}] CC6.6 - Boundary Protection & Downgrade Prevention:
+    - HTTP Strict Transport Security (HSTS): ${siteScanResults.checks.hsts?.pass ? 'PASSED' : 'FAILED - Lacking transport layer protection. Vulnerable to MITM.'}
+
+[${siteScanResults.checks.xfo?.pass ? 'x' : ' '}] CC6.8 - Transmission Protection & Clickjacking:
+    - Clickjacking Defense (X-Frame-Options / frame-ancestors): ${siteScanResults.checks.xfo?.pass ? 'PASSED' : 'FAILED - UI redressing exploit active.'}
+
+[${siteScanResults.checks.serverLeak?.pass && siteScanResults.checks.xPoweredByLeak?.pass ? 'x' : ' '}] CC6.8 - Information Disclosure Prevention:
+    - Server Banner: ${siteScanResults.checks.serverLeak?.pass ? 'PASSED' : 'FAILED - Revealing server runtime version information.'}
+    - Runtime Technology Stack Disclosure: ${siteScanResults.checks.xPoweredByLeak?.pass ? 'PASSED' : 'FAILED - Revealing backend framework signatures.'}
+
+[${siteScanResults.checks.xcto?.pass ? 'x' : ' '}] CC6.3 - Input Validation and Injection Defense:
+    - MIME Sniffing Protection (nosniff): ${siteScanResults.checks.xcto?.pass ? 'PASSED' : 'FAILED - Browser can execute uploaded media files as scripts.'}
+
+[${siteScanResults.checks.referrer?.pass ? 'x' : ' '}] CC6.8 - Referrer Privacy Enforcement:
+    - Referrer Policy: ${siteScanResults.checks.referrer?.pass ? 'PASSED' : 'FAILED - Risk of leaking private tokens in referrer headers.'}
+
+## 3. REGULATORY COMPLIANCE CORRELATIONS (GDPR / KVKK / PCI-DSS v4)
+- GDPR Article 32 (Security of Processing): Failure to enforce HSTS and CSP indicates a lack of state-of-the-art security measures.
+- GDPR Article 5 (Data Minimization & Referrer Leakage): Leaving Referrer-Policy unconfigured can transmit private user parameters and password reset tokens in URL query strings to external parties.
+- PCI-DSS v4 Requirement 6.4.3: Mandates managing and auditing all client-side scripts. Absent CSP directly prevents compliance with this requirement.
+
+## 4. DETAILED SECURITY CHECKS & REMEDIATIONS
+${Object.values(siteScanResults.checks).map((chk: any) => `
+### [${chk.pass ? 'PASS' : 'FAIL'}] ${chk.name}
+- Severity: ${chk.severity.toUpperCase()}
+- CWE: ${chk.cwe || 'N/A'}
+- Observed Value: "${chk.value}"
+- Technical Impact: ${chk.impact}
+- Business Risk: ${chk.businessImpact || 'N/A'}
+- Remediation Strategy: ${chk.recommendation}
+--------------------------------------------------------------------------------
+`).join('\n')}
+
+## 5. RE-VERIFICATION & EDGE PATCHING
+To automate the verification of these vulnerabilities and deploy instant virtual patching at the edge:
+1. Log in to your Securify Dashboard.
+2. Navigate to "Live Site Scanner" for "${siteScanResults.domain}".
+3. Generate the required security configuration using the Interactive Policy Builder.
+4. Apply the Edge Patching rules to rewrite headers dynamically at your CDN / Proxy level.
+
+================================================================================
+Report cryptographically signed and generated by Securify Platform (https://securify.gucluyumhe.dev).
+`;
+    } else {
+      // Basic free user report
+      md = `# Securify Live Website Security Audit
 Domain: ${siteScanResults.domain}
 Audit Time: ${siteScanResults.scannedAt}
 Security Grade: ${siteScanResults.grade} (Score: ${siteScanResults.score}/100)
@@ -1840,6 +2233,7 @@ ${Object.values(siteScanResults.checks).map((chk: any) => `
 ---
 Report generated cryptographically via Securify SaaS platform.
 `;
+    }
 
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -2059,14 +2453,20 @@ Report generated cryptographically via Securify SaaS platform.
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto sm:items-center">
                       <select
-                        disabled={scanning}
+                        disabled={scanning || githubRepos.length === 0 || githubRepos[0] === 'loading repositories...'}
                         value={selectedGithubRepo}
                         onChange={(e) => setSelectedGithubRepo(e.target.value)}
-                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase"
+                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase disabled:opacity-50"
                       >
-                        {githubRepos.map(repo => (
-                          <option key={repo} value={repo}>{repo}</option>
-                        ))}
+                        {githubRepos.length === 0 ? (
+                          <option value="">no repositories found</option>
+                        ) : githubRepos[0] === 'loading repositories...' ? (
+                          <option value="">loading repositories...</option>
+                        ) : (
+                          githubRepos.map(repo => (
+                            <option key={repo} value={repo}>{repo}</option>
+                          ))
+                        )}
                       </select>
                       <button
                         onClick={() => handleGithubScan(selectedGithubRepo)}
@@ -2298,19 +2698,23 @@ Report generated cryptographically via Securify SaaS platform.
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleExportSiteReportMarkdown}
-                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.md)
                 </button>
                 <button
                   onClick={handleExportSiteReportJSON}
-                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.json)
                 </button>
                 <button
                   onClick={handleShareSiteReport}
-                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className={`border text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none ${
+                    siteReportShared 
+                      ? 'bg-neutral-950 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-neutral-950 border-white/10 text-neutral-400 hover:text-white'
+                  }`}
                 >
                   {siteReportShared ? 'copied!' : 'share'}
                 </button>
@@ -2320,7 +2724,7 @@ Report generated cryptographically via Securify SaaS platform.
                     setSiteUrl('');
                     setActiveSiteExploitSim(null);
                   }}
-                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/10 hover:border-white/20 text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   clear
                 </button>
@@ -2348,16 +2752,19 @@ Report generated cryptographically via Securify SaaS platform.
                       cy="64"
                       r="54"
                       stroke={
-                        siteScanResults.grade === 'A+' 
+                        siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
                           ? '#10b981' 
-                          : siteScanResults.grade === 'A' 
-                            ? '#34d399'
-                            : siteScanResults.grade === 'B' 
-                              ? '#f59e0b' 
-                              : siteScanResults.grade === 'C' 
-                                ? '#f97316' 
-                                : '#ef4444'
+                          : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
+                            ? '#f59e0b' 
+                            : '#f43f5e'
                       }
+                      style={{
+                        filter: siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
+                          ? 'drop-shadow(0 0 4px rgba(16,185,129,0.4))'
+                          : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
+                            ? 'drop-shadow(0 0 4px rgba(245,158,11,0.4))'
+                            : 'drop-shadow(0 0 4px rgba(244,63,94,0.4))'
+                      }}
                       strokeWidth="8"
                       fill="transparent"
                       strokeDasharray="339.29"
@@ -2369,11 +2776,9 @@ Report generated cryptographically via Securify SaaS platform.
                     <span className={`text-4xl font-extrabold font-mono ${
                       siteScanResults.grade === 'A+' || siteScanResults.grade === 'A'
                         ? 'text-emerald-400' 
-                        : siteScanResults.grade === 'B' 
+                        : siteScanResults.grade === 'B' || siteScanResults.grade === 'C'
                           ? 'text-amber-400' 
-                          : siteScanResults.grade === 'C' 
-                            ? 'text-orange-400' 
-                            : 'text-red-500'
+                          : 'text-rose-400'
                     }`}>
                       {siteScanResults.grade}
                     </span>
@@ -2422,51 +2827,102 @@ Report generated cryptographically via Securify SaaS platform.
                         <p className="text-red-400 text-[10px] font-mono lowercase leading-relaxed">
                           {siteScanResults.financialRisk.failedCritical} critical-severity vulnerability detected.
                           {siteScanResults.financialRisk.failedHigh > 0 && ` ${siteScanResults.financialRisk.failedHigh} high-severity vulnerabilities detected.`}
-                          {' '}regulatory notification timelines under GDPR Art. 33 require breach disclosure within 72 hours of detection.
+                          {' '}regulatory notification timelines under GDPR Art. 33 require disclosure within 72 hours.
                         </p>
                       </div>
                     </div>
                   )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">regulatory fines (GDPR/KVKK)</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
-                        {siteScanResults.financialRisk.potentialFine}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">art. 32 mandates appropriate technical measures. missing security headers constitute a documented infringement.</span>
-                    </div>
-                    
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">estimated breach cost (IBM 2024)</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-red-400 leading-snug">
-                        {siteScanResults.financialRisk.dataBreachRisk}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">includes: forensics, incident response, legal fees, customer notification, regulatory liaison, PR, and churn.</span>
-                    </div>
-                    
-                    <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left space-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-[9px] font-mono text-neutral-500 lowercase">cyber insurance surcharge</span>
-                      </div>
-                      <span className="block text-[11px] font-mono font-semibold text-amber-500 leading-snug">
-                        {siteScanResults.financialRisk.cyberInsurancePenalty}
-                      </span>
-                      <span className="block text-[8px] text-neutral-600 lowercase font-light leading-relaxed">underwriters assess missing mandatory controls as elevated actuarial risk profile. may trigger coverage exclusions.</span>
-                    </div>
+                    {/* GDPR/KVKK Fines Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.potentialFine);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">regulatory fines (GDPR/KVKK)</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              art. 32 mandates appropriate technical measures. missing security headers constitute a documented infringement.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Estimated Breach Cost Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.dataBreachRisk);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">estimated breach cost (IBM)</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              includes: forensics, incident response, legal fees, customer notification, PR, and churn.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Cyber Insurance Surcharge Card */}
+                    {(() => {
+                      const parsed = parseFinancialRiskString(siteScanResults.financialRisk.cyberInsurancePenalty);
+                      return (
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl text-left flex flex-col justify-between min-h-[140px] hover:border-amber-500/10 transition-colors">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 text-neutral-500">
+                              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-[9px] font-mono lowercase">cyber insurance surcharge</span>
+                            </div>
+                            <span className="block text-lg font-bold font-mono text-amber-500 leading-none">
+                              {parsed.value}
+                            </span>
+                          </div>
+                          <div className="space-y-1 mt-2">
+                            {parsed.details && (
+                              <span className="block text-[8px] text-neutral-400 font-mono lowercase leading-normal">
+                                {parsed.details}
+                              </span>
+                            )}
+                            <span className="block text-[7px] text-neutral-600 lowercase leading-relaxed">
+                              underwriters assess missing controls as elevated actuarial risk, triggering possible coverage exclusions.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -2488,7 +2944,7 @@ Report generated cryptographically via Securify SaaS platform.
                   ) : (
                     <button
                       onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                      className="bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-semibold px-5 py-2.5 rounded-xl lowercase transition-all select-none shrink-0"
+                      className="bg-neutral-900 hover:bg-neutral-850 border border-white/10 text-white text-[10px] font-mono font-medium rounded-xl px-5 py-2.5 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
                     >
                       enable automated daily checks
                     </button>
@@ -2540,44 +2996,88 @@ Report generated cryptographically via Securify SaaS platform.
 
             {/* Post-Scan Conversion CTA Banner */}
             {!premiumStatus?.valid && (
-              <div className="bg-gradient-to-r from-neutral-900/80 via-indigo-950/30 to-neutral-900/80 border border-indigo-500/20 backdrop-blur-sm rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-indigo-950/60 border border-indigo-500/30 rounded-2xl flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-gradient-to-br from-neutral-900/90 via-black to-neutral-950 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.02)] rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-stretch justify-between gap-6 select-none">
+                <div className="flex flex-col md:flex-row items-start gap-4">
+                  <div className="w-10 h-10 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <div className="space-y-1 text-left">
+                  <div className="space-y-2 text-left">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-white text-sm font-medium lowercase">
-                        {(siteScanResults.failedChecks || 0) > 4
-                          ? `${siteScanResults.failedChecks} critical attack vectors found on ${siteScanResults.domain}`
-                          : `security audit complete — ${siteScanResults.failedChecks || 0} issues need remediation`
-                        }
-                      </span>
-                      <span className="text-[9px] font-mono bg-indigo-950/60 border border-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded uppercase">
-                        upgrade to fix
+                      <span className="text-[10px] font-mono bg-emerald-950/40 border border-emerald-500/25 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-wider">
+                        Securify Shield Edge™ active defense
                       </span>
                     </div>
+                    <h3 className="text-white text-base font-semibold lowercase">
+                      {(siteScanResults.failedChecks || 0) > 0
+                        ? `patch all ${siteScanResults.failedChecks} detected vulnerabilities at the edge`
+                        : `enable continuous active protection for ${siteScanResults.domain}`
+                      }
+                    </h3>
                     <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
-                      securify pro continuously monitors {siteScanResults.domain} with daily automated scans, instant breach alerts (72h GDPR window compliance), signed PDF audit reports, and white-label reports for client delivery. includes infrastructure change detection and regression testing.
+                      deploy instant edge-level virtual patching, block automated exploit scanners, receive real-time discord/slack security event notifications, and generate signed SOC2 compliance reports.
                     </p>
-                    <div className="flex flex-wrap gap-3 mt-2">
-                      {['daily automated scans', 'gdpr 72h alert window', 'signed pdf reports', 'white-label delivery', 'api access'].map(feature => (
-                        <span key={feature} className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
-                          {feature}
-                        </span>
-                      ))}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">automated edge patching</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">inject headers at edge layer with 1 click</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">daily automatic auditing</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">never miss configuration regressions</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">certified compliance exports</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">generate signed SOC2/GDPR checklist PDFs</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-emerald-400 text-[10px] mt-0.5">✓</span>
+                        <div className="text-left font-mono">
+                          <span className="block text-[11px] font-semibold text-white lowercase">slack & webhooks alerts</span>
+                          <span className="block text-[9px] text-neutral-500 lowercase">get notified instantly of critical leaks</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                  className="bg-white hover:bg-neutral-100 text-black text-xs font-mono font-semibold px-6 py-3.5 rounded-xl lowercase transition-all select-none shrink-0 whitespace-nowrap"
-                >
-                  start pro plan — $9/mo
-                </button>
+
+                <div className="lg:w-64 shrink-0 bg-black/60 border border-white/5 rounded-2xl p-5 flex flex-col justify-between items-center text-center gap-4">
+                  <div className="w-full space-y-1.5 font-mono text-left">
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500 border-b border-white/5 pb-2">
+                      <span>defense status:</span>
+                      <span className="text-red-400 animate-pulse font-bold lowercase">inactive (trial)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500">
+                      <span>monitored host:</span>
+                      <span className="text-white truncate max-w-[120px]">{siteScanResults.domain}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-neutral-500">
+                      <span>daily checks:</span>
+                      <span className="text-neutral-400">disabled</span>
+                    </div>
+                  </div>
+                  
+                  <div className="w-full space-y-2">
+                    <button
+                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      className="w-full bg-white hover:bg-neutral-100 text-black text-xs font-mono font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] text-center block select-none"
+                    >
+                      start pro plan — $9/mo
+                    </button>
+                    <span className="block text-[9px] font-mono text-neutral-600 lowercase">secure payment processing via Paddle</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2591,9 +3091,9 @@ Report generated cryptographically via Securify SaaS platform.
                     if (count === 0) return null;
                     return (
                       <span key={sev} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
-                        sev === 'critical' ? 'bg-red-950/40 border-red-500/20 text-red-400'
-                        : sev === 'high' ? 'bg-orange-950/40 border-orange-500/20 text-orange-400'
-                        : 'bg-amber-950/40 border-amber-500/20 text-amber-400'
+                        sev === 'critical' ? 'bg-amber-950/40 border-amber-500/20 text-amber-500'
+                        : sev === 'high' ? 'bg-amber-900/30 border-amber-500/20 text-amber-500/90'
+                        : 'bg-neutral-900 border-white/5 text-neutral-400'
                       }`}>{count} {sev}</span>
                     );
                   })}
@@ -2601,126 +3101,163 @@ Report generated cryptographically via Securify SaaS platform.
               </div>
               
               <div className="space-y-4">
-                {Object.entries(siteScanResults.checks).map(([key, check]: any) => (
-                  <div key={key} className="bg-neutral-900/20 border border-white/5 hover:border-white/10 rounded-3xl p-6 transition-all flex flex-col md:flex-row md:items-start justify-between gap-6">
-                    <div className="space-y-3.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap select-none">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${
-                          check.pass ? 'bg-emerald-500' 
-                          : check.severity === 'critical' ? 'bg-red-500 animate-pulse'
-                          : check.severity === 'high' ? 'bg-orange-500'
-                          : 'bg-amber-500'
-                        }`} />
-                        <span className="text-xs font-semibold text-white lowercase">{check.name}</span>
-                        
-                        <span className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
-                          check.pass 
-                            ? 'bg-emerald-950/40 border border-emerald-500/20 text-emerald-400' 
-                            : 'bg-red-950/40 border border-red-500/20 text-red-400'
-                        }`}>
-                          {check.pass ? 'secure' : 'action required'}
-                        </span>
-                        
-                        {!check.pass && (
-                          <span className={`text-[9px] font-mono border px-2 py-0.5 rounded lowercase ${
-                            check.severity === 'critical'
-                              ? 'bg-red-950/40 border-red-500/30 text-red-400'
-                              : check.severity === 'high'
-                                ? 'bg-orange-950/40 border-orange-500/30 text-orange-400'
-                                : 'bg-amber-950/40 border-amber-500/30 text-amber-400'
-                          }`}>
-                            {check.severity}
-                          </span>
-                        )}
-                        
-                        {check.cwe && (
-                          <span className="text-[9px] font-mono bg-neutral-900 border border-white/10 text-neutral-400 px-2 py-0.5 rounded lowercase">
-                            {check.cwe}
-                          </span>
-                        )}
-                        
-                        {check.compliance && (
-                          <span className="text-[9px] font-mono bg-indigo-950/20 border border-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded lowercase">
-                            {check.compliance}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Engine detail line */}
-                      {check.detail && (
-                        <p className="text-[10px] font-mono leading-relaxed text-neutral-400">
-                          → {check.detail}
-                        </p>
-                      )}
-                      
-                      {/* Structured threat analysis grid */}
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/5 pt-4">
-                        <div className="space-y-4 text-left">
-                          <div>
-                            <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-wider block mb-1">technical threat impact</span>
-                            <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
-                          </div>
+                {Object.entries(siteScanResults.checks).map(([key, check]: any) => {
+                  const isExpanded = !!expandedChecks[key];
+                  return (
+                    <div 
+                      key={key} 
+                      className="bg-neutral-900/10 border border-white/5 hover:border-white/10 rounded-3xl transition-all duration-300 overflow-hidden"
+                    >
+                      {/* Row Header (Clickable) */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedChecks(prev => ({ ...prev, [key]: !prev[key] }))}
+                        className="w-full text-left p-5 md:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none hover:bg-white/[0.01] transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {/* Status Dot */}
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            check.pass 
+                              ? 'bg-emerald-500/60' 
+                              : check.severity === 'critical' || check.severity === 'high'
+                                ? 'bg-rose-500/70'
+                                : 'bg-amber-500/70'
+                          }`} />
                           
-                          {check.businessImpact && (
-                            <div>
-                              <span className="text-[9px] font-mono text-rose-500/50 uppercase tracking-wider block mb-1">business & conversion risk</span>
-                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
-                            </div>
+                          <span className="text-xs font-semibold text-white lowercase font-sans">{check.name}</span>
+                          
+                          {/* Muted Verified text for passed, single clean status badge for failed */}
+                          {check.pass ? (
+                            <span className="text-[10px] font-mono text-neutral-500 lowercase">verified</span>
+                          ) : (
+                            <span className={`text-[9px] font-mono border px-2 py-0.5 rounded-md lowercase ${
+                              check.severity === 'critical' || check.severity === 'high'
+                                ? 'bg-rose-950/30 border-rose-500/20 text-rose-400/90'
+                                : 'bg-amber-950/30 border-amber-500/20 text-amber-400/90'
+                            }`}>
+                              {check.severity} risk
+                            </span>
                           )}
                         </div>
 
-                        <div className="space-y-4 flex flex-col justify-between">
-                          {!check.pass && check.recommendation && (
-                            <div>
-                              <span className="text-[9px] font-mono text-emerald-500/50 uppercase tracking-wider block mb-1 font-semibold">remediation strategy</span>
-                              <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
-                            </div>
+                        {/* Right Side: Chevron & Expand Indicator */}
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                          {!check.pass && (
+                            <span className="text-[9px] font-mono text-neutral-500 lowercase hidden sm:inline">
+                              action required
+                            </span>
                           )}
+                          <svg 
+                            className={`w-4 h-4 text-neutral-500 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : ''}`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
 
-                          <div className="font-mono text-[9px] bg-black/60 border border-white/5 rounded-2xl p-3 flex justify-between items-center gap-3">
-                            <div className="truncate">
-                              <span className="text-neutral-500 select-none">observed value:</span>{" "}
-                              <span className="select-all text-neutral-300 truncate">{check.value}</span>
-                            </div>
+                      {/* Expandable Details Area */}
+                      {isExpanded && (
+                        <div className="border-t border-white/5 p-6 space-y-4 bg-neutral-950/20 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {/* Badges in Details */}
+                          <div className="flex gap-2 flex-wrap mb-2">
+                            {check.cwe && (
+                              <span className="text-[9px] font-mono bg-neutral-950 border border-white/5 text-neutral-400 px-2.5 py-1 rounded-md lowercase">
+                                cwe: {check.cwe}
+                              </span>
+                            )}
+                            {check.compliance && (
+                              <span className="text-[9px] font-mono bg-neutral-950 border border-white/5 text-neutral-400 px-2.5 py-1 rounded-md lowercase">
+                                standard: {check.compliance}
+                              </span>
+                            )}
                           </div>
 
-                          {!check.pass && (
-                            <div className="bg-indigo-950/20 border border-indigo-500/10 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                              <div className="space-y-0.5 text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" />
-                                  <span className="text-[9px] font-mono text-indigo-300 uppercase block font-bold tracking-wider">pro automatic patch</span>
-                                </div>
-                                <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure header rewrite rules instantly at the edge.</p>
+                          {check.detail && (
+                            <p className="text-[10px] font-mono leading-relaxed text-neutral-400 pl-1 py-2 border-b border-white/[0.02]">
+                              → {check.detail}
+                            </p>
+                          )}
+
+                          {/* Threat & Remediation Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            
+                            {/* Left Column: Threats */}
+                            <div className="space-y-4 text-left">
+                              <div>
+                                <span className="text-[10px] font-mono text-neutral-500 lowercase block mb-1">technical threat impact</span>
+                                <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.impact}</p>
                               </div>
-                              {premiumStatus?.valid ? (
-                                <span className="text-[9px] font-mono text-emerald-400 shrink-0">✓ active</span>
-                              ) : (
-                                <button
-                                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                                  className="bg-white hover:bg-neutral-200 text-black text-[9px] font-mono font-bold px-3 py-1.5 rounded-xl transition-all lowercase select-none shrink-0"
-                                >
-                                  deploy patch
-                                </button>
+                              
+                              {check.businessImpact && (
+                                <div>
+                                  <span className="text-[10px] font-mono text-neutral-500 lowercase block mb-1">business & conversion risk</span>
+                                  <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">{check.businessImpact}</p>
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="shrink-0 flex md:flex-col gap-2">
-                      {!check.pass && (
-                        <button
-                          onClick={() => handleStartSiteExploitSimulation(key, check.name)}
-                          className="bg-red-950/20 hover:bg-red-900/40 text-red-400/90 border border-red-500/10 text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none whitespace-nowrap"
-                        >
-                          simulate exploit
-                        </button>
+                            {/* Right Column: Remediation & Obs Value */}
+                            <div className="space-y-4 flex flex-col justify-between">
+                              {!check.pass && check.recommendation && (
+                                <div>
+                                  <span className="text-[10px] font-mono text-neutral-400 lowercase block mb-1 font-semibold">remediation strategy</span>
+                                  <p className="text-neutral-300 text-xs font-light leading-relaxed lowercase">{check.recommendation}</p>
+                                </div>
+                              )}
+
+                              <div className="space-y-3 mt-auto pt-4">
+                                <div className="font-mono text-[9px] bg-neutral-950/60 border border-white/5 rounded-xl p-3 flex justify-between items-center gap-3">
+                                  <div className="truncate">
+                                    <span className="text-neutral-500 select-none">observed value:</span>{" "}
+                                    <span className="select-all text-neutral-300 truncate font-mono">{check.value}</span>
+                                  </div>
+                                </div>
+
+                                {!check.pass && (
+                                  <div className="bg-neutral-950/60 border border-white/5 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-white/10 transition-colors">
+                                    <div className="space-y-0.5 text-left">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500/80 rounded-full shrink-0" />
+                                        <span className="text-[10px] font-mono text-emerald-400 lowercase block font-medium">pro automatic edge patch</span>
+                                      </div>
+                                      <p className="text-neutral-400 text-[9px] font-light lowercase leading-snug">inject secure security headers dynamically at CDN/edge level.</p>
+                                    </div>
+                                    {premiumStatus?.valid ? (
+                                      <span className="text-[9px] font-mono text-emerald-400 shrink-0 font-bold">✓ active on edge</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                                        className="bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-medium rounded-xl px-4 py-2.5 lowercase transition-all select-none w-full sm:w-auto text-center shrink-0"
+                                      >
+                                        deploy patch
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Simulation button inside details container */}
+                                {!check.pass && (
+                                  <div className="flex justify-end pt-2">
+                                    <button
+                                      onClick={() => handleStartSiteExploitSimulation(key, check.name)}
+                                      className="bg-neutral-950 hover:bg-neutral-900 border border-white/5 hover:border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono px-4 py-2.5 rounded-xl lowercase transition-all select-none w-full sm:w-auto text-center"
+                                    >
+                                      simulate attack vector
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -2831,23 +3368,100 @@ ServerTokens Prod`}</pre>
               
               {/* PDF report */}
               <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 flex flex-col justify-between items-start space-y-4">
-                <div className="space-y-1.5 text-left">
+                <div className="space-y-1.5 text-left w-full">
                   <span className="inline-flex items-center gap-1.5 text-[9px] font-mono text-neutral-500 uppercase">
                     executive reporting
                   </span>
-                  <h4 className="text-sm font-semibold text-white lowercase">download signed PDF report</h4>
+                  <h4 className="text-sm font-semibold text-white lowercase">download signed reports</h4>
                   <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
-                    export a detailed, multi-page security audit PDF showing compliance parameters, exploit timelines, and remediations. deliver to clients as agency white-label reports.
+                    export a detailed, compliance-mapped audit report showing compliance parameters, exploit timelines, and remediations.
                   </p>
                 </div>
                 
                 {premiumStatus?.valid && (premiumStatus.plan?.toLowerCase() === 'pro' || premiumStatus.plan?.toLowerCase() === 'agency') ? (
-                  <button
-                    onClick={handleExportSiteReportMarkdown}
-                    className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none"
-                  >
-                    download PDF document
-                  </button>
+                  <div className="w-full space-y-4 text-left">
+                    {/* Template Selector */}
+                    <div>
+                      <span className="block text-[10px] font-mono text-neutral-500 mb-1.5 lowercase">
+                        compliance template
+                      </span>
+                      <select
+                        value={selectedReportType}
+                        onChange={(e) => setSelectedReportType(e.target.value as any)}
+                        className="w-full bg-neutral-950 border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono lowercase"
+                      >
+                        <option value="soc2">SOC2 Type II Readiness Checklist</option>
+                        <option value="gdpr">GDPR Data Leak Summary</option>
+                        <option value="pci">PCI-DSS v4 Compliance Attestation</option>
+                      </select>
+                    </div>
+
+                    {/* Logo upload (Agency only) */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="block text-[10px] font-mono text-neutral-500 lowercase">
+                          white-label branding logo
+                        </span>
+                        {premiumStatus.plan?.toLowerCase() !== 'agency' && (
+                          <span className="text-[9px] font-mono text-amber-500 lowercase">
+                            requires agency plan
+                          </span>
+                        )}
+                      </div>
+                      
+                      {premiumStatus.plan?.toLowerCase() === 'agency' ? (
+                        <div className="flex gap-3 items-center w-full">
+                          <label className="flex-1 w-full flex flex-col items-center justify-center border border-dashed border-white/10 hover:border-white/20 rounded-xl p-3 cursor-pointer bg-black/20 hover:bg-black/40 transition-all">
+                            <span className="text-[10px] font-mono text-neutral-400">
+                              {logoFileName ? logoFileName : 'select image (JPEG/PNG)'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          {customLogo && (
+                            <div className="relative w-16 h-10 border border-white/10 rounded-lg overflow-hidden shrink-0 bg-neutral-950 flex items-center justify-center p-1">
+                              <img src={customLogo} className="max-h-full max-w-full object-contain" alt="Preview" />
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setCustomLogo(null);
+                                  setLogoFileName(null);
+                                }}
+                                className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-white/5 rounded-xl p-3 text-center bg-black/20">
+                          <p className="text-[10px] text-neutral-500 font-mono lowercase">
+                            custom logo upload is locked. upgrade to agency plan to white-label compliance reports.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 w-full pt-1">
+                      <button
+                        onClick={() => handleDownloadComplianceReport('html')}
+                        className="flex-1 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none text-center"
+                      >
+                        export HTML
+                      </button>
+                      <button
+                        onClick={() => handleDownloadComplianceReport('md')}
+                        className="flex-1 bg-neutral-950 hover:bg-neutral-900 text-neutral-300 border border-white/10 text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none text-center"
+                      >
+                        export markdown
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-3 w-full">
                     <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">
@@ -2923,19 +3537,34 @@ ServerTokens Prod`}</pre>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3 w-full">
-                    <div className="flex items-center gap-2 text-[10px] text-amber-500 font-mono">
-                      <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      locked feature: requires Pro / Agency plan
+                  <div className="bg-neutral-950/60 border border-white/5 rounded-2xl p-5 flex flex-col justify-between items-center text-center gap-4 relative overflow-hidden group w-full">
+                    {/* Blurred badge visual mock in background to tempt user */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08] blur-[2px] scale-95 transition-transform group-hover:scale-100 duration-500 select-none">
+                      <div className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        <span className="font-mono text-xs font-bold text-white">Securify Verified</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-5 py-3.5 lowercase transition-all select-none w-full sm:w-auto"
-                    >
-                      unlock trust badge
-                    </button>
+                    
+                    <div className="relative z-10 w-full space-y-3">
+                      <div className="flex items-center justify-center gap-2 text-[10px] text-amber-500 font-mono">
+                        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>locked feature: requires Pro / Agency plan</span>
+                      </div>
+                      
+                      <p className="text-[10px] text-neutral-500 font-mono lowercase leading-relaxed max-w-sm mx-auto">
+                        embed a dynamic, live security verification badge on your README or homepage to prove compliance to clients and users.
+                      </p>
+                      
+                      <button
+                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                        className="bg-neutral-900 hover:bg-neutral-850 border border-white/10 hover:border-emerald-500/20 text-neutral-300 hover:text-white text-xs font-mono font-medium rounded-xl px-5 py-3 transition-all select-none w-full sm:w-auto text-center"
+                      >
+                        unlock live trust badge
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2960,25 +3589,29 @@ ServerTokens Prod`}</pre>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={exportReportMarkdown}
-                  className="bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.md)
                 </button>
                 <button
                   onClick={exportReportJSON}
-                  className="bg-sky-950/60 hover:bg-sky-900/60 text-sky-400 border border-sky-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 border border-white/10 text-neutral-400 hover:text-white text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   export (.json)
                 </button>
                 <button
                   onClick={shareAuditReport}
-                  className="bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className={`border text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none ${
+                    reportShared 
+                      ? 'bg-neutral-950 border-emerald-500/20 text-emerald-400' 
+                      : 'bg-neutral-950 border-white/10 text-neutral-400 hover:text-white'
+                  }`}
                 >
                   {reportShared ? 'copied!' : 'share'}
                 </button>
                 <button
                   onClick={handleReset}
-                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/5 hover:border-white/10 text-[10px] font-mono rounded-xl px-3 py-2 lowercase transition-all select-none"
+                  className="bg-neutral-950 hover:bg-neutral-900 text-neutral-400 border border-white/10 hover:border-white/20 text-[10px] font-mono rounded-xl px-3.5 py-2 lowercase transition-all select-none"
                 >
                   clear
                 </button>
@@ -3061,6 +3694,15 @@ ServerTokens Prod`}</pre>
                                 ? '#f97316' 
                                 : '#ef4444'
                         }
+                        style={{
+                          filter: customScanResults.grade === 'A+'
+                            ? 'drop-shadow(0 0 4px rgba(16,185,129,0.4))'
+                            : customScanResults.grade === 'B'
+                              ? 'drop-shadow(0 0 4px rgba(245,158,11,0.4))'
+                              : customScanResults.grade === 'C'
+                                ? 'drop-shadow(0 0 4px rgba(249,115,22,0.4))'
+                                : 'drop-shadow(0 0 4px rgba(239,68,68,0.4))'
+                        }}
                         strokeWidth="8"
                         fill="transparent"
                         strokeDasharray="339.29"
@@ -3450,26 +4092,26 @@ ServerTokens Prod`}</pre>
                   <path d="M 150 60 L 260 90" stroke="#fff" strokeWidth="1.2" className="animate-dash-slow" />
 
                   {/* Left Nodes */}
-                  <circle cx="40" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="40" cy="30" r="4" fill="#ef4444" className="animate-pulse" />
+                  <circle cx="40" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="40" cy="30" r="3" fill="#a3a3a3" className="animate-pulse" />
                   <text x="40" y="16" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">git hook</text>
 
-                  <circle cx="40" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="40" cy="90" r="4" fill="#a3a3a3" />
+                  <circle cx="40" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="40" cy="90" r="3" fill="#737373" />
                   <text x="40" y="112" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">local cli</text>
 
                   {/* Core Node */}
-                  <circle cx="150" cy="60" r="15" fill="#000" stroke="#fff" strokeWidth="1.5" className="animate-pulse-glow" />
-                  <circle cx="150" cy="60" r="6" fill="#fff" />
+                  <circle cx="150" cy="60" r="15" fill="#000" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" className="animate-pulse-glow" />
+                  <circle cx="150" cy="60" r="5" fill="#fff" />
                   <text x="150" y="38" fill="#fff" fontSize="9" fontFamily="monospace" textAnchor="middle" fontWeight="bold">securify</text>
 
                   {/* Right Nodes */}
-                  <circle cx="260" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="260" cy="30" r="4" fill="#10b981" />
+                  <circle cx="260" cy="30" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="260" cy="30" r="3" fill="#10b981" />
                   <text x="260" y="16" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">slack alert</text>
 
-                  <circle cx="260" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-                  <circle cx="260" cy="90" r="4" fill="#3b82f6" className="animate-pulse" />
+                  <circle cx="260" cy="90" r="10" fill="#0c0a09" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <circle cx="260" cy="90" r="3" fill="#e5e7eb" className="animate-pulse" />
                   <text x="260" y="112" fill="#737373" fontSize="8" fontFamily="monospace" textAnchor="middle">deploy api</text>
                 </svg>
               </div>

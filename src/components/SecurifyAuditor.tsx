@@ -353,15 +353,15 @@ export const SecurifyAuditor = () => {
   const getSeverityBadgeClass = (sev: string) => {
     switch (sev) {
       case 'critical':
-        return 'bg-neutral-900 text-white border border-white/20';
+        return 'bg-red-950/40 border border-red-500/20 text-red-400';
       case 'high':
-        return 'bg-neutral-900 text-neutral-200 border border-white/15';
+        return 'bg-orange-950/40 border border-orange-500/20 text-orange-400';
       case 'medium':
-        return 'bg-neutral-900 text-neutral-400 border border-white/10';
+        return 'bg-amber-950/40 border border-amber-500/20 text-amber-400';
       case 'low':
-        return 'bg-neutral-900 text-neutral-500 border border-white/5';
+        return 'bg-neutral-900 border border-white/5 text-neutral-400';
       default:
-        return 'bg-neutral-900 text-neutral-400 border border-white/5';
+        return 'bg-neutral-900 border border-white/5 text-neutral-400';
     }
   };
 
@@ -515,19 +515,38 @@ export const SecurifyAuditor = () => {
           <div className="lg:col-span-7 space-y-6">
             {/* Progress indicators */}
             {scanning && scanProgress && (
-              <div className="bg-neutral-900/40 border border-white/5 rounded-3xl p-6 space-y-4 animate-pulse">
-                <div className="flex justify-between items-center text-xs font-mono text-neutral-400">
-                  <span className="lowercase">osv query queue: {scanProgress.current} / {scanProgress.total}</span>
-                  <span className="text-white">{Math.round((scanProgress.current / scanProgress.total) * 100)}%</span>
+              <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-md rounded-3xl p-6 space-y-5 shadow-[0_0_30px_rgba(255,255,255,0.02)] animate-in fade-in duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
+                    <div className="absolute inset-0 rounded-full border border-white/10 animate-ping opacity-75"></div>
+                    <div className="w-5 h-5 border-2 border-white/10 border-t-white rounded-full animate-spin"></div>
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-xs font-mono text-white lowercase">running OSV vulnerability check</span>
+                    <span className="block text-[9px] font-mono text-neutral-500 lowercase">querying packages concurrently...</span>
+                  </div>
                 </div>
-                <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-white h-full transition-all duration-150" 
-                    style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
-                  />
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-mono text-neutral-400">
+                    <span className="lowercase">query queue: {scanProgress.current} of {scanProgress.total}</span>
+                    <span className="text-white font-medium">{Math.round((scanProgress.current / scanProgress.total) * 100)}%</span>
+                  </div>
+                  <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+                    <div 
+                      className="bg-white h-full transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.4)]" 
+                      style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-[10px] font-mono text-neutral-500 truncate lowercase text-left">
-                  querying: {scanProgress.name}
+                
+                <div className="bg-black border border-white/5 rounded-xl p-3 flex justify-between items-center">
+                  <span className="text-[9px] font-mono text-neutral-500 lowercase truncate max-w-[250px]">
+                    target: {scanProgress.name}
+                  </span>
+                  <span className="text-[8px] font-mono text-neutral-500 px-2 py-0.5 bg-white/5 border border-white/10 rounded animate-pulse">
+                    fetching api
+                  </span>
                 </div>
               </div>
             )}
@@ -543,7 +562,7 @@ export const SecurifyAuditor = () => {
                   </div>
                   <div className="bg-neutral-900/40 border border-white/5 p-5 rounded-2xl text-left">
                     <span className="block text-[9px] font-mono text-neutral-500 lowercase mb-1">vulnerable packages</span>
-                    <span className="block text-2xl font-bold font-mono text-white">
+                    <span className={`block text-2xl font-bold font-mono ${scanResults.vulnerableDeps > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                       {scanResults.vulnerableDeps}
                     </span>
                   </div>
@@ -558,13 +577,13 @@ export const SecurifyAuditor = () => {
                   <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4 select-none">
                     <h3 className="text-sm font-mono font-medium text-white lowercase">vulnerability findings</h3>
                     <span className="text-[10px] font-mono text-neutral-500 lowercase">
-                      {scanResults.findings.length} zafiyet bulundu
+                      {scanResults.findings.length} issues identified
                     </span>
                   </div>
 
                   {scanResults.findings.length === 0 ? (
                     <div className="text-center py-12 space-y-3">
-                      <div className="w-12 h-12 bg-neutral-950 border border-white/10 text-white rounded-full flex items-center justify-center mx-auto text-lg">
+                      <div className="w-12 h-12 bg-neutral-950 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-lg shadow-[0_0_15px_rgba(16,185,129,0.1)]">
                         ✓
                       </div>
                       <div className="space-y-1">
@@ -587,7 +606,7 @@ export const SecurifyAuditor = () => {
                                 {finding.severity}
                               </span>
                             </div>
-                            <span className="text-[9px] font-mono text-neutral-400 bg-white/5 px-2 py-0.5 rounded select-all">
+                            <span className="text-[9px] font-mono text-neutral-400 bg-white/5 px-2 py-0.5 rounded select-all border border-white/5">
                               {finding.vulnId}
                             </span>
                           </div>
@@ -599,14 +618,19 @@ export const SecurifyAuditor = () => {
 
                           <div className="flex justify-between items-center pt-3 border-t border-white/5 flex-wrap gap-2">
                             {finding.fixedVersion ? (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[8px] font-mono text-neutral-500 uppercase">remediation:</span>
-                                <span className="text-white text-[10px] font-mono font-medium lowercase">
-                                  upgrade to {finding.fixedVersion}
+                              <div className="flex items-center gap-1.5 bg-emerald-950/20 border border-emerald-500/10 px-2.5 py-1 rounded-lg">
+                                <span className="text-emerald-400 text-[9px]">✔</span>
+                                <span className="text-emerald-400 text-[10px] font-mono font-medium lowercase">
+                                  remediation: upgrade to {finding.fixedVersion}
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-neutral-600 text-[9px] lowercase font-light font-mono">remediation: no fix available yet</span>
+                              <div className="flex items-center gap-1.5 bg-neutral-900 border border-white/5 px-2.5 py-1 rounded-lg">
+                                <span className="text-neutral-500 text-[9px]">⚠</span>
+                                <span className="text-neutral-400 text-[10px] font-mono font-medium lowercase">
+                                  remediation: no fix available yet
+                                </span>
+                              </div>
                             )}
                             <a
                               href={`https://osv.dev/vulnerability/${finding.vulnId}`}

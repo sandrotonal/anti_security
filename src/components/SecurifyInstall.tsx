@@ -17,9 +17,12 @@ export const SecurifyInstall = () => {
 
   // CI/CD configurator states
   const [ciPlatform, setCiPlatform] = useState<'github' | 'gitlab'>('github');
-  const [ciTrigger, setCiTrigger] = useState<'push' | 'pr' | 'both'>('both');
   const [ciBranch, setCiBranch] = useState<string>('main');
   const [ciCopied, setCiCopied] = useState<boolean>(false);
+  const [ciScanPush, setCiScanPush] = useState<boolean>(true);
+  const [ciScanPR, setCiScanPR] = useState<boolean>(true);
+  const [ciFailOnLeak, setCiFailOnLeak] = useState<boolean>(true);
+  const [ciSlackAlerts, setCiSlackAlerts] = useState<boolean>(false);
 
   const getInstallCommand = (): string => {
     if (os === 'windows') {
@@ -86,11 +89,29 @@ exit 0`;
 
   const generateCiYaml = (): string => {
     if (ciPlatform === 'github') {
-      const triggerSection = ciTrigger === 'push'
-        ? `on:\n  push:\n    branches: [ "${ciBranch}" ]`
-        : ciTrigger === 'pr'
-        ? `on:\n  pull_request:\n    branches: [ "${ciBranch}" ]`
-        : `on:\n  push:\n    branches: [ "${ciBranch}" ]\n  pull_request:\n    branches: [ "${ciBranch}" ]`;
+      const triggers: string[] = [];
+      if (ciScanPush) {
+        triggers.push(`  push:\n    branches: [ "${ciBranch}" ]`);
+      }
+      if (ciScanPR) {
+        triggers.push(`  pull_request:\n    branches: [ "${ciBranch}" ]`);
+      }
+      const triggerSection = triggers.length > 0 
+        ? `on:\n${triggers.join('\n')}` 
+        : `on:\n  push:\n    branches: [ "${ciBranch}" ]`; // fallback
+
+      let slackStep = '';
+      if (ciSlackAlerts) {
+        slackStep = `\n
+      - name: Send Slack Notification
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: \${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_COLOR: '#ff0000'
+          SLACK_TITLE: 'Securify Scan Alert'
+          SLACK_MESSAGE: 'securify detected credentials in branch ${ciBranch}!'`;
+      }
 
       return `name: Securify Leak Scan
 ${triggerSection}
@@ -107,22 +128,36 @@ jobs:
       - name: Execute Securify Audit
         uses: securify-cli/securify-action@v2
         with:
-          fail-on-leak: true
-          entropy-limit: ${entropyThresholdVal}`;
+          fail-on-leak: ${ciFailOnLeak}
+          entropy-limit: ${entropyThresholdVal}${slackStep}`;
     } else {
       // GitLab CI/CD config
-      const triggerRule = ciTrigger === 'push'
-        ? `  only:\n    - ${ciBranch}`
-        : ciTrigger === 'pr'
-        ? `  only:\n    - merge_requests`
-        : `  only:\n    - ${ciBranch}\n    - merge_requests`;
+      const rules: string[] = [];
+      if (ciScanPush) {
+        rules.push(`$CI_COMMIT_BRANCH == "${ciBranch}"`);
+      }
+      if (ciScanPR) {
+        rules.push(`$CI_PIPELINE_SOURCE == "merge_request_event"`);
+      }
+      const triggerRule = rules.length > 0
+        ? `  rules:\n    - if: '${rules.join(' || ')}'`
+        : `  only:\n    - ${ciBranch}`;
+
+      let slackAfterScript = '';
+      if (ciSlackAlerts) {
+        slackAfterScript = `\n  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" = "failed" ]; then
+        curl -X POST -H 'Content-type: application/json' --data "{\\"text\\":\\"[securify] leak detected in $CI_COMMIT_REF_NAME!\\"}" $SLACK_WEBHOOK_URL
+      fi`;
+      }
 
       return `securify-audit:
   stage: test
   image: securify/cli:latest
   script:
-    - securify scan --entropy=${entropyThresholdVal} --fail-on-leak
-${triggerRule}`;
+    - securify scan --entropy=${entropyThresholdVal} ${ciFailOnLeak ? '--fail-on-leak' : '--warn-only'}
+${triggerRule}${slackAfterScript}`;
     }
   };
 
@@ -435,28 +470,6 @@ ${triggerRule}`;
                 </div>
               </div>
 
-              {/* Trigger selection */}
-              <div>
-                <span className="block text-[10px] font-mono text-neutral-500 mb-2 lowercase">
-                  trigger event
-                </span>
-                <div className="flex gap-2">
-                  {(['push', 'pr', 'both'] as const).map((trig) => (
-                    <button
-                      key={trig}
-                      onClick={() => setCiTrigger(trig)}
-                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-mono border transition-all lowercase ${
-                        ciTrigger === trig
-                          ? 'bg-white text-black border-white'
-                          : 'bg-neutral-950 text-neutral-500 border-white/5 hover:text-white'
-                      }`}
-                    >
-                      {trig === 'pr' ? 'pull request' : trig === 'both' ? 'push & pr' : 'push'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Target Branch selection */}
               <div className="space-y-1.5">
                 <span className="block text-[10px] font-mono text-neutral-500 lowercase">
@@ -469,6 +482,109 @@ ${triggerRule}`;
                   placeholder="e.g. main"
                   className="w-full bg-neutral-950 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-white/20 font-mono"
                 />
+              </div>
+
+              {/* Checkboxes */}
+              <div className="space-y-4 pt-2">
+                {/* Scan on Push */}
+                <div className="flex items-start gap-3 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setCiScanPush(!ciScanPush)}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                      ciScanPush 
+                        ? 'bg-white border-white text-black font-bold' 
+                        : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                    }`}
+                    aria-checked={ciScanPush}
+                    role="checkbox"
+                  >
+                    {ciScanPush && (
+                      <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                  <div onClick={() => setCiScanPush(!ciScanPush)} className="cursor-pointer">
+                    <span className="text-xs font-mono text-white block lowercase">scan on push</span>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">trigger security analysis on every branch push event.</p>
+                  </div>
+                </div>
+
+                {/* Scan on PR */}
+                <div className="flex items-start gap-3 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setCiScanPR(!ciScanPR)}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                      ciScanPR 
+                        ? 'bg-white border-white text-black font-bold' 
+                        : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                    }`}
+                    aria-checked={ciScanPR}
+                    role="checkbox"
+                  >
+                    {ciScanPR && (
+                      <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                  <div onClick={() => setCiScanPR(!ciScanPR)} className="cursor-pointer">
+                    <span className="text-xs font-mono text-white block lowercase">scan on pull request</span>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">trigger security analysis on pull request syncs and updates.</p>
+                  </div>
+                </div>
+
+                {/* Fail on Leak */}
+                <div className="flex items-start gap-3 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setCiFailOnLeak(!ciFailOnLeak)}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                      ciFailOnLeak 
+                        ? 'bg-white border-white text-black font-bold' 
+                        : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                    }`}
+                    aria-checked={ciFailOnLeak}
+                    role="checkbox"
+                  >
+                    {ciFailOnLeak && (
+                      <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                  <div onClick={() => setCiFailOnLeak(!ciFailOnLeak)} className="cursor-pointer">
+                    <span className="text-xs font-mono text-white block lowercase">block build on high severity</span>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">mark the build step as failed if any secret matches are identified.</p>
+                  </div>
+                </div>
+
+                {/* Slack Notifications */}
+                <div className="flex items-start gap-3 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setCiSlackAlerts(!ciSlackAlerts)}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                      ciSlackAlerts 
+                        ? 'bg-white border-white text-black font-bold' 
+                        : 'bg-black border-white/20 text-transparent hover:border-white/40'
+                    }`}
+                    aria-checked={ciSlackAlerts}
+                    role="checkbox"
+                  >
+                    {ciSlackAlerts && (
+                      <svg className="w-3 h-3 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </button>
+                  <div onClick={() => setCiSlackAlerts(!ciSlackAlerts)} className="cursor-pointer">
+                    <span className="text-xs font-mono text-white block lowercase">notify via slack</span>
+                    <p className="text-[10px] text-neutral-500 lowercase leading-relaxed">send instant alerts to your team's slack channel when a scan fails.</p>
+                  </div>
+                </div>
               </div>
 
             </div>

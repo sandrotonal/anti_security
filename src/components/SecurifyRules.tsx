@@ -244,14 +244,14 @@ export const SecurifyRules = () => {
         </div>
 
         {/* Rules List Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 select-text">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 select-text animate-page-entrance">
           {filteredRules.map((rule) => {
             const isSelected = selectedRuleId === rule.id;
             return (
               <div
                 key={rule.id}
                 onClick={() => setSelectedRuleId(isSelected ? null : rule.id)}
-                className={`bg-neutral-950/80 border rounded-2xl p-6 transition-all duration-300 relative group flex flex-col justify-between cursor-pointer ${
+                className={`bg-neutral-950/80 border rounded-2xl p-6 transition-all duration-300 relative group flex flex-col justify-between cursor-pointer hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(255,255,255,0.03)] hover:bg-neutral-900/10 ${
                   isSelected ? 'border-white/25 bg-neutral-900/40 shadow-[0_0_20px_rgba(255,255,255,0.02)]' : 'border-white/5 hover:border-white/15'
                 }`}
               >
@@ -267,10 +267,10 @@ export const SecurifyRules = () => {
                       <span 
                         className={`text-[9px] font-mono px-2 py-0.5 rounded lowercase ${
                           rule.severity === 'critical'
-                            ? 'bg-neutral-900 border border-white/20 text-white'
+                            ? 'bg-red-950/40 border border-red-500/20 text-red-400'
                             : rule.severity === 'high'
-                            ? 'bg-neutral-900 border border-white/15 text-neutral-300'
-                            : 'bg-neutral-900 border border-white/5 text-neutral-400'
+                            ? 'bg-orange-950/40 border border-orange-500/20 text-orange-400'
+                            : 'bg-amber-950/40 border border-amber-500/20 text-amber-400'
                         }`}
                       >
                         {rule.severity}
@@ -308,11 +308,17 @@ export const SecurifyRules = () => {
                     <div className="space-y-1 bg-black/40 border border-white/5 rounded-xl p-3">
                       <div className="flex justify-between items-center text-[10px] font-mono">
                         <span className="text-neutral-400 lowercase">CVSS Severity Rating</span>
-                        <span className="text-white">{rule.cvss} / 10</span>
+                        <span className="text-white font-medium">{rule.cvss} / 10</span>
                       </div>
-                      <div className="w-full bg-neutral-900 h-1 rounded-full overflow-hidden">
+                      <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full rounded-full transition-all duration-500 ${rule.cvss >= 9.0 ? 'bg-white' : rule.cvss >= 7.0 ? 'bg-white/50' : 'bg-white/20'}`}
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            rule.cvss >= 9.0 
+                              ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' 
+                              : rule.cvss >= 7.0 
+                              ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]' 
+                              : 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]'
+                          }`}
                           style={{ width: `${rule.cvss * 10}%` }}
                         />
                       </div>
@@ -379,6 +385,33 @@ export const SecurifyRules = () => {
             className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
           >
             view pro features
+          </button>
+        </div>
+
+        {/* Custom Rule Suggestion CTA (Marketing Hook) */}
+        <div className="mt-6 p-6 bg-neutral-950/60 border border-white/5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 text-left relative overflow-hidden select-none">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-10" />
+          <div className="relative z-10 space-y-2 max-w-xl">
+            <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] text-neutral-400 uppercase font-mono">
+              open source community
+            </span>
+            <h4 className="text-base font-medium text-white lowercase">suggest a scanning rule.</h4>
+            <p className="text-neutral-500 text-xs font-light lowercase leading-relaxed">
+              need detection for a specific SaaS provider, internal API key, or custom token format? suggest rules to our threat intelligence registry.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const contactBtn = document.getElementById('nav-contact') || document.querySelector('[data-view="contact"]');
+              if (contactBtn) {
+                (contactBtn as HTMLButtonElement).click();
+              } else {
+                window.location.hash = '#contact';
+              }
+            }}
+            className="relative z-10 w-full md:w-auto shrink-0 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+          >
+            submit suggestion
           </button>
         </div>
 
