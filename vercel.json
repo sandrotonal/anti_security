@@ -27,6 +27,12 @@
     }
   ],
   "rewrites": [
-    { "source": "/badge.svg", "destination": "/api/badge" }
+    { "source": "/badge.svg", "destination": "/api/badge" },
+    { "source": "/license", "destination": "/license.html" },
+    { "source": "/security", "destination": "/security-policy.html" },
+    { "source": "/pgp", "destination": "/pgp.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/refund", "destination": "/refund.html" },
+    { "source": "/contact", "destination": "/contact.html" }
   ]
 }

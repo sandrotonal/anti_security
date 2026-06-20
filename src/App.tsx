@@ -31,6 +31,11 @@ function App() {
   const paddleInitializedRef = useRef<boolean>(false);
   const [activeView, setActiveView] = useState<ViewType>(() => {
     const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') as ViewType;
+    const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
+    if (viewParam && validViews.includes(viewParam)) {
+      return viewParam;
+    }
     return params.get('submitted') === 'true' ? 'contact' : 'home';
   });
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
@@ -111,6 +116,38 @@ function App() {
       });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
+
+  // Synchronize activeView state to URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const currentView = params.get('view');
+    if (currentView !== activeView) {
+      if (activeView === 'home') {
+        params.delete('view');
+      } else {
+        params.set('view', activeView);
+      }
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash}`;
+      window.history.replaceState({ view: activeView }, '', newUrl);
+    }
+  }, [activeView]);
+
+  // Handle browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view') as ViewType;
+      const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
+      if (viewParam && validViews.includes(viewParam)) {
+        setActiveView(viewParam);
+      } else {
+        setActiveView('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Checkout Email Modal states

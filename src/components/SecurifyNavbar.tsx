@@ -332,66 +332,57 @@ export const SecurifyNavbar = ({
 
       {/* Mobile Drawer Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-lg lg:hidden flex flex-col justify-between p-8 pt-28 animate-in fade-in slide-in-from-bottom duration-300">
-          <div className="flex items-center justify-between border-b border-white/5 pb-6">
-            <div className="flex items-center gap-2">
-              <svg viewBox="0 0 256 256" fill="currentColor" className="h-5 w-5 text-white">
-                <path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z" />
-              </svg>
-              <span className="text-white text-sm font-normal tracking-tight">securify</span>
-            </div>
-          </div>
-
-          <nav className="flex flex-col gap-6 my-auto select-none">
+        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-lg lg:hidden flex flex-col justify-between p-6 pt-24 overflow-y-auto animate-in fade-in slide-in-from-bottom duration-300">
+          <nav className="flex flex-col gap-4 my-4 select-none">
             <a
               href="#platform"
               onClick={(e) => handleLinkClick(e, 'home', 'platform')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               sandbox demo
             </a>
             <a
               href="#solutions"
               onClick={(e) => handleLinkClick(e, 'home', 'solutions')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               pipeline
             </a>
 
-            <div className="h-px bg-white/5 my-2" />
+            <div className="h-px bg-white/5 my-1" />
 
             <a
               href="#rules"
               onClick={(e) => handleLinkClick(e, 'rules')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               rules
             </a>
             <a
               href="#dashboard"
               onClick={(e) => handleLinkClick(e, 'dashboard')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               dashboard
             </a>
             <a
               href="#sandbox"
               onClick={(e) => handleLinkClick(e, 'sandbox')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               sandbox scanner
             </a>
             <a
               href="#auditor"
               onClick={(e) => handleLinkClick(e, 'auditor')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               dependency auditor
             </a>
             <a
               href="#pricing"
               onClick={(e) => handleLinkClick(e, 'pricing')}
-              className={`text-2xl font-light transition-colors lowercase ${activeView === 'pricing' ? 'text-white' : 'text-neutral-400 hover:text-white'
+              className={`text-xl font-light transition-colors lowercase ${activeView === 'pricing' ? 'text-white' : 'text-neutral-400 hover:text-white'
                 }`}
             >
               pricing
@@ -399,15 +390,15 @@ export const SecurifyNavbar = ({
             <a
               href="#contact"
               onClick={(e) => handleLinkClick(e, 'contact')}
-              className="text-2xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
+              className="text-xl font-light text-neutral-400 hover:text-white transition-colors lowercase"
             >
               contact
             </a>
           </nav>
 
-          <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
+          <div className="border-t border-white/5 pt-5 flex flex-col gap-2.5">
             {githubUser ? (
-              <div className="flex items-center gap-3 bg-neutral-900/60 border border-white/5 rounded-2xl p-3 mb-2">
+              <div className="flex items-center gap-3 bg-neutral-900/60 border border-white/5 rounded-2xl p-2.5 mb-1">
                 <UserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-8 h-8" />
                 <div className="flex-1 min-w-0">
                   <span className="text-[9px] text-neutral-500 font-mono block lowercase">connected as</span>
@@ -421,7 +412,7 @@ export const SecurifyNavbar = ({
                     setIsMobileMenuOpen(false);
                     onGithubLogout();
                   }}
-                  className="text-red-400 hover:text-red-300 text-xs font-mono lowercase border border-red-500/20 bg-red-950/15 rounded-xl px-3 py-1.5"
+                  className="text-red-400 hover:text-red-300 text-xs font-mono lowercase border border-red-500/20 bg-red-950/15 rounded-xl px-2.5 py-1"
                 >
                   disconnect
                 </button>
@@ -432,7 +423,7 @@ export const SecurifyNavbar = ({
                   setIsMobileMenuOpen(false);
                   onGithubLogin();
                 }}
-                className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase flex items-center justify-center gap-2 mb-2"
+                className="w-full bg-neutral-900 border border-white/10 text-white py-2.5 rounded-full text-sm font-medium transition-colors lowercase flex items-center justify-center gap-2 mb-1"
               >
                 <svg fill="currentColor" className="w-5 h-5 text-white" viewBox="0 0 24 24">
                   <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -446,14 +437,14 @@ export const SecurifyNavbar = ({
                   setIsMobileMenuOpen(false);
                   onRestoreSubscription();
                 }}
-                className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
+                className="w-full bg-neutral-900 border border-white/10 text-white py-2.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
               >
                 restore subscription
               </button>
             )}
             <button
               onClick={handleInstallClick}
-              className="w-full bg-white text-black py-3.5 rounded-full text-sm font-medium transition-colors lowercase"
+              className="w-full bg-white text-black py-2.5 rounded-full text-sm font-medium transition-colors lowercase"
             >
               install cli
             </button>
@@ -463,12 +454,12 @@ export const SecurifyNavbar = ({
                 setIsMobileMenuOpen(false);
                 onOpenTerminal();
               }}
-              className="w-full bg-neutral-900 border border-white/10 text-white py-3.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
+              className="w-full bg-neutral-900 border border-white/10 text-white py-2.5 rounded-full text-sm font-medium transition-colors lowercase font-mono"
             >
               terminal hook
             </button>
-            <span className="text-[10px] font-mono text-neutral-600 text-center lowercase mt-1">
-              securify cli. open-source and local-first.
+            <span className="text-[9px] font-mono text-neutral-600 text-center lowercase mt-0.5">
+              securify cli · open-source and local-first
             </span>
           </div>
         </div>
