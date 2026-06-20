@@ -443,8 +443,8 @@ function App() {
 
               {/* Status Banner */}
               <div className={`p-4 rounded-xl border flex items-center justify-between ${reportData.leaks === 0
-                  ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 print:border-emerald-600 print:text-emerald-700'
-                  : 'bg-red-950/20 border-red-500/20 text-red-400 print:border-red-600 print:text-red-700'
+                ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 print:border-emerald-600 print:text-emerald-700'
+                : 'bg-red-950/20 border-red-500/20 text-red-400 print:border-red-600 print:text-red-700'
                 }`}>
                 <div className="space-y-1">
                   <div className="text-sm font-semibold lowercase">
@@ -491,7 +491,7 @@ function App() {
               <div className="border-t border-white/5 pt-6 space-y-4 print:border-neutral-300">
                 <h3 className="text-xs font-semibold text-white lowercase tracking-wider print:text-black">compliance auditing standards</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
+
                   {/* SOC 2 Column */}
                   <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3 print:border-neutral-300 print:bg-transparent">
                     <span className="block text-[9px] text-neutral-500 font-mono uppercase">SOC 2 Type II Readiness</span>
@@ -600,7 +600,7 @@ function App() {
 
         {activeView === 'rules' && (
           <div className="animate-page-entrance">
-            <SecurifyRules />
+            <SecurifyRules onViewChange={setActiveView} />
           </div>
         )}
 
@@ -649,6 +649,7 @@ function App() {
         {activeView === 'pricing' && (
           <div className="animate-page-entrance">
             <SecurifyPricing
+              onViewChange={setActiveView}
               onPurchase={(planId, planName, billingPeriod) => {
                 setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
                 setCheckoutEmail('');

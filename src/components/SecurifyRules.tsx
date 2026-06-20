@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ViewType } from './SecurifyNavbar';
 
 interface Rule {
   id: string;
@@ -72,7 +73,11 @@ const remediationPlans: Record<string, { steps: string[]; command?: string }> = 
   }
 };
 
-export const SecurifyRules = () => {
+interface SecurifyRulesProps {
+  onViewChange?: (view: ViewType) => void;
+}
+
+export const SecurifyRules = ({ onViewChange }: SecurifyRulesProps) => {
   const [search, setSearch] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
@@ -375,14 +380,18 @@ export const SecurifyRules = () => {
           </div>
           <button
             onClick={() => {
-              const navItem = document.getElementById('nav-pricing') || document.querySelector('[data-view="pricing"]');
-              if (navItem) {
-                (navItem as HTMLButtonElement).click();
+              if (onViewChange) {
+                onViewChange('pricing');
               } else {
-                window.location.hash = '#pricing';
+                const navItem = document.getElementById('nav-pricing') || document.querySelector('[data-view="pricing"]');
+                if (navItem) {
+                  (navItem as HTMLButtonElement).click();
+                } else {
+                  window.location.hash = '#pricing';
+                }
               }
             }}
-            className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+            className="relative z-10 w-full md:w-auto shrink-0 bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all hover:scale-[1.02] active:scale-[0.98] select-none"
           >
             view pro features
           </button>
@@ -402,14 +411,18 @@ export const SecurifyRules = () => {
           </div>
           <button
             onClick={() => {
-              const contactBtn = document.getElementById('nav-contact') || document.querySelector('[data-view="contact"]');
-              if (contactBtn) {
-                (contactBtn as HTMLButtonElement).click();
+              if (onViewChange) {
+                onViewChange('contact');
               } else {
-                window.location.hash = '#contact';
+                const contactBtn = document.getElementById('nav-contact') || document.querySelector('[data-view="contact"]');
+                if (contactBtn) {
+                  (contactBtn as HTMLButtonElement).click();
+                } else {
+                  window.location.hash = '#contact';
+                }
               }
             }}
-            className="relative z-10 w-full md:w-auto shrink-0 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all"
+            className="relative z-10 w-full md:w-auto shrink-0 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all hover:scale-[1.02] active:scale-[0.98] select-none"
           >
             submit suggestion
           </button>

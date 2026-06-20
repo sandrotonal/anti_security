@@ -2503,7 +2503,7 @@ Report generated cryptographically via Securify SaaS platform.
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={scanning}
-                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
+                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       {scanning ? "scanning..." : "re-scan folder"}
                     </button>
@@ -2511,7 +2511,7 @@ Report generated cryptographically via Securify SaaS platform.
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={scanning}
-                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       {scanning ? "scanning files..." : "select folder & scan"}
                     </button>
@@ -2550,7 +2550,7 @@ Report generated cryptographically via Securify SaaS platform.
                     </div>
                     <button
                       onClick={onGithubLogin}
-                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none shrink-0 flex items-center gap-2"
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none shrink-0 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       <svg fill="currentColor" className="w-4 h-4 text-black" viewBox="0 0 24 24" aria-hidden="true">
                         <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2576,13 +2576,13 @@ Report generated cryptographically via Securify SaaS platform.
                           localStorage.setItem('securify_usage_github', '0');
                           setLimitExceeded(null);
                         }}
-                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap"
+                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         reset limit (demo)
                       </button>
                       <button
                         onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap"
+                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         upgrade plan
                       </button>
@@ -2641,7 +2641,7 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         onClick={() => handleGithubScan(selectedGithubRepo)}
                         disabled={scanning || !selectedGithubRepo}
-                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
                           <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2651,7 +2651,7 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         onClick={() => setIsLabOpen(!isLabOpen)}
                         disabled={scanning}
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
@@ -2744,7 +2744,7 @@ Report generated cryptographically via Securify SaaS platform.
                           <button
                             type="submit"
                             disabled={scanning}
-                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                           >
                             <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
                               <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2778,13 +2778,13 @@ Report generated cryptographically via Securify SaaS platform.
                           localStorage.setItem('securify_usage_website', '0');
                           setLimitExceeded(null);
                         }}
-                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap"
+                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         reset limit (demo)
                       </button>
                       <button
                         onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap"
+                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         upgrade plan
                       </button>
@@ -2836,7 +2836,7 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         type="submit"
                         disabled={siteScanning || !siteUrl.trim()}
-                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 shrink-0 whitespace-nowrap"
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 shrink-0 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         {siteScanning ? "scanning..." : (siteScanResults ? "re-scan site" : "scan site")}
                       </button>
