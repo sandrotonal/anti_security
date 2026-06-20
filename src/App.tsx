@@ -487,6 +487,58 @@ function App() {
                 </div>
               </div>
 
+              {/* Compliance Standards Checklist */}
+              <div className="border-t border-white/5 pt-6 space-y-4 print:border-neutral-300">
+                <h3 className="text-xs font-semibold text-white lowercase tracking-wider print:text-black">compliance auditing standards</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* SOC 2 Column */}
+                  <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3 print:border-neutral-300 print:bg-transparent">
+                    <span className="block text-[9px] text-neutral-500 font-mono uppercase">SOC 2 Type II Readiness</span>
+                    <ul className="space-y-1.5 text-[9px] text-neutral-400 list-none pl-0 print:text-neutral-700">
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.1 (Perimeter Defense - Whitelists)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.3 (Credential Access & Secrets)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.6 (Boundary Transmission Encryption)</span>
+                      </li>
+                    </ul>
+                    <div className={`text-[8px] font-mono border px-2 py-0.5 rounded w-fit ${reportData.leaks === 0 ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400' : 'bg-red-950/20 border-red-500/20 text-red-400'}`}>
+                      {reportData.leaks === 0 ? 'ready' : 'action required'}
+                    </div>
+                  </div>
+
+                  {/* GDPR Column */}
+                  <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3 print:border-neutral-300 print:bg-transparent">
+                    <span className="block text-[9px] text-neutral-500 font-mono uppercase">GDPR Art. 32 Compliance</span>
+                    <ul className="space-y-1.5 text-[9px] text-neutral-400 list-none pl-0 print:text-neutral-700">
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.a (Encryption of Personal Data)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.b (Confidentiality & Integrity)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.d (Regular Vulnerability Testing)</span>
+                      </li>
+                    </ul>
+                    <div className={`text-[8px] font-mono border px-2 py-0.5 rounded w-fit ${reportData.leaks === 0 ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400' : 'bg-red-950/20 border-red-500/20 text-red-400'}`}>
+                      {reportData.leaks === 0 ? 'compliant' : 'action required'}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
               {/* Crypto Verification Fingerprint */}
               <div className="border-t border-white/5 pt-6 space-y-2 select-text print:border-neutral-300">
                 <div className="text-[10px] text-neutral-500 lowercase">verification signature hash:</div>

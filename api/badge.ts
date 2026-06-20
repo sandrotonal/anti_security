@@ -79,10 +79,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   </defs>
   <rect width="258" height="38" x="1" y="1" rx="10" fill="url(#glow)" stroke="#262626" stroke-width="1" />
   
-  <!-- Shield Icon -->
-  <g transform="translate(12, 10)">
-    <path d="M10 2.69l5.66 2.13a1 1 0 0 1 .65.94v4.47a7.06 7.06 0 0 1-4.22 6.47l-1.79.79a.94.94 0 0 1-.6 0l-1.79-.79A7.06 7.06 0 0 1 3.7 10.23V5.76a1 1 0 0 1 .65-.94z" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M7 10l2 2 4-4" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Securify Logo (Branded Trust Badge) -->
+  <g transform="translate(12, 11) scale(0.0703125)">
+    <path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z" fill="${color}" />
   </g>
 
   <!-- Text elements -->

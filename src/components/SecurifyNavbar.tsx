@@ -202,13 +202,13 @@ export const SecurifyNavbar = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleInstallClick}
-              className="hidden md:flex h-11 items-center justify-center text-sm font-normal rounded-full px-6 transition-colors lowercase border bg-white text-black border-white hover:bg-neutral-200"
+              className="hidden md:flex h-11 items-center justify-center text-sm font-normal rounded-full px-6 transition-colors lowercase border bg-white text-black border-white hover:bg-neutral-200 whitespace-nowrap"
             >
               install cli
             </button>
             <button
               onClick={onOpenTerminal}
-              className="hidden sm:flex h-11 items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-full px-5 lowercase transition-all select-none"
+              className="hidden sm:flex h-11 items-center justify-center bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-full px-5 lowercase transition-all select-none whitespace-nowrap"
             >
               terminal hook
             </button>
