@@ -12,6 +12,8 @@ interface Finding {
   safeFix: string;
   explanation: string;
   remediation: string;
+  originalContent?: string;
+  fileName?: string;
 }
 
 interface ScanLog {
@@ -179,6 +181,10 @@ export const SecurifyDashboard = ({
   initialWebsiteUrl,
   onClearInitialWebsiteUrl
 }: SecurifyDashboardProps) => {
+  const planName = premiumStatus?.valid ? (premiumStatus.plan?.toLowerCase() || 'pro') : 'free';
+  const githubLimit = planName === 'agency' ? Infinity : planName === 'pro' ? 50 : 5;
+  const websiteLimit = planName === 'agency' ? Infinity : planName === 'pro' ? 100 : 3;
+
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
   const [stats, setStats] = useState({
@@ -188,6 +194,26 @@ export const SecurifyDashboard = ({
   });
 
   const [scanTab, setScanTab] = useState<'local' | 'github' | 'website'>('local');
+  const [limitExceeded, setLimitExceeded] = useState<'github' | 'website' | null>(null);
+
+  // Usage and API limits tracking state
+  const [githubSyncCount, setGithubSyncCount] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('securify_usage_github');
+      return val ? parseInt(val, 10) : 2;
+    } catch {
+      return 2;
+    }
+  });
+
+  const [websiteScanCount, setWebsiteScanCount] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('securify_usage_website');
+      return val ? parseInt(val, 10) : 1;
+    } catch {
+      return 1;
+    }
+  });
   
   // Live website URL scanning states
   const [siteUrl, setSiteUrl] = useState<string>('');
@@ -257,6 +283,11 @@ export const SecurifyDashboard = ({
   }, [siteScanResults]);
 
   const performSiteScan = async (target: string) => {
+    if (websiteScanCount >= websiteLimit) {
+      setLimitExceeded('website');
+      return;
+    }
+
     setSiteScanning(true);
     setSiteScanResults(null);
     setSiteScanError(null);
@@ -296,6 +327,11 @@ export const SecurifyDashboard = ({
 
       const data = await response.json();
       setSiteScanResults(data);
+
+      // Increment site scan count
+      const newCount = websiteScanCount + 1;
+      setWebsiteScanCount(newCount);
+      localStorage.setItem('securify_usage_website', newCount.toString());
     } catch (err: any) {
       console.error("Real-time scan failed:", err);
       setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
@@ -698,6 +734,66 @@ export const SecurifyDashboard = ({
     }
   };
 
+  const handleAutoFixFinding = (finding: Finding) => {
+    if (!finding.originalContent || !finding.fileName) return;
+
+    // Apply auto-fix to the lines
+    const lines = finding.originalContent.split('\n');
+    const lineNum = finding.line;
+    if (lineNum > 0 && lineNum <= lines.length) {
+      const originalLine = lines[lineNum - 1];
+      const indentMatch = originalLine.match(/^\s*/);
+      const indent = indentMatch ? indentMatch[0] : '';
+      
+      // Determine clean safeFix replacement
+      let cleanFix = finding.safeFix;
+      // Strip trailing comment description if it's there
+      if (cleanFix.includes('// keep on server-side!')) {
+        cleanFix = cleanFix.replace('// keep on server-side!', '').trim();
+      }
+      lines[lineNum - 1] = indent + cleanFix;
+    }
+    const fixedContent = lines.join('\n');
+
+    // Download the fixed file
+    try {
+      const blob = new Blob([fixedContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = finding.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download fixed file:', err);
+    }
+
+    // Extract env variable name for .env.example
+    const envMatch = finding.safeFix.match(/(?:process\.env\.|env\.)([A-Z0-9_]+)/);
+    if (envMatch) {
+      const varName = envMatch[1];
+      const envExampleContent = `# Environment Variables for Securify\n${varName}=your_${varName.toLowerCase()}_here\n`;
+      try {
+        const envBlob = new Blob([envExampleContent], { type: 'text/plain;charset=utf-8' });
+        const envUrl = URL.createObjectURL(envBlob);
+        const envLink = document.createElement('a');
+        envLink.href = envUrl;
+        envLink.download = '.env.example';
+        document.body.appendChild(envLink);
+        envLink.click();
+        document.body.removeChild(envLink);
+        URL.revokeObjectURL(envUrl);
+      } catch (err) {
+        console.error('Failed to download .env.example:', err);
+      }
+    }
+
+    // Close the inspector modal
+    setSelectedFinding(null);
+  };
+
   interface WorkflowFinding {
     file: string;
     rule: string;
@@ -970,6 +1066,11 @@ export const SecurifyDashboard = ({
   }
 
   const handleGithubScan = async (repoName: string, injectedLeaks?: InjectedLeaks) => {
+    if (githubSyncCount >= githubLimit) {
+      setLimitExceeded('github');
+      return;
+    }
+
     setIsLiveStream(false);
     setScanning(true);
     setLogs([]);
@@ -1426,6 +1527,11 @@ export const SecurifyDashboard = ({
         details: `⚠ remote sync finished. flagged ${leaksFound} credentials. check inspection modal.`
       });
     }
+
+    // Increment sync count
+    const newCount = githubSyncCount + 1;
+    setGithubSyncCount(newCount);
+    localStorage.setItem('securify_usage_github', newCount.toString());
 
     setLogs(prev => [...tempLogs, ...prev]);
     setScanning(false);
@@ -1884,7 +1990,9 @@ export const SecurifyDashboard = ({
                     contextLines,
                     safeFix,
                     explanation,
-                    remediation
+                    remediation,
+                    originalContent: text,
+                    fileName: file.name
                   });
                 }
               });
@@ -2358,9 +2466,15 @@ Report generated cryptographically via Securify SaaS platform.
             {scanTab === 'local' ? (
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="space-y-1">
-                  <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
-                    client-side audit engine
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                      client-side audit engine
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border border-white/10 bg-white/5 text-neutral-300 lowercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      scans: unlimited
+                    </span>
+                  </div>
                   <h3 className="text-base font-medium text-white lowercase">
                     {customScanResults && !customScanResults.folderName.includes('/')
                       ? `scanned codebase: ${customScanResults.folderName}` 
@@ -2389,7 +2503,7 @@ Report generated cryptographically via Securify SaaS platform.
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={scanning}
-                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
+                      className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       {scanning ? "scanning..." : "re-scan folder"}
                     </button>
@@ -2397,7 +2511,7 @@ Report generated cryptographically via Securify SaaS platform.
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={scanning}
-                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50"
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       {scanning ? "scanning files..." : "select folder & scan"}
                     </button>
@@ -2410,9 +2524,23 @@ Report generated cryptographically via Securify SaaS platform.
                 {!githubUser ? (
                   <>
                     <div className="space-y-1">
-                      <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
-                        remote repository sync
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                          remote repository sync
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border lowercase ${
+                          githubSyncCount >= githubLimit
+                            ? 'bg-red-950/20 border-red-500/20 text-red-400'
+                            : githubSyncCount >= githubLimit - 1
+                            ? 'bg-amber-950/20 border-amber-500/20 text-amber-400'
+                            : 'bg-white/5 border-white/10 text-neutral-300'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            githubSyncCount >= githubLimit ? 'bg-red-500' : githubSyncCount >= githubLimit - 1 ? 'bg-amber-500' : 'bg-emerald-400'
+                          }`} />
+                          {planName === 'agency' ? `syncs: ${githubSyncCount} / unlimited` : `syncs: ${githubSyncCount} / ${githubLimit} repos`}
+                        </span>
+                      </div>
                       <h3 className="text-base font-medium text-white lowercase">
                         github connection required
                       </h3>
@@ -2422,7 +2550,7 @@ Report generated cryptographically via Securify SaaS platform.
                     </div>
                     <button
                       onClick={onGithubLogin}
-                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none shrink-0 flex items-center gap-2"
+                      className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3.5 lowercase transition-all select-none shrink-0 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
                     >
                       <svg fill="currentColor" className="w-4 h-4 text-black" viewBox="0 0 24 24" aria-hidden="true">
                         <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2430,13 +2558,55 @@ Report generated cryptographically via Securify SaaS platform.
                       connect github account
                     </button>
                   </>
+                ) : limitExceeded === 'github' ? (
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full animate-in fade-in duration-200 text-left">
+                    <div className="space-y-1.5 text-left">
+                      <span className="inline-block bg-red-950/40 border border-red-500/20 text-red-400 rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
+                        usage limit exceeded
+                      </span>
+                      <h3 className="text-base font-semibold text-white lowercase">github repository sync limit reached</h3>
+                      <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                        you have consumed your current tier limit of <span className="font-mono text-white">{githubLimit}</span> github sync scans. upgrade your account to unlock higher capacities.
+                      </p>
+                    </div>
+                    <div className="flex gap-3 w-full md:w-auto shrink-0">
+                      <button
+                        onClick={() => {
+                          setGithubSyncCount(0);
+                          localStorage.setItem('securify_usage_github', '0');
+                          setLimitExceeded(null);
+                        }}
+                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        reset limit (demo)
+                      </button>
+                      <button
+                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        upgrade plan
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-2 text-left">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <DashboardUserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-5 h-5" />
                         <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
                           remote workspaces for @{githubUser.username}
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border lowercase ${
+                          githubSyncCount >= githubLimit
+                            ? 'bg-red-950/20 border-red-500/20 text-red-400'
+                            : githubSyncCount >= githubLimit - 1
+                            ? 'bg-amber-950/20 border-amber-500/20 text-amber-400'
+                            : 'bg-white/5 border-white/10 text-neutral-300'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            githubSyncCount >= githubLimit ? 'bg-red-500' : githubSyncCount >= githubLimit - 1 ? 'bg-amber-500' : 'bg-emerald-400'
+                          }`} />
+                          {planName === 'agency' ? `syncs: ${githubSyncCount} / unlimited` : `syncs: ${githubSyncCount} / ${githubLimit} repos`}
                         </span>
                       </div>
                       <h3 className="text-base font-medium text-white lowercase">
@@ -2471,7 +2641,7 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         onClick={() => handleGithubScan(selectedGithubRepo)}
                         disabled={scanning || !selectedGithubRepo}
-                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
                           <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2481,7 +2651,7 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         onClick={() => setIsLabOpen(!isLabOpen)}
                         disabled={scanning}
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5"
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
@@ -2574,7 +2744,7 @@ Report generated cryptographically via Securify SaaS platform.
                           <button
                             type="submit"
                             disabled={scanning}
-                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                           >
                             <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
                               <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
@@ -2590,11 +2760,56 @@ Report generated cryptographically via Securify SaaS platform.
             ) : (
               // Website Scanner Tab
               <div className="flex flex-col gap-6 animate-in fade-in duration-200">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                {limitExceeded === 'website' ? (
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full text-left">
+                    <div className="space-y-1.5 text-left">
+                      <span className="inline-block bg-red-950/40 border border-red-500/20 text-red-400 rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
+                        usage limit exceeded
+                      </span>
+                      <h3 className="text-base font-semibold text-white lowercase">website audit limit reached</h3>
+                      <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
+                        you have consumed your current tier limit of <span className="font-mono text-white">{websiteLimit}</span> daily website audits. upgrade your account to unlock higher capacities.
+                      </p>
+                    </div>
+                    <div className="flex gap-3 w-full md:w-auto shrink-0">
+                      <button
+                        onClick={() => {
+                          setWebsiteScanCount(0);
+                          localStorage.setItem('securify_usage_website', '0');
+                          setLimitExceeded(null);
+                        }}
+                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        reset limit (demo)
+                      </button>
+                      <button
+                        onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        upgrade plan
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="space-y-1 text-left">
-                    <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
-                      production domain auditor
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                        production domain auditor
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border lowercase ${
+                        websiteScanCount >= websiteLimit
+                          ? 'bg-red-950/20 border-red-500/20 text-red-400'
+                          : websiteScanCount >= websiteLimit - 1
+                          ? 'bg-amber-950/20 border-amber-500/20 text-amber-400'
+                          : 'bg-white/5 border-white/10 text-neutral-300'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          websiteScanCount >= websiteLimit ? 'bg-red-500' : websiteScanCount >= websiteLimit - 1 ? 'bg-amber-500' : 'bg-emerald-400'
+                        }`} />
+                        {planName === 'agency' ? `scans: ${websiteScanCount} / unlimited` : `scans: ${websiteScanCount} / ${websiteLimit} used`}
+                      </span>
+                    </div>
                     <h3 className="text-base font-medium text-white lowercase">
                       {siteScanResults 
                         ? `audit report: ${siteScanResults.domain}` 
@@ -2621,13 +2836,14 @@ Report generated cryptographically via Securify SaaS platform.
                       <button
                         type="submit"
                         disabled={siteScanning || !siteUrl.trim()}
-                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 shrink-0"
+                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 shrink-0 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
                         {siteScanning ? "scanning..." : (siteScanResults ? "re-scan site" : "scan site")}
                       </button>
                     </form>
                   </div>
                 </div>
+                )}
 
                 {siteScanError && (
                   <div className="mt-4 bg-red-950/20 border border-red-500/20 text-red-400 text-xs font-mono rounded-xl p-4 text-left flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -3499,8 +3715,8 @@ ServerTokens Prod`}</pre>
                   {/* Glassmorphic Badge */}
                   <div className="relative z-10 bg-neutral-950/80 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-md shadow-lg shadow-black/50 select-none">
                     <div className="w-6 h-6 bg-emerald-950/50 border border-emerald-500/30 rounded-lg flex items-center justify-center shrink-0">
-                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      <svg viewBox="0 0 256 256" fill="currentColor" className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true">
+                        <path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z" />
                       </svg>
                     </div>
                     <div className="text-left font-mono">
@@ -4069,6 +4285,111 @@ ServerTokens Prod`}</pre>
           {/* Left Column: Visual Map & Compliance checklist */}
           <div className="lg:col-span-5 space-y-6 print:lg:col-span-12 print:space-y-4">
             
+            {/* Subscription & API Limits Card */}
+            <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl space-y-4 print:hidden text-left">
+              <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                <div>
+                  <h4 className="text-xs font-mono text-white lowercase">subscription & api limits</h4>
+                  <p className="text-[9px] text-neutral-500 lowercase leading-none mt-1">tier allowances & usage metrics</p>
+                </div>
+                <div className={`px-2.5 py-1 rounded-full text-[9px] font-mono border lowercase flex items-center gap-1.5 ${
+                  premiumStatus?.valid 
+                    ? planName === 'agency'
+                      ? 'bg-purple-950/20 border-purple-500/20 text-purple-400'
+                      : 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400'
+                    : 'bg-neutral-900 border-white/10 text-neutral-400'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    premiumStatus?.valid ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-500'
+                  }`} />
+                  {premiumStatus?.valid ? `${premiumStatus.plan} plan` : 'free tier'}
+                </div>
+              </div>
+
+              <div className="space-y-3.5 font-mono text-[10px]">
+                {/* Local Scan Limit */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-neutral-400">
+                    <span className="lowercase">local directory scan</span>
+                    <span className="text-neutral-300">unlimited</span>
+                  </div>
+                  <div className="w-full bg-neutral-900/60 h-1 rounded-full overflow-hidden">
+                    <div className="bg-neutral-500 h-full w-full" />
+                  </div>
+                </div>
+
+                {/* GitHub Sync Limit */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-neutral-400">
+                    <span className="lowercase">github repo sync</span>
+                    <span className="text-neutral-300">
+                      {planName === 'agency' ? `${githubSyncCount} / unlimited` : `${githubSyncCount} / ${githubLimit}`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-neutral-900/60 h-1 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        githubSyncCount >= githubLimit ? 'bg-red-500' : 'bg-white/40'
+                      }`}
+                      style={{ width: `${planName === 'agency' ? 100 : Math.min(100, (githubSyncCount / githubLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Website Scan Limit */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-neutral-400">
+                    <span className="lowercase">website audits (daily)</span>
+                    <span className="text-neutral-300">
+                      {planName === 'agency' ? `${websiteScanCount} / unlimited` : `${websiteScanCount} / ${websiteLimit}`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-neutral-900/60 h-1 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        websiteScanCount >= websiteLimit ? 'bg-red-500' : 'bg-white/40'
+                      }`}
+                      style={{ width: `${planName === 'agency' ? 100 : Math.min(100, (websiteScanCount / websiteLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Compliance Reports Limit */}
+                <div className="flex justify-between text-neutral-400 pt-1">
+                  <span className="lowercase">signed compliance exports</span>
+                  <span className={premiumStatus?.valid ? "text-emerald-400 font-bold" : "text-neutral-600"}>
+                    {premiumStatus?.valid ? "unlocked" : "locked"}
+                  </span>
+                </div>
+
+                {/* Brand Customization Limit */}
+                <div className="flex justify-between text-neutral-400">
+                  <span className="lowercase">report white-labeling</span>
+                  <span className={planName === 'agency' ? "text-purple-400 font-bold" : "text-neutral-600"}>
+                    {planName === 'agency' ? "unlocked" : "locked"}
+                  </span>
+                </div>
+              </div>
+
+              {!premiumStatus?.valid && (
+                <button
+                  onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                  className="w-full mt-2 py-2 bg-white hover:bg-neutral-200 text-black text-[10px] font-mono font-medium rounded-xl transition-all lowercase text-center block"
+                >
+                  upgrade subscription
+                </button>
+              )}
+
+              {premiumStatus?.valid && planName !== 'agency' && (
+                <button
+                  onClick={() => onPurchaseTrigger?.('agency', 'Agency', 'monthly')}
+                  className="w-full mt-2 py-2 bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-[10px] font-mono font-medium rounded-xl transition-all lowercase text-center block"
+                >
+                  upgrade to agency (white-label)
+                </button>
+              )}
+            </div>
+
             {/* Visual Node Activity Map */}
             <div className="bg-neutral-950 border border-white/5 p-6 rounded-2xl flex flex-col justify-between min-h-[220px] print:hidden">
               <div>
@@ -4261,9 +4582,8 @@ ServerTokens Prod`}</pre>
                       <span>markdown snippet:</span>
                       <button
                         onClick={() => {
-                          const label = customScanResults.leaksFound === 0 ? 'verified' : customScanResults.leaksFound <= 3 ? 'warnings' : 'critical';
-                          const color = customScanResults.leaksFound === 0 ? 'green' : customScanResults.leaksFound <= 3 ? 'orange' : 'red';
-                          copyBadgeMarkdown(`[![Securify](https://img.shields.io/badge/securify-${label}-${color})](https://gucluyumhe.dev)`);
+                          const grade = customScanResults.leaksFound === 0 ? 'A' : customScanResults.leaksFound <= 3 ? 'B' : 'D';
+                          copyBadgeMarkdown(`[![Securify Secured](https://securify.gucluyumhe.dev/badge.svg?domain=${encodeURIComponent(customScanResults.folderName)}&grade=${grade})](https://securify.gucluyumhe.dev)`);
                         }}
                         className="text-neutral-400 hover:text-white transition-colors lowercase"
                       >
@@ -4272,9 +4592,9 @@ ServerTokens Prod`}</pre>
                     </div>
                     <div className="bg-black/60 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-neutral-400 overflow-x-auto select-text whitespace-nowrap">
                       <code>
-                        {`[![Securify](https://img.shields.io/badge/securify-${
-                          customScanResults.leaksFound === 0 ? 'verified-green' : customScanResults.leaksFound <= 3 ? 'warnings-orange' : 'critical-red'
-                        })](https://gucluyumhe.dev)`}
+                        {`[![Securify Secured](https://securify.gucluyumhe.dev/badge.svg?domain=${encodeURIComponent(customScanResults.folderName)}&grade=${
+                          customScanResults.leaksFound === 0 ? 'A' : customScanResults.leaksFound <= 3 ? 'B' : 'D'
+                        })](https://securify.gucluyumhe.dev)`}
                       </code>
                     </div>
                   </div>
@@ -4660,6 +4980,14 @@ ServerTokens Prod`}</pre>
 
               {/* Footer */}
               <div className="px-6 py-4 bg-neutral-900 border-t border-white/5 flex justify-end shrink-0 select-none">
+                {selectedFinding.originalContent && selectedFinding.fileName && (
+                  <button
+                    onClick={() => handleAutoFixFinding(selectedFinding)}
+                    className="mr-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-mono font-medium rounded-xl px-5 py-2.5 lowercase transition-all flex items-center gap-1.5"
+                  >
+                    ✨ auto-fix & download
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedFinding(null)}
                   className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-2.5 lowercase transition-all"

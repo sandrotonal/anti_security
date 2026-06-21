@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ViewType } from './SecurifyNavbar';
 
 type BillingPeriod = 'monthly' | 'yearly';
 
@@ -161,9 +162,10 @@ const CheckIcon = ({ active }: { active: boolean }) => (
 
 interface PricingProps {
   onPurchase: (planId: string, planName: string, billing: BillingPeriod) => void;
+  onViewChange?: (view: ViewType) => void;
 }
 
-export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
+export const SecurifyPricing = ({ onPurchase, onViewChange }: PricingProps) => {
   const [billing, setBilling] = useState<BillingPeriod>('monthly');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -176,11 +178,15 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
 
   const handlePurchaseClick = (plan: PricingPlan) => {
     if (plan.id === 'free') {
-      const navItem = document.getElementById('nav-dashboard') || document.querySelector('[data-view="dashboard"]');
-      if (navItem) {
-        (navItem as HTMLButtonElement).click();
+      if (onViewChange) {
+        onViewChange('dashboard');
       } else {
-        window.location.reload();
+        const navItem = document.getElementById('nav-dashboard') || document.querySelector('[data-view="dashboard"]');
+        if (navItem) {
+          (navItem as HTMLButtonElement).click();
+        } else {
+          window.location.reload();
+        }
       }
       return;
     }
@@ -242,7 +248,7 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`relative flex flex-col bg-neutral-950/60 border ${plan.accentColor} rounded-3xl p-6 transition-all duration-300 hover:border-white/20 ${plan.featured ? 'ring-1 ring-white/20 shadow-2xl shadow-white/5' : ''
+              className={`relative flex flex-col bg-neutral-950/60 border ${plan.accentColor} rounded-3xl p-6 transition-all duration-300 hover:border-white/30 hover:-translate-y-1 hover:shadow-2xl hover:shadow-white/5 ${plan.featured ? 'ring-1 ring-white/20 shadow-2xl shadow-white/5' : ''
                 }`}
             >
               {/* Featured glow */}
@@ -302,7 +308,7 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
               {/* CTA */}
               <button
                 onClick={() => handlePurchaseClick(plan)}
-                className={`w-full py-3 rounded-xl text-xs font-mono lowercase transition-all ${plan.featured
+                className={`w-full py-3 rounded-xl text-xs font-mono lowercase transition-all hover:scale-[1.02] active:scale-[0.98] select-none ${plan.featured
                     ? 'bg-white hover:bg-neutral-200 text-black font-medium'
                     : plan.id === 'enterprise'
                       ? 'bg-transparent border border-white/15 hover:border-white/30 text-white'
@@ -417,10 +423,16 @@ export const SecurifyPricing = ({ onPurchase }: PricingProps) => {
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <button className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all">
+            <button 
+              onClick={() => handlePurchaseClick({ id: 'free' } as PricingPlan)}
+              className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all hover:scale-[1.02] active:scale-[0.98] select-none"
+            >
               get started free
             </button>
-            <button className="bg-transparent border border-white/15 hover:border-white/30 text-white text-xs font-mono rounded-xl px-6 py-3 lowercase transition-all">
+            <button 
+              onClick={() => window.location.href = 'mailto:sales@gucluyumhe.dev?subject=Securify Enterprise Plan Interest'}
+              className="bg-transparent border border-white/15 hover:border-white/30 text-white text-xs font-mono rounded-xl px-6 py-3 lowercase transition-all hover:bg-white/5 hover:scale-[1.02] active:scale-[0.98] select-none"
+            >
               talk to sales
             </button>
           </div>

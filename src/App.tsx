@@ -31,6 +31,11 @@ function App() {
   const paddleInitializedRef = useRef<boolean>(false);
   const [activeView, setActiveView] = useState<ViewType>(() => {
     const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') as ViewType;
+    const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
+    if (viewParam && validViews.includes(viewParam)) {
+      return viewParam;
+    }
     return params.get('submitted') === 'true' ? 'contact' : 'home';
   });
   const [isTerminalOpen, setIsTerminalOpen] = useState<boolean>(false);
@@ -111,6 +116,38 @@ function App() {
       });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
+
+  // Synchronize activeView state to URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const currentView = params.get('view');
+    if (currentView !== activeView) {
+      if (activeView === 'home') {
+        params.delete('view');
+      } else {
+        params.set('view', activeView);
+      }
+      const newSearch = params.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash}`;
+      window.history.replaceState({ view: activeView }, '', newUrl);
+    }
+  }, [activeView]);
+
+  // Handle browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view') as ViewType;
+      const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
+      if (viewParam && validViews.includes(viewParam)) {
+        setActiveView(viewParam);
+      } else {
+        setActiveView('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Checkout Email Modal states
@@ -406,8 +443,8 @@ function App() {
 
               {/* Status Banner */}
               <div className={`p-4 rounded-xl border flex items-center justify-between ${reportData.leaks === 0
-                  ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 print:border-emerald-600 print:text-emerald-700'
-                  : 'bg-red-950/20 border-red-500/20 text-red-400 print:border-red-600 print:text-red-700'
+                ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 print:border-emerald-600 print:text-emerald-700'
+                : 'bg-red-950/20 border-red-500/20 text-red-400 print:border-red-600 print:text-red-700'
                 }`}>
                 <div className="space-y-1">
                   <div className="text-sm font-semibold lowercase">
@@ -447,6 +484,58 @@ function App() {
                   <span className={`text-lg font-semibold ${reportData.warning > 0 ? 'text-yellow-400' : 'text-neutral-400'} print:text-black`}>
                     {reportData.warning}
                   </span>
+                </div>
+              </div>
+
+              {/* Compliance Standards Checklist */}
+              <div className="border-t border-white/5 pt-6 space-y-4 print:border-neutral-300">
+                <h3 className="text-xs font-semibold text-white lowercase tracking-wider print:text-black">compliance auditing standards</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* SOC 2 Column */}
+                  <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3 print:border-neutral-300 print:bg-transparent">
+                    <span className="block text-[9px] text-neutral-500 font-mono uppercase">SOC 2 Type II Readiness</span>
+                    <ul className="space-y-1.5 text-[9px] text-neutral-400 list-none pl-0 print:text-neutral-700">
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.1 (Perimeter Defense - Whitelists)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.3 (Credential Access & Secrets)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>CC6.6 (Boundary Transmission Encryption)</span>
+                      </li>
+                    </ul>
+                    <div className={`text-[8px] font-mono border px-2 py-0.5 rounded w-fit ${reportData.leaks === 0 ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400' : 'bg-red-950/20 border-red-500/20 text-red-400'}`}>
+                      {reportData.leaks === 0 ? 'ready' : 'action required'}
+                    </div>
+                  </div>
+
+                  {/* GDPR Column */}
+                  <div className="bg-black/40 border border-white/5 p-4 rounded-xl space-y-3 print:border-neutral-300 print:bg-transparent">
+                    <span className="block text-[9px] text-neutral-500 font-mono uppercase">GDPR Art. 32 Compliance</span>
+                    <ul className="space-y-1.5 text-[9px] text-neutral-400 list-none pl-0 print:text-neutral-700">
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.a (Encryption of Personal Data)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.b (Confidentiality & Integrity)</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className={reportData.leaks === 0 ? "text-emerald-400 font-bold" : "text-neutral-600"}>✓</span>
+                        <span>Art 32.1.d (Regular Vulnerability Testing)</span>
+                      </li>
+                    </ul>
+                    <div className={`text-[8px] font-mono border px-2 py-0.5 rounded w-fit ${reportData.leaks === 0 ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400' : 'bg-red-950/20 border-red-500/20 text-red-400'}`}>
+                      {reportData.leaks === 0 ? 'compliant' : 'action required'}
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
@@ -511,7 +600,7 @@ function App() {
 
         {activeView === 'rules' && (
           <div className="animate-page-entrance">
-            <SecurifyRules />
+            <SecurifyRules onViewChange={setActiveView} />
           </div>
         )}
 
@@ -560,6 +649,7 @@ function App() {
         {activeView === 'pricing' && (
           <div className="animate-page-entrance">
             <SecurifyPricing
+              onViewChange={setActiveView}
               onPurchase={(planId, planName, billingPeriod) => {
                 setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
                 setCheckoutEmail('');

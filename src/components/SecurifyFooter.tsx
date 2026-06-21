@@ -51,48 +51,55 @@ export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
           >
             github
           </a>
-          <button
-            onClick={() => onSelectModal('license')}
+          <a
+            href="/license"
+            onClick={(e) => { e.preventDefault(); onSelectModal('license'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             mit license
-          </button>
-          <button
-            onClick={() => onSelectModal('security')}
+          </a>
+          <a
+            href="/security"
+            onClick={(e) => { e.preventDefault(); onSelectModal('security'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             security policy
-          </button>
-          <button
-            onClick={() => onSelectModal('pgp')}
+          </a>
+          <a
+            href="/pgp"
+            onClick={(e) => { e.preventDefault(); onSelectModal('pgp'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             pgp key
-          </button>
-          <button
-            onClick={() => onSelectModal('sales_contract')}
+          </a>
+          <a
+            href="/terms"
+            onClick={(e) => { e.preventDefault(); onSelectModal('sales_contract'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             distance sales
-          </button>
-          <button
-            onClick={() => onSelectModal('return_policy')}
+          </a>
+          <a
+            href="/refund"
+            onClick={(e) => { e.preventDefault(); onSelectModal('return_policy'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             cancellation & refund
-          </button>
-          <button
-            onClick={() => onSelectModal('privacy_policy')}
+          </a>
+          <a
+            href="/privacy"
+            onClick={(e) => { e.preventDefault(); onSelectModal('privacy_policy'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             privacy & gdpr
-          </button>
-          <button
-            onClick={() => onSelectModal('company_info')}
+          </a>
+          <a
+            href="/contact"
+            onClick={(e) => { e.preventDefault(); onSelectModal('company_info'); }}
             className="hover:text-white transition-colors lowercase text-left focus:outline-none font-mono text-neutral-500 text-[10px] md:text-xs"
           >
             contact info
-          </button>
+          </a>
         </div>
 
       </div>

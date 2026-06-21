@@ -551,7 +551,7 @@ export const SecurifyIntegrations = () => {
                 <button
                   onClick={handleTestWebhook}
                   disabled={testStatus === 'sending'}
-                  className="w-full bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none disabled:opacity-50"
+                  className="w-full bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl py-3 lowercase transition-all select-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {testStatus === 'sending' ? 'dispatching request...' : 'test notification'}
                 </button>
