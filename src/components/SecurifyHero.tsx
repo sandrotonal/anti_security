@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
+import type { ViewType } from './SecurifyNavbar';
+import { ShinyButton } from './ui/shiny-button';
 
-export const SecurifyHero = () => {
+export const SecurifyHero = ({ onViewChange }: { onViewChange?: (view: ViewType) => void }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -43,10 +45,29 @@ export const SecurifyHero = () => {
             data
           </h1>
 
-          {/* Description Paragraph */}
-          <p className="absolute left-6 md:left-10 top-[46%] max-w-[240px] text-[15px] leading-snug text-white/90 lowercase select-none font-light">
-            we can guarding your data with utmost care, empowering you with privacy everywhere
-          </p>
+          {/* Description Paragraph & CTA Buttons Group - Unified and full-width stacked on mobile */}
+          <div className="absolute left-6 right-6 md:right-auto md:left-10 bottom-[12%] md:bottom-[16%] md:max-w-sm flex flex-col gap-4 md:gap-5 pointer-events-auto select-none z-20">
+            <p className="text-[13px] md:text-[15px] leading-relaxed text-white/90 font-light pointer-events-none lowercase">
+              we can guarding your data with utmost care, empowering you with privacy everywhere
+            </p>
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full">
+              <ShinyButton className="w-full md:w-auto justify-center" onClick={() => onViewChange?.('dashboard')}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                start scanning free
+              </ShinyButton>
+              <button
+                onClick={() => {
+                  const sim = document.getElementById('platform');
+                  if (sim) {
+                    sim.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="w-full md:w-auto bg-black/60 hover:bg-neutral-950 border border-white/10 text-white text-xs font-mono font-medium rounded-full py-[0.85rem] px-[1.45rem] lowercase transition-all hover:scale-[1.02] active:scale-[0.98] backdrop-blur-md whitespace-nowrap flex items-center justify-center"
+              >
+                how it works
+              </button>
+            </div>
+          </div>
 
         </main>
       </div>

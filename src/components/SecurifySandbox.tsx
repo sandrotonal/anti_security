@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ShieldCheck, ShieldAlert, Check, X } from 'lucide-react';
 
 interface ScanReport {
   isSafe: boolean;
@@ -1289,8 +1290,9 @@ ssh_keys = ${enabledScanners.ssh}
                     </div>
                   ) : report.isSafe ? (
                     <div className="space-y-3">
-                      <div className="text-white font-mono text-sm lowercase">
-                        ✔ status: safe code structure
+                      <div className="text-white font-mono text-sm lowercase flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                        status: safe code structure
                       </div>
                       <p className="text-neutral-400 text-xs font-light leading-relaxed lowercase">
                         no common cloud api credentials, database tokens, or payment secret signatures were detected in your input space.
@@ -1298,8 +1300,9 @@ ssh_keys = ${enabledScanners.ssh}
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="text-neutral-200 font-mono text-sm lowercase">
-                        ⚠️ status: leaks discovered ({report.leaks.length})
+                      <div className="text-neutral-200 font-mono text-sm lowercase flex items-center gap-1.5">
+                        <ShieldAlert className="w-4 h-4 text-red-500 shrink-0" />
+                        status: leaks discovered ({report.leaks.length})
                       </div>
 
                       <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 select-text">
@@ -1687,27 +1690,35 @@ ssh_keys = ${enabledScanners.ssh}
                     <span className="text-[10px] font-mono text-neutral-500 block lowercase">character diversity:</span>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-neutral-400">
                       <div className="flex items-center gap-1.5">
-                        <span className={/[A-Z]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
-                          {/[A-Z]/.test(entropyInput) ? '✔' : '✖'}
-                        </span>
+                        {/[A-Z]/.test(entropyInput) ? (
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 text-neutral-700 shrink-0" />
+                        )}
                         <span>uppercase letters</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/[a-z]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
-                          {/[a-z]/.test(entropyInput) ? '✔' : '✖'}
-                        </span>
+                        {/[a-z]/.test(entropyInput) ? (
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 text-neutral-700 shrink-0" />
+                        )}
                         <span>lowercase letters</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/\d/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
-                          {/[0-9]/.test(entropyInput) ? '✔' : '✖'}
-                        </span>
+                        {/\d/.test(entropyInput) ? (
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 text-neutral-700 shrink-0" />
+                        )}
                         <span>numeric digits</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={/[^A-Za-z0-9]/.test(entropyInput) ? 'text-white' : 'text-neutral-700'}>
-                          {/[^A-Za-z0-9]/.test(entropyInput) ? '✔' : '✖'}
-                        </span>
+                        {/[^A-Za-z0-9]/.test(entropyInput) ? (
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 text-neutral-700 shrink-0" />
+                        )}
                         <span>special symbols</span>
                       </div>
                     </div>
@@ -2050,9 +2061,9 @@ ssh_keys = ${enabledScanners.ssh}
                       {getRegexTestResults().error ? (
                         <span className="text-red-400">compilation error</span>
                       ) : getRegexTestResults().matched ? (
-                        <span className="text-emerald-400 font-medium animate-pulse">leak detected ✔</span>
+                        <span className="text-emerald-400 font-medium animate-pulse">leak detected</span>
                       ) : (
-                        <span className="text-neutral-500">no matches found ✖</span>
+                        <span className="text-neutral-500">no matches found</span>
                       )}
                     </div>
 

@@ -1,4 +1,17 @@
 import { useState, useEffect } from 'react';
+import { 
+  FileCode, 
+  FileJson, 
+  Settings, 
+  GitCommit, 
+  Code2,
+  Terminal, 
+  ShieldAlert, 
+  ShieldCheck, 
+  Sparkles, 
+  AlertTriangle,
+  RefreshCw
+} from 'lucide-react';
 
 interface MockFile {
   name: string;
@@ -121,6 +134,16 @@ const autoFixCode = (fileName: string, currentCode: string): string => {
   }
 };
 
+const getFileIcon = (name: string) => {
+  if (name.endsWith('.ts')) return <Code2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+  if (name.endsWith('.py')) return <FileCode className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
+  if (name.endsWith('.json')) return <FileJson className="w-3.5 h-3.5 text-yellow-400 shrink-0" />;
+  if (name === '.env') return <Settings className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
+  if (name.endsWith('.go')) return <Code2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
+  if (name.endsWith('.yml') || name.endsWith('.yaml')) return <GitCommit className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
+  return <FileCode className="w-3.5 h-3.5 text-neutral-400 shrink-0" />;
+};
+
 export const SecurifySimulator = () => {
   const [selectedFile, setSelectedFile] = useState<number>(0);
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -181,14 +204,14 @@ export const SecurifySimulator = () => {
 [action] git commit aborted. remove secrets or bypass with '// securify:ignore'.`;
     } else if (bypassed) {
       finalState = 'bypassed';
-      output = `[securify] ✔ bypass active
+      output = `[securify] bypass active
 [file] ${activeFile.path}
 [reason] inline comment 'securify:ignore' detected.
 
 [action] git commit passed with warnings.`;
     } else {
       finalState = 'clean';
-      output = `[securify] ✔ git commit passed
+      output = `[securify] git commit passed
 [status] scanned 1 files, 0 leaks identified.
 [engine] local hooks signature match finished.`;
     }
@@ -280,7 +303,7 @@ export const SecurifySimulator = () => {
       console.error('Failed to download .env.example', err);
     }
 
-    const output = `[securify] ✔ git commit passed
+    const output = `[securify] git commit passed
 [status] scanned 1 files, 0 leaks identified.
 [auto-fix] replaced hardcoded credentials with safe environment bindings.
 [auto-fix] generated and downloaded .env.example.
@@ -316,6 +339,59 @@ export const SecurifySimulator = () => {
           </p>
         </div>
 
+        {/* Interactive Steps Workflow */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          
+          {/* Step 1 */}
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:border-white/10 hover:-translate-y-0.5 group">
+            <div className="absolute right-4 top-4 text-6xl font-mono text-white/5 select-none font-bold pointer-events-none group-hover:text-white/10 transition-colors">
+              01
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center mb-4 text-emerald-400 group-hover:scale-105 transition-transform duration-300">
+              <FileCode className="w-5 h-5 text-emerald-400" />
+            </div>
+            <h3 className="text-sm font-medium text-white font-mono lowercase mb-2 flex items-center gap-1.5">
+              choose or edit code
+            </h3>
+            <p className="text-xs text-neutral-400 font-light lowercase leading-relaxed">
+              select one of the files in the editor tabs below. each file contains a hardcoded API token, private key, or credential.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:border-white/10 hover:-translate-y-0.5 group">
+            <div className="absolute right-4 top-4 text-6xl font-mono text-white/5 select-none font-bold pointer-events-none group-hover:text-white/10 transition-colors">
+              02
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center mb-4 text-white group-hover:scale-105 transition-transform duration-300">
+              <Terminal className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-sm font-medium text-white font-mono lowercase mb-2">
+              trigger git commit
+            </h3>
+            <p className="text-xs text-neutral-400 font-light lowercase leading-relaxed">
+              click the <strong className="text-white font-mono font-medium">"git commit"</strong> button. securify intercepts the commit locally, scans the file, and blocks leaks.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="bg-neutral-950/40 backdrop-blur-md border border-white/5 rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:border-white/10 hover:-translate-y-0.5 group">
+            <div className="absolute right-4 top-4 text-6xl font-mono text-white/5 select-none font-bold pointer-events-none group-hover:text-white/10 transition-colors">
+              03
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center mb-4 text-emerald-400 group-hover:scale-105 transition-transform duration-300">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+            </div>
+            <h3 className="text-sm font-medium text-white font-mono lowercase mb-2">
+              auto-fix credentials
+            </h3>
+            <p className="text-xs text-neutral-400 font-light lowercase leading-relaxed">
+              click <strong className="text-emerald-400 font-mono font-medium">"auto-fix"</strong>. securify automatically migrates secrets to environment variables and downloads <code className="text-white bg-neutral-900 px-1 border border-white/10 rounded font-mono font-bold">.env.example</code>.
+            </p>
+          </div>
+
+        </div>
+
         {/* Mock IDE Container */}
         <div className="w-full bg-neutral-950 border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
           
@@ -338,12 +414,13 @@ export const SecurifySimulator = () => {
                     setScanState('idle');
                     setProgress(0);
                   }}
-                  className={`px-3 py-1 text-xs font-mono rounded transition-colors lowercase shrink-0 ${
+                  className={`px-3 py-1.5 text-xs font-mono rounded transition-colors lowercase shrink-0 flex items-center gap-1.5 ${
                     selectedFile === idx
-                      ? 'bg-neutral-950 text-white'
+                      ? 'bg-neutral-950 text-white border border-white/5 shadow-sm'
                       : 'text-neutral-500 hover:text-white'
                   }`}
                 >
+                  {getFileIcon(file.name)}
                   {file.name}
                 </button>
               ))}
@@ -399,8 +476,9 @@ export const SecurifySimulator = () => {
               </div>
 
               {/* Live Hint */}
-              <div className="mt-4 pt-3 border-t border-white/5 text-[10px] text-neutral-500 font-mono lowercase select-none shrink-0">
-                💡 <span className="text-neutral-400">tip:</span> add <span className="text-white bg-neutral-900 px-1.5 py-0.5 rounded border border-white/10 font-bold">// securify:ignore</span> to the line with the key, then try committing.
+              <div className="mt-4 pt-3 border-t border-white/5 text-[11px] text-neutral-400 font-mono lowercase select-none shrink-0 flex items-center gap-2">
+                <span className="text-emerald-500 animate-pulse">●</span>
+                <span>tip: add <code className="text-white bg-neutral-900 px-1.5 py-0.5 rounded border border-white/10 font-mono font-medium select-text">// securify:ignore</code> to the line with the key, then click commit.</span>
               </div>
             </div>
 
@@ -433,18 +511,13 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [14ms]</span>
-                    <span className="block text-white font-medium font-sans text-sm mt-3 select-text">
-                      [securify] ❌ commit blocked
+                    <span className="block text-red-400 font-semibold font-mono text-sm mt-3 flex items-center gap-1.5 select-text">
+                      <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse shrink-0" />
+                      [securify] commit blocked
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/10 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text mb-3">
+                    <pre className="block bg-red-950/10 border border-red-500/20 p-3 rounded text-[11px] text-red-200/90 whitespace-pre-wrap select-text mb-3 font-mono leading-relaxed">
                       {pendingScanResult.output}
                     </pre>
-                    <button
-                      onClick={handleAutoFix}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-black hover:bg-neutral-200 border border-white/10 rounded-xl text-xs font-mono font-medium transition-colors lowercase"
-                    >
-                      ✨ auto-fix credentials
-                    </button>
                   </div>
                 )}
 
@@ -452,10 +525,11 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [18ms]</span>
-                    <span className="block text-neutral-300 font-medium font-sans text-sm mt-3 select-text">
-                      [securify] ⚠️ bypass active (passed with warnings)
+                    <span className="block text-yellow-400 font-semibold font-mono text-sm mt-3 flex items-center gap-1.5 select-text">
+                      <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0" />
+                      [securify] bypass active (passed with warnings)
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-neutral-400 whitespace-pre-wrap select-text">
+                    <pre className="block bg-yellow-950/10 border border-yellow-500/20 p-3 rounded text-[11px] text-yellow-200/80 whitespace-pre-wrap select-text font-mono leading-relaxed">
                       {pendingScanResult.output}
                     </pre>
                   </div>
@@ -465,10 +539,11 @@ export const SecurifySimulator = () => {
                   <div className="space-y-2 leading-relaxed animate-in fade-in duration-300">
                     <span className="block text-neutral-500">$ git commit -m "add database keys"</span>
                     <span className="block text-neutral-400">⠏ running pre-commit hook (securify)... done [12ms]</span>
-                    <span className="block text-white font-medium font-sans text-sm mt-3 select-text">
-                      [securify] ✔ git commit passed
+                    <span className="block text-emerald-400 font-semibold font-mono text-sm mt-3 flex items-center gap-1.5 select-text">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      [securify] git commit passed
                     </span>
-                    <pre className="block bg-neutral-950 border border-white/5 p-3 rounded text-[11px] text-neutral-300 whitespace-pre-wrap select-text">
+                    <pre className="block bg-emerald-950/10 border border-emerald-500/20 p-3 rounded text-[11px] text-emerald-200/90 whitespace-pre-wrap select-text font-mono leading-relaxed">
                       {pendingScanResult.output}
                     </pre>
                   </div>
@@ -480,23 +555,28 @@ export const SecurifySimulator = () => {
                 {scanState === 'blocked' ? (
                   <button
                     onClick={handleAutoFix}
-                    className="flex-1 bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-xs font-mono font-medium transition-colors lowercase"
+                    className="flex-1 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.05)] py-3.5 px-6 rounded-full text-xs font-mono font-medium transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 lowercase"
                   >
-                    ✨ auto-fix secret
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    auto-fix secret
                   </button>
                 ) : (
                   <button
                     onClick={handleStartScan}
                     disabled={isScanning}
-                    className="flex-1 bg-white text-black hover:bg-neutral-200 py-3 rounded-xl text-xs font-mono font-medium transition-colors disabled:opacity-50 lowercase"
+                    className={`flex-1 py-3.5 px-6 rounded-full text-xs font-mono font-medium transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 lowercase ${
+                      scanState === 'idle' ? 'bg-white text-black hover:bg-neutral-200 animate-pulse' : 'bg-white text-black hover:bg-neutral-200'
+                    }`}
                   >
-                    {isScanning ? 'scanning repos...' : 'git commit'}
+                    <Terminal className="w-3.5 h-3.5 shrink-0" />
+                    {isScanning ? 'scanning...' : 'git commit'}
                   </button>
                 )}
                 <button
                   onClick={handleReset}
-                  className="px-4 bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white py-3 rounded-xl text-xs font-mono transition-colors lowercase"
+                  className="px-6 bg-neutral-900 text-neutral-400 border border-white/5 hover:text-white py-3.5 rounded-full text-xs font-mono transition-colors lowercase flex items-center justify-center gap-1.5"
                 >
+                  <RefreshCw className="w-3 h-3 shrink-0" />
                   reset
                 </button>
               </div>

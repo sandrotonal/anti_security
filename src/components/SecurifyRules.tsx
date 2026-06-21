@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Zap } from 'lucide-react';
 import type { ViewType } from './SecurifyNavbar';
 
 interface Rule {
@@ -329,8 +330,9 @@ export const SecurifyRules = ({ onViewChange }: SecurifyRulesProps) => {
                       </div>
                     </div>
 
-                    <span className="text-[10px] font-mono text-neutral-400 block lowercase tracking-wider">
-                      ⚡ step-by-step rotation guide
+                    <span className="text-[10px] font-mono text-neutral-400 block lowercase tracking-wider flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-yellow-400 shrink-0" />
+                      step-by-step rotation guide
                     </span>
                     <ol className="list-decimal pl-4 space-y-2 text-[11px] text-neutral-400 lowercase leading-relaxed font-light">
                       {(remediationPlans[rule.id]?.steps || []).map((step, idx) => (

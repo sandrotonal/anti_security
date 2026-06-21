@@ -38,7 +38,7 @@ export const SecurifyIntegrations = () => {
     if (activePlatform === 'slack') {
       return {
         channel: channelName,
-        text: "⚠️ [securify] credential leak identified in commit!",
+        text: "[warning] [securify] credential leak identified in commit!",
         attachments: [
           {
             color: "#ef4444",
@@ -54,7 +54,7 @@ export const SecurifyIntegrations = () => {
     } else if (activePlatform === 'discord') {
       return {
         username: "securify-monitor",
-        content: `⚠️ **credential leak detected** in ${channelName}!`,
+        content: `[warning] **credential leak detected** in ${channelName}!`,
         embeds: [
           {
             title: "critical vulnerability flagged",
@@ -558,7 +558,7 @@ export const SecurifyIntegrations = () => {
 
                 {testStatus === 'success' && (
                   <div className="p-3 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 rounded-xl text-center font-mono text-[10px] lowercase animate-page-entrance">
-                    ✔ test payload dispatched successfully! status code 200 ok.
+                    test payload dispatched successfully! status code 200 ok.
                   </div>
                 )}
               </div>
