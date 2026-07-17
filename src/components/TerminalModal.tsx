@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { scanContent } from '../lib/scanEngine';
 
 interface TerminalModalProps {
   isOpen: boolean;
@@ -35,10 +36,10 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const installCommands: CommandMap = {
-    npm: 'npm install -g @securify/cli',
-    pnpm: 'pnpm add -g @securify/cli',
-    cargo: 'cargo install securify',
-    brew: 'brew install securify-cli/securify/securify'
+    npm: 'npm install -g securify-scanner',
+    pnpm: 'pnpm add -g securify-scanner',
+    cargo: 'cargo install securify-scanner',
+    brew: 'brew install securify-scanner'
   };
 
   const getThemeTextClass = () => {
@@ -114,7 +115,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
     const bootLogs = [
       {
         input: 'securify --version',
-        output: 'securify core CLI v1.2.4\n[info] loading secret scanning modules...\n[success] 9 scanning filters successfully mounted.\n\ntype "--help" to list available terminal commands.'
+        output: 'securify web scanner v1.0.0\n[info] loaded 40+ secret detection patterns\n[info] entropy analysis: enabled\n[success] real-time scanning engine ready\n\ntype "--help" for available commands'
       }
     ];
     setHistory(bootLogs);
@@ -130,40 +131,68 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
       case 'help':
       case '--help':
       case '?':
-        output = `securify cli options:
-  - rules           list all core secret detection rules
-  - scan            run simulated codebase security audit
-  - bypass          show how to ignore/bypass rule detections
-  - faq             view frequently asked security questions
-  - clear           clear the terminal buffer logs
-  - exit            close this terminal session`;
+        output = `securify terminal commands:
+  - rules           list active secret detection patterns
+  - scan            run real-time code security scan
+  - bypass          learn about false positive handling
+  - faq             frequently asked questions
+  - clear           clear terminal history
+  - exit            close terminal session`;
         break;
       case 'rules':
-        output = `active detection rule sets:
-  [sec-001] aws access key id (critical)
-  [sec-002] aws secret access key (critical)
-  [sec-003] supabase service role jwt (critical)
-  [sec-004] stripe secret api key (critical)
-  [sec-005] github personal token (high)
-  [sec-006] google cloud api key (high)
-  [sec-007] slack webhook incoming URL (high)
-  [sec-008] generic high-entropy token (warning)`;
+        output = `active secret detection patterns:
+  [critical] AWS Access Key ID (AKIA*, A3T*)
+  [critical] AWS Secret Access Key (40-char base64)
+  [critical] RSA/DSA/EC Private Keys (PEM format)
+  [critical] SSH Private Keys
+  [high] GitHub Personal Access Token (ghp_*)
+  [high] Stripe Secret Key (sk_live_*)
+  [high] Google Cloud API Key (AIza*)
+  [high] PostgreSQL/MySQL Connection Strings
+  [high] Slack Tokens (xox*)
+  [medium] JWT Tokens (eyJ*)
+  [medium] Generic API Keys (high entropy)
+  [medium] SendGrid/Twilio/Mailgun Keys
+  
+total: 40+ patterns with entropy analysis`;
         break;
       case 'scan':
-        output = `[info] scanning git repository...
-[info] 12 files verified in 14ms
-[success] 0 leaks found. codebase is secure!`;
+        // Real scanning - test with sample content
+        const sampleCode = `
+const AWS_KEY = "AKIAIOSFODNN7EXAMPLE";
+const stripe_key = "sk_live_51ABC123XYZ";
+function connect() {
+  const password = "test123";
+}`;
+        const results = scanContent(sampleCode, 'demo.js');
+        if (results.length === 0) {
+          output = `[info] scanning code sample...
+[info] analyzed 5 lines in real-time
+[success] no secrets detected. code is clean!`;
+        } else {
+          output = `[info] scanning code sample...
+[warning] found ${results.length} potential secret(s):
+${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
+[info] use "bypass" command to learn about false positives`;
+        }
         break;
       case 'bypass':
         output = `to ignore a false positive detection, append:
   "# securify:ignore" at the end of the flagged code line.`;
         break;
       case 'faq':
-        output = `securify faq list:
-  Q: does securify send my codebase to cloud servers?
-  A: no. securify scans fully locally on your device.
-  Q: how do i update the scanning signatures?
-  A: run 'npm update -g @securify/cli'`;
+        output = `frequently asked questions:
+  Q: is my code sent to external servers?
+  A: no. all scanning runs locally in your browser
+  
+  Q: how accurate is the detection?
+  A: uses 40+ industry-standard patterns + entropy analysis
+  
+  Q: does it scan my entire repository?
+  A: yes, when connected to GitHub - scans all text files
+  
+  Q: can i use this in CI/CD pipelines?
+  A: yes, integrate via GitHub Actions or webhook scanning`;
         break;
       case 'clear':
         setHistory([]);

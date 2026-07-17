@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, ShieldAlert, Check, X } from 'lucide-react';
+import { scanContent } from '../lib/scanEngine';
 
 interface ScanReport {
   isSafe: boolean;
@@ -937,67 +938,15 @@ export const SecurifySandbox = () => {
   };
 
   const runBrowserScan = (text: string) => {
-    const lines = text.split('\n');
-    const detectedLeaks: ScanReport['leaks'] = [];
-
-    // AWS Access Key Pattern
-    const awsRegex = /AKIA[A-Z0-9]{16}/g;
-    // Stripe secret key pattern
-    const stripeRegex = /sk_(live|test)_[a-zA-Z0-9]{24}/g;
-    // GitHub PAT pattern
-    const githubRegex = /ghp_[a-zA-Z0-9]{36}/g;
-    // Database URL passwords
-    const dbRegex = /postgres(?:ql)?:\/\/([^:]+):([^@]+)@/g;
-
-    lines.forEach((lineText, index) => {
-      // Check AWS
-      let awsMatch = awsRegex.exec(lineText);
-      while (awsMatch) {
-        detectedLeaks.push({
-          type: 'aws access key id',
-          line: index + 1,
-          match: awsMatch[0],
-          description: 'allows raw authentication to amazon web services cloud nodes.'
-        });
-        awsMatch = awsRegex.exec(lineText);
-      }
-
-      // Check Stripe
-      let stripeMatch = stripeRegex.exec(lineText);
-      while (stripeMatch) {
-        detectedLeaks.push({
-          type: 'stripe secret key',
-          line: index + 1,
-          match: stripeMatch[0],
-          description: 'allows API access to execute payments and check transactions.'
-        });
-        stripeMatch = stripeRegex.exec(lineText);
-      }
-
-      // Check GitHub
-      let githubMatch = githubRegex.exec(lineText);
-      while (githubMatch) {
-        detectedLeaks.push({
-          type: 'github access token',
-          line: index + 1,
-          match: githubMatch[0],
-          description: 'grants read/write credentials to repositories.'
-        });
-        githubMatch = githubRegex.exec(lineText);
-      }
-
-      // Check Database Passwords
-      let dbMatch = dbRegex.exec(lineText);
-      while (dbMatch) {
-        detectedLeaks.push({
-          type: 'database connection secret',
-          line: index + 1,
-          match: dbMatch[2],
-          description: 'exposes database user authentication credentials.'
-        });
-        dbMatch = dbRegex.exec(lineText);
-      }
-    });
+    // Use real scan engine with 40+ patterns and entropy analysis
+    const results = scanContent(text, 'sandbox-input');
+    
+    const detectedLeaks: ScanReport['leaks'] = results.map(result => ({
+      type: result.type,
+      line: result.line,
+      match: result.redacted,
+      description: result.description
+    }));
 
     setReport({
       isSafe: detectedLeaks.length === 0,

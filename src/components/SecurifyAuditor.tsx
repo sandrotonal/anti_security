@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { parseDependencyFile } from '../lib/dependencyParser';
+import { batchQueryVulnerabilities } from '../lib/cveDatabase';
 
 interface Dependency {
   name: string;

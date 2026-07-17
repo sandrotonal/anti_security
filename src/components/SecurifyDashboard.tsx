@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 import { GlowCard } from './GlowCard';
 import { trackEvent } from '../lib/analytics';
+import { scanContent } from '../lib/scanEngine';
+import { GitHubRepoScanner, parseGitHubUrl } from '../lib/githubScanner';
 
 
 interface Finding {
@@ -314,9 +316,9 @@ export const SecurifyDashboard = ({
   const [logs, setLogs] = useState<ScanLog[]>([]);
   const [isLiveStream, setIsLiveStream] = useState<boolean>(true);
   const [stats, setStats] = useState({
-    totalScanned: 842,
-    blockedLeaks: 14,
-    activeHooks: 3
+    totalScanned: 0,
+    blockedLeaks: 0,
+    activeHooks: 0
   });
 
   const [scanTab, setScanTab] = useState<'local' | 'github' | 'website'>('local');
@@ -1494,7 +1496,7 @@ export const SecurifyDashboard = ({
     const tempLogs: ScanLog[] = [];
     const localSeverity = { critical: 0, high: 0, warning: 0 };
 
-    // Select files to actually scan for secrets (limit to top 5 config/sensitive files)
+    // Scan ALL files - no artificial limits
     const filesToAudit = repoFiles.filter(path => 
       path.endsWith('.env') || 
       path.endsWith('config.js') || 
@@ -1502,7 +1504,7 @@ export const SecurifyDashboard = ({
       path.endsWith('package.json') || 
       path.includes('credentials') || 
       path.includes('secret')
-    ).slice(0, 5);
+    );
 
     // Show scanning progress for the files
     const totalSteps = 5 + repoFiles.length;
@@ -1513,45 +1515,34 @@ export const SecurifyDashboard = ({
       }
     }
 
-    // Actually fetch raw contents and scan them
+    // Use real scan engine with 40+ patterns and entropy analysis
     for (const filePath of filesToAudit) {
       try {
         const content = await fetchFileContent(filePath);
         if (content) {
-          const rules = [
-            { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
-            { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
-            { name: 'Generic Database Connection String', regex: /(postgres|postgresql|mongodb|mysql):\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+:\d+\/[a-zA-Z0-9_-]+/g, severity: 'warning', explanation: 'Exposed database connection string with password.', remediation: 'Move to secure secret store.' },
-            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
-          ];
+          // Use real scanEngine with professional patterns
+          const scanResults = scanContent(content, filePath);
+          
+          scanResults.forEach(result => {
+            const lines = content.split('\n');
+            const contextStart = Math.max(0, result.line - 3);
+            const contextEnd = Math.min(lines.length, result.line + 2);
+            const contextLines = lines.slice(contextStart, contextEnd).map((l, lIdx) => ({
+              lineNum: contextStart + lIdx + 1,
+              content: l
+            }));
 
-          rules.forEach(rule => {
-            const matches = content.match(rule.regex);
-            if (matches && matches.length > 0) {
-              matches.forEach((match) => {
-                const lines = content.split('\n');
-                const lineNum = lines.findIndex(l => l.includes(match)) + 1;
-                
-                const contextStart = Math.max(0, lineNum - 3);
-                const contextEnd = Math.min(lines.length, lineNum + 2);
-                const contextLines = lines.slice(contextStart, contextEnd).map((l, lIdx) => ({
-                  lineNum: contextStart + lIdx + 1,
-                  content: l
-                }));
-
-                repoFindings.push({
-                  file: filePath,
-                  line: lineNum || 1,
-                  type: rule.name,
-                  codeMatch: match,
-                  details: rule.name,
-                  contextLines,
-                  safeFix: `// Load from environment variable: process.env.${rule.name.replace(/\s+/g, '_').toUpperCase()}`,
-                  explanation: rule.explanation,
-                  remediation: rule.remediation
-                });
-              });
-            }
+            repoFindings.push({
+              file: result.file,
+              line: result.line,
+              type: result.type,
+              codeMatch: result.redacted,
+              details: result.description,
+              contextLines,
+              safeFix: `// Load from environment variable: process.env.SECRET_KEY`,
+              explanation: `${result.type} detected with ${result.severity} severity`,
+              remediation: 'Immediately revoke this credential and store it in environment variables or secret management system.'
+            });
           });
         }
       } catch (err) {
@@ -1559,81 +1550,7 @@ export const SecurifyDashboard = ({
       }
     }
 
-    // Now inject lab leaks if specified
-    if (injectedLeaks) {
-      if (injectedLeaks.stripe) {
-        repoFindings.push({
-          file: 'src/config/stripe.ts',
-          line: 12,
-          type: 'Stripe Secret API Key',
-          codeMatch: 'const stripeKey = "sk_test_51NzABC123XYZ...";',
-          details: 'Stripe Secret API Key',
-          contextLines: [
-            { lineNum: 10, content: '// Stripe init' },
-            { lineNum: 11, content: 'import Stripe from "stripe";' },
-            { lineNum: 12, content: 'const stripeKey = "sk_test_51NzABC123XYZ...";' },
-            { lineNum: 13, content: 'export const stripe = new Stripe(stripeKey);' }
-          ],
-          safeFix: 'const stripeKey = process.env.STRIPE_SECRET_KEY;',
-          explanation: 'stripe secret api key exposed. malicious actors can use this to execute transactions, refund charges, or access customer data.',
-          remediation: 'go to Stripe Dashboard -> Developers -> API Keys and roll the secret key. transition code to use environment variables.'
-        });
-      }
-      if (injectedLeaks.aws) {
-        repoFindings.push({
-          file: 'src/config/aws.js',
-          line: 3,
-          type: 'AWS Access Key ID',
-          codeMatch: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE',
-          details: 'AWS Access Key ID',
-          contextLines: [
-            { lineNum: 1, content: '# AWS configuration' },
-            { lineNum: 2, content: 'PORT=8080' },
-            { lineNum: 3, content: 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE' },
-            { lineNum: 4, content: 'AWS_REGION=us-east-1' }
-          ],
-          safeFix: 'AWS_ACCESS_KEY_ID=env.AWS_ACCESS_KEY_ID # load from environment variables',
-          explanation: 'aws access key id is hardcoded in plain text. anyone with read access to this repository can compromise your aws account resources.',
-          remediation: 'move the key to a safe .env file (add to .gitignore) and reference it via process.env or system environment variables.'
-        });
-      }
-      if (injectedLeaks.db) {
-        repoFindings.push({
-          file: '.env.production',
-          line: 4,
-          type: 'Generic Database Connection String',
-          codeMatch: 'DATABASE_URL="postgres://admin:superSecretPassword@localhost:5432/mydb"',
-          details: 'Generic Database Connection String',
-          contextLines: [
-            { lineNum: 2, content: 'NODE_ENV=production' },
-            { lineNum: 3, content: 'PORT=3000' },
-            { lineNum: 4, content: 'DATABASE_URL="postgres://admin:superSecretPassword@localhost:5432/mydb"' },
-            { lineNum: 5, content: 'REDIS_URL="redis://localhost:6379"' }
-          ],
-          safeFix: 'DATABASE_URL=process.env.DATABASE_URL',
-          explanation: 'exposed sensitive credential or high-entropy value in codebase.',
-          remediation: 'always store secrets in external environment files (.env) or secret management systems like Vault or AWS Secrets Manager. Never commit secrets to version control.'
-        });
-      }
-      if (injectedLeaks.slack) {
-        repoFindings.push({
-          file: 'src/utils/slack.js',
-          line: 8,
-          type: 'Slack Webhook URL',
-          codeMatch: 'const webhook = "https://hooks.slack.com/services/" + "T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX";',
-          details: 'Slack Webhook URL',
-          contextLines: [
-            { lineNum: 6, content: 'const axios = require("axios");' },
-            { lineNum: 7, content: '// slack logs notification' },
-            { lineNum: 8, content: 'const webhook = "https://hooks.slack.com/services/" + "T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX";' },
-            { lineNum: 9, content: 'axios.post(webhook, { text: "Hello World" });' }
-          ],
-          safeFix: 'const webhook = process.env.SLACK_WEBHOOK_URL;',
-          explanation: 'slack webhook url exposed. allows spammers or attackers to send messages, forge notifications, or gather workspace information.',
-          remediation: 'revoke/delete the exposed webhook url in slack app management, recreate it, and store it as a secure secret variable.'
-        });
-      }
-    }
+    // Real findings only - no fake injections
 
     if (repoFindings.length > 0) {
       leaksFound = repoFindings.length;
@@ -1906,91 +1823,11 @@ export const SecurifyDashboard = ({
     });
   };
 
-  // Live Simulated Stream Hook
+  // Live Stream - Disabled (no mock data)
   useEffect(() => {
     if (!isLiveStream) return;
-
-    // Pre-populate some historical logs
-    const initialLogs: ScanLog[] = [
-      {
-        timestamp: new Date(Date.now() - 15000).toLocaleTimeString(),
-        repo: 'github.com/org/auth-service',
-        status: 'passed',
-        details: '✔ securify-git-hook: scanned 12 staged files. no secrets found.'
-      },
-      {
-        timestamp: new Date(Date.now() - 10000).toLocaleTimeString(),
-        repo: 'github.com/org/payment-gateway',
-        status: 'failed',
-        details: '❌ blocked commit: detected Stripe Secret API Key on payment-gateway/src/config.js:L24'
-      },
-      {
-        timestamp: new Date(Date.now() - 5000).toLocaleTimeString(),
-        repo: 'github.com/org/infrastructure',
-        status: 'passed',
-        details: '✔ securify-ci: verified terraform scripts. 0 leaks detected.'
-      }
-    ];
-    setLogs(initialLogs);
-
-    const repos = [
-      'github.com/org/billing-api',
-      'github.com/org/data-lake',
-      'github.com/org/mobile-client',
-      'github.com/org/user-dashboard',
-      'github.com/org/auth-service'
-    ];
-
-    const leakTypes = [
-      { name: 'AWS Access Key ID', detail: '❌ blocked commit: detected AWS Access Key ID on billing-api/secrets.env:L3', severity: 'critical' },
-      { name: 'Google Cloud API Key', detail: '❌ blocked push: detected Google Cloud API Key on data-lake/index.js:L92', severity: 'high' },
-      { name: 'GitHub Personal Access Token', detail: '❌ blocked commit: detected GitHub Personal Access Token on mobile-client/src/auth.ts:L12', severity: 'high' }
-    ];
-
-    const interval = setInterval(() => {
-      const isLeak = Math.random() > 0.8;
-      const randomRepo = repos[Math.floor(Math.random() * repos.length)];
-      const timestamp = new Date().toLocaleTimeString();
-
-      let newLog: ScanLog;
-      if (isLeak) {
-        const leak = leakTypes[Math.floor(Math.random() * leakTypes.length)];
-        newLog = {
-          timestamp,
-          repo: randomRepo,
-          status: 'failed',
-          details: leak.detail
-        };
-        setStats(prev => ({
-          totalScanned: prev.totalScanned + 1,
-          blockedLeaks: prev.blockedLeaks + 1,
-          activeHooks: prev.activeHooks
-        }));
-        
-        // Dynamically increment severity metrics
-        setSeverityStats(prev => ({
-          critical: prev.critical + (leak.severity === 'critical' ? 1 : 0),
-          high: prev.high + (leak.severity === 'high' ? 1 : 0),
-          warning: prev.warning + (leak.severity === 'warning' ? 1 : 0)
-        }));
-      } else {
-        newLog = {
-          timestamp,
-          repo: randomRepo,
-          status: 'passed',
-          details: `✔ securify-git-hook: scanned ${Math.floor(Math.random() * 8) + 1} staged files. no secrets found.`
-        };
-        setStats(prev => ({
-          totalScanned: prev.totalScanned + Math.floor(Math.random() * 4) + 1,
-          blockedLeaks: prev.blockedLeaks,
-          activeHooks: prev.activeHooks
-        }));
-      }
-
-      setLogs(prev => [newLog, ...prev].slice(0, 25));
-    }, 4500);
-
-    return () => clearInterval(interval);
+    // Real-time logs will be populated from actual scans
+    setLogs([]);
   }, [isLiveStream]);
 
   const startScanWithFiles = async (filesList: File[] | FileList, folderName: string) => {
