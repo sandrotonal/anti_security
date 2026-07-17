@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ViewType } from './SecurifyNavbar';
+import { trackEvent } from '../lib/analytics';
 
 type BillingPeriod = 'monthly' | 'yearly';
 
@@ -191,9 +192,11 @@ export const SecurifyPricing = ({ onPurchase, onViewChange }: PricingProps) => {
       return;
     }
     if (plan.id === 'enterprise') {
+      trackEvent('checkout_started', { plan_id: plan.id, plan_name: plan.name, billing_period: billing });
       window.location.href = 'mailto:sales@gucluyumhe.dev?subject=Securify Enterprise Plan Interest';
       return;
     }
+    trackEvent('checkout_started', { plan_id: plan.id, plan_name: plan.name, billing_period: billing });
     onPurchase(plan.id, plan.name, billing);
   };
 

@@ -152,7 +152,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
       case 'scan':
         output = `[info] scanning git repository...
 [info] 12 files verified in 14ms
-[success] 0 leaks found. codebase is secure! 🔒`;
+[success] 0 leaks found. codebase is secure!`;
         break;
       case 'bypass':
         output = `to ignore a false positive detection, append:

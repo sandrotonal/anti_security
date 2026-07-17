@@ -580,7 +580,7 @@ function App() {
       <main className="transition-all duration-300">
         {activeView === 'home' && (
           <div className="animate-page-entrance">
-            <SecurifyHero />
+            <SecurifyHero onViewChange={setActiveView} />
             <SecurifyTrust />
             <div className="relative z-10 bg-black">
               <SecurifySimulator />
