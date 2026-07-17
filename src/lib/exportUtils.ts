@@ -85,7 +85,7 @@ export function exportAsSARIF(data: ExportData): void {
             rules: generateSARIFRules(data.findings)
           }
         },
-        results: data.findings.map((f, idx) => ({
+        results: data.findings.map((f) => ({
           ruleId: `securify-${f.type.toLowerCase().replace(/\s+/g, '-')}`,
           level: mapSeverityToSARIF(f.severity),
           message: {

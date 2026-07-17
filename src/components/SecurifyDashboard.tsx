@@ -3,9 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { GlowCard } from './GlowCard';
 import { trackEvent } from '../lib/analytics';
 import { scanContent } from '../lib/scanEngine';
-import { exportAsJSON, exportAsCSV, exportAsSARIF, exportAsMarkdown, type ExportData } from '../lib/exportUtils';
-import { filterFindings, calculateStats, type FilterOptions } from '../lib/filterUtils';
-import { saveScanHistory, getScanHistory } from '../lib/storage';
+
 
 
 interface Finding {

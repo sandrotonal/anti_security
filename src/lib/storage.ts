@@ -35,7 +35,7 @@ interface IgnoredFindingRecord {
   ignoredAt: number;
 }
 
-interface UserPreferences {
+export interface UserPreferences {
   theme?: string;
   autoScan?: boolean;
   notifications?: boolean;
@@ -262,7 +262,7 @@ export async function clearExpiredCache(): Promise<number> {
 }
 
 // Ignored Findings Operations
-export async function ignoreF inding(
+export async function ignoreFinding(
   file: string,
   line: number,
   type: string,

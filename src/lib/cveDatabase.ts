@@ -215,7 +215,7 @@ function extractGHFixedVersion(vulnerabilities: any[]): string | undefined {
   return vulnerabilities.find((v: any) => v.patched_versions)?.patched_versions;
 }
 
-function isVersionAffected(version: string, range: string): boolean {
+function isVersionAffected(_version: string, range: string): boolean {
   // Simplified version check - in production use semver library
   if (!range) return false;
   // This is a placeholder - real implementation needs semver comparison

@@ -1,7 +1,8 @@
 // Real Scanning Web Worker - No Mock Data
 // Professional multi-threaded scanning engine
 
-import { scanContent, ScanResult } from '../lib/scanEngine';
+import { scanContent } from '../lib/scanEngine';
+import type { ScanResult } from '../lib/scanEngine';
 
 export interface WorkerMessage {
   action: 'scan' | 'scanMultiple' | 'cancel';

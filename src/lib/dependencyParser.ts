@@ -1,7 +1,7 @@
 // Real Dependency Parser - No Mock Data
 // Parses manifest files and extracts real dependencies
 
-import { PackageVersion } from './cveDatabase';
+import type { PackageVersion } from './cveDatabase';
 
 export interface ParsedDependency {
   name: string;
