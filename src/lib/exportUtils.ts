@@ -1,0 +1,212 @@
+// Export Utilities - JSON, CSV, SARIF formats
+// Browser-based export, no backend required
+
+export interface ExportData {
+  metadata: {
+    timestamp: string;
+    scanType: 'local' | 'github' | 'website';
+    repoName?: string;
+    repoUrl?: string;
+    totalFiles?: number;
+    duration?: number;
+  };
+  findings: Array<{
+    file: string;
+    line: number;
+    column?: number;
+    type: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    match: string;
+    description: string;
+  }>;
+  summary: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+}
+
+// Export as JSON
+export function exportAsJSON(data: ExportData): void {
+  const jsonStr = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `securify-scan-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Export as CSV
+export function exportAsCSV(data: ExportData): void {
+  const headers = ['File', 'Line', 'Severity', 'Type', 'Match', 'Description'];
+  const rows = data.findings.map(f => [
+    f.file,
+    f.line.toString(),
+    f.severity,
+    f.type,
+    `"${f.match.replace(/"/g, '""')}"`,
+    `"${f.description.replace(/"/g, '""')}"`
+  ]);
+
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `securify-scan-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Export as SARIF (GitHub Code Scanning format)
+export function exportAsSARIF(data: ExportData): void {
+  const sarif = {
+    version: '2.1.0',
+    $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'Securify',
+            version: '1.0.0',
+            informationUri: 'https://securify.dev',
+            rules: generateSARIFRules(data.findings)
+          }
+        },
+        results: data.findings.map((f, idx) => ({
+          ruleId: `securify-${f.type.toLowerCase().replace(/\s+/g, '-')}`,
+          level: mapSeverityToSARIF(f.severity),
+          message: {
+            text: f.description
+          },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: {
+                  uri: f.file
+                },
+                region: {
+                  startLine: f.line,
+                  startColumn: f.column || 1
+                }
+              }
+            }
+          ]
+        }))
+      }
+    ]
+  };
+
+  const jsonStr = JSON.stringify(sarif, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `securify-scan-${Date.now()}.sarif`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generateSARIFRules(findings: ExportData['findings']): any[] {
+  const uniqueTypes = [...new Set(findings.map(f => f.type))];
+  return uniqueTypes.map(type => ({
+    id: `securify-${type.toLowerCase().replace(/\s+/g, '-')}`,
+    name: type,
+    shortDescription: {
+      text: `Detected ${type}`
+    },
+    fullDescription: {
+      text: `Security vulnerability: ${type} detected in source code`
+    },
+    help: {
+      text: 'Remove or secure this credential immediately'
+    },
+    properties: {
+      tags: ['security', 'secret-scanning']
+    }
+  }));
+}
+
+function mapSeverityToSARIF(severity: string): string {
+  switch (severity) {
+    case 'critical': return 'error';
+    case 'high': return 'error';
+    case 'medium': return 'warning';
+    case 'low': return 'note';
+    default: return 'warning';
+  }
+}
+
+// Export as Markdown Report
+export function exportAsMarkdown(data: ExportData): void {
+  const md = `# Securify Security Scan Report
+
+**Scan Date:** ${new Date(data.metadata.timestamp).toLocaleString()}
+**Scan Type:** ${data.metadata.scanType}
+${data.metadata.repoName ? `**Repository:** ${data.metadata.repoName}` : ''}
+${data.metadata.repoUrl ? `**URL:** ${data.metadata.repoUrl}` : ''}
+
+## Summary
+
+- **Total Findings:** ${data.summary.total}
+- **Critical:** ${data.summary.critical}
+- **High:** ${data.summary.high}
+- **Medium:** ${data.summary.medium}
+- **Low:** ${data.summary.low}
+
+## Findings
+
+${data.findings.map((f, idx) => `### ${idx + 1}. ${f.type} (${f.severity.toUpperCase()})
+
+- **File:** \`${f.file}\`
+- **Line:** ${f.line}
+- **Description:** ${f.description}
+- **Match:** \`${f.match}\`
+
+`).join('\n')}
+
+---
+*Generated by Securify - Professional Security Scanner*
+`;
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `securify-scan-${Date.now()}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Copy to clipboard
+export async function copyToClipboard(data: ExportData, format: 'json' | 'text'): Promise<void> {
+  let content: string;
+  
+  if (format === 'json') {
+    content = JSON.stringify(data, null, 2);
+  } else {
+    content = `Securify Scan Results
+Total: ${data.summary.total} findings
+Critical: ${data.summary.critical} | High: ${data.summary.high} | Medium: ${data.summary.medium} | Low: ${data.summary.low}
+
+${data.findings.map((f, idx) => `${idx + 1}. ${f.type} (${f.severity}) - ${f.file}:${f.line}`).join('\n')}`;
+  }
+
+  await navigator.clipboard.writeText(content);
+}
