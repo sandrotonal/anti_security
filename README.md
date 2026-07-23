@@ -5,6 +5,8 @@ Securify, kod tabanlarındaki hassas veri sızıntılarını (API anahtarları, 
 Yazılım hem bir komut satırı arayüzü (CLI) hem de gelişmiş bir web uygulamasından oluşur. Kod analizi, güvenlik taraması ve harici entegrasyonlar tamamen tarayıcı üzerinde ve yerel makinede çalışacak şekilde yapılandırılmıştır.
 
 ---
+<img width="1919" height="861" alt="image" src="https://github.com/user-attachments/assets/6860a7c9-58f0-4886-ba73-a8fa8266cc1a" />
+
 
 ## Mimari Prensipler ve Güvenlik Tasarımı
 
