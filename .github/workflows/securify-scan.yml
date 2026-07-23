@@ -1,0 +1,176 @@
+name: Securify Security Scan
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  securify-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g securify-scanner || echo "Installing from source"
+      
+      - name: Run Securify Scanner
+        id: scan
+        run: |
+          # Create scan results directory
+          mkdir -p scan-results
+          
+          # Run real scan with our engine
+          node -e "
+          const { scanContent } = require('./dist/lib/scanEngine.js');
+          const fs = require('fs');
+          const path = require('path');
+          const glob = require('glob');
+          
+          // Scan all source files
+          const files = glob.sync('**/*.{js,ts,jsx,tsx,py,go,java,rb,php,env,yml,yaml,json}', {
+            ignore: ['node_modules/**', 'dist/**', '.git/**']
+          });
+          
+          let allFindings = [];
+          let stats = { critical: 0, high: 0, medium: 0, low: 0 };
+          
+          files.forEach(file => {
+            const content = fs.readFileSync(file, 'utf-8');
+            const results = scanContent(content, file);
+            allFindings = allFindings.concat(results);
+            
+            results.forEach(r => {
+              if (r.severity === 'critical') stats.critical++;
+              else if (r.severity === 'high') stats.high++;
+              else if (r.severity === 'medium') stats.medium++;
+              else if (r.severity === 'low') stats.low++;
+            });
+          });
+          
+          // Write results
+          fs.writeFileSync('scan-results/findings.json', JSON.stringify(allFindings, null, 2));
+          fs.writeFileSync('scan-results/stats.json', JSON.stringify(stats, null, 2));
+          
+          // Output for GitHub Actions
+          console.log('SCAN_TOTAL=' + allFindings.length);
+          console.log('SCAN_CRITICAL=' + stats.critical);
+          console.log('SCAN_HIGH=' + stats.high);
+          
+          // Exit with error if critical/high findings
+          if (stats.critical > 0 || stats.high > 0) {
+            process.exit(1);
+          }
+          "
+        continue-on-error: true
+      
+      - name: Generate SARIF Report
+        if: always()
+        run: |
+          node -e "
+          const fs = require('fs');
+          const findings = JSON.parse(fs.readFileSync('scan-results/findings.json', 'utf-8'));
+          
+          const sarif = {
+            version: '2.1.0',
+            runs: [{
+              tool: {
+                driver: {
+                  name: 'Securify',
+                  version: '1.0.0',
+                  informationUri: 'https://github.com/${{ github.repository }}',
+                  rules: []
+                }
+              },
+              results: findings.map(f => ({
+                ruleId: f.type.toLowerCase().replace(/\\s+/g, '-'),
+                level: f.severity === 'critical' || f.severity === 'high' ? 'error' : 'warning',
+                message: { text: f.description },
+                locations: [{
+                  physicalLocation: {
+                    artifactLocation: { uri: f.file },
+                    region: { startLine: f.line }
+                  }
+                }]
+              }))
+            }]
+          };
+          
+          fs.writeFileSync('scan-results/securify.sarif', JSON.stringify(sarif, null, 2));
+          "
+      
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scan-results/securify.sarif
+          category: securify-secrets
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const stats = JSON.parse(fs.readFileSync('scan-results/stats.json', 'utf-8'));
+            const findings = JSON.parse(fs.readFileSync('scan-results/findings.json', 'utf-8'));
+            
+            const total = stats.critical + stats.high + stats.medium + stats.low;
+            const status = (stats.critical > 0 || stats.high > 0) ? '❌' : '✅';
+            
+            let comment = `## ${status} Securify Security Scan Results\\n\\n`;
+            comment += `**Total Findings:** ${total}\\n`;
+            comment += `- 🔴 Critical: ${stats.critical}\\n`;
+            comment += `- 🟠 High: ${stats.high}\\n`;
+            comment += `- 🟡 Medium: ${stats.medium}\\n`;
+            comment += `- 🔵 Low: ${stats.low}\\n\\n`;
+            
+            if (total > 0) {
+              comment += `### Top Findings:\\n`;
+              findings.slice(0, 5).forEach(f => {
+                comment += `- **${f.type}** in \`${f.file}:${f.line}\`\\n`;
+              });
+            } else {
+              comment += `✅ No secrets detected! Your code is secure.\\n`;
+            }
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+      
+      - name: Upload Results Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securify-scan-results
+          path: scan-results/
+          retention-days: 30
+      
+      - name: Fail if Critical/High Findings
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::error::Critical or High severity secrets detected!"
+          exit 1
