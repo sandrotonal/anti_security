@@ -63,14 +63,15 @@
   will-change: transform, opacity;
 }
 
-/* Hide iOS Safari and Chrome native play button overlay on video */
-video::-webkit-media-controls-start-playback-button {
-  display: none !important;
-  -webkit-appearance: none;
-}
-
+/* Hide iOS Safari, Chrome, and Edge native play button overlay on video */
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-overlay-play-button,
+video::-webkit-media-controls-enclosure,
 video::-webkit-media-controls {
   display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 video::-webkit-media-controls-panel {

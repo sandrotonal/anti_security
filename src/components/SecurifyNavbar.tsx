@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type ViewType = 'home' | 'rules' | 'dashboard' | 'sandbox' | 'install' | 'contact' | 'auditor' | 'pricing';
+export type ViewType = 'home' | 'rules' | 'dashboard' | 'analytics' | 'integrations' | 'sandbox' | 'install' | 'contact' | 'auditor' | 'pricing';
 
 interface NavbarProps {
   activeView: ViewType;
@@ -223,7 +223,6 @@ export const SecurifyNavbar = ({
                 </svg>
               </button>
             )}
-
             {githubUser ? (
               <div className="relative">
                 <button
@@ -259,36 +258,20 @@ export const SecurifyNavbar = ({
                         </div>
                       )}
                     </div>
-
-                    <div className="h-px bg-white/5 my-1.5" />
-
-                    {!premiumStatus?.valid && onRestoreSubscription && (
+                    <div className="border-t border-white/5 mt-1 pt-1">
                       <button
                         onClick={() => {
                           setIsDropdownOpen(false);
-                          onRestoreSubscription();
+                          onGithubLogout();
                         }}
-                        className="w-full text-left text-neutral-400 hover:text-white hover:bg-white/5 px-3 py-2.5 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2.5 mb-1"
+                        className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-white/5 rounded-xl font-mono transition-colors lowercase flex items-center justify-between"
                       >
-                        <svg className="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        disconnect
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
-                        restore sub
                       </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        onGithubLogout();
-                      }}
-                      className="w-full text-left text-neutral-400 hover:text-red-450 hover:bg-red-950/20 px-3 py-2.5 rounded-xl text-xs font-mono lowercase transition-colors flex items-center gap-2.5"
-                    >
-                      <svg className="w-3.5 h-3.5 text-neutral-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                      </svg>
-                      disconnect
-                    </button>
+                    </div>
                   </div>
                 )}
               </div>

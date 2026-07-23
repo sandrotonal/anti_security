@@ -27,6 +27,15 @@ export const EnterpriseAnalytics = () => {
 
   useEffect(() => {
     loadAnalytics();
+
+    const handleScanCompleted = () => {
+      loadAnalytics();
+    };
+
+    window.addEventListener('securify_scan_completed', handleScanCompleted);
+    return () => {
+      window.removeEventListener('securify_scan_completed', handleScanCompleted);
+    };
   }, [timeRange]);
 
   const loadAnalytics = async () => {

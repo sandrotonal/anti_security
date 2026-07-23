@@ -26,13 +26,14 @@ import { SecurifyAuditor } from './components/SecurifyAuditor';
 import { SecurifyPricing } from './components/SecurifyPricing';
 import { SecurifyHomeScanner } from './components/SecurifyHomeScanner';
 import { SubscriptionRestoreModal } from './components/SubscriptionRestoreModal';
+import { EnterpriseAnalytics } from './components/EnterpriseAnalytics';
 
 function App() {
   const paddleInitializedRef = useRef<boolean>(false);
   const [activeView, setActiveView] = useState<ViewType>(() => {
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view') as ViewType;
-    const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
+    const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'analytics', 'integrations', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
     if (viewParam && validViews.includes(viewParam)) {
       return viewParam;
     }
@@ -619,6 +620,18 @@ function App() {
               initialWebsiteUrl={initialWebsiteUrl}
               onClearInitialWebsiteUrl={() => setInitialWebsiteUrl('')}
             />
+          </div>
+        )}
+
+        {activeView === 'analytics' && (
+          <div className="animate-page-entrance max-w-7xl mx-auto px-6 py-28">
+            <EnterpriseAnalytics />
+          </div>
+        )}
+
+        {activeView === 'integrations' && (
+          <div className="animate-page-entrance">
+            <SecurifyIntegrations />
           </div>
         )}
 

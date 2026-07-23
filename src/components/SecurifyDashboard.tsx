@@ -3,6 +3,8 @@ import { Sparkles } from 'lucide-react';
 import { GlowCard } from './GlowCard';
 import { trackEvent } from '../lib/analytics';
 import { scanContent } from '../lib/scanEngine';
+import { EnterpriseAnalytics } from './EnterpriseAnalytics';
+import { saveScanHistory } from '../lib/storage';
 
 
 
@@ -1640,10 +1642,26 @@ export const SecurifyDashboard = ({
       });
     }
 
-    // Increment sync count
-    const newCount = githubSyncCount + 1;
-    setGithubSyncCount(newCount);
-    localStorage.setItem('securify_usage_github', newCount.toString());
+    // Save GitHub scan record into IndexedDB for persistent Enterprise Analytics
+    try {
+      await saveScanHistory({
+        timestamp: Date.now(),
+        repoName: repoName,
+        scanType: 'github',
+        findings: leaksFound,
+        severity: {
+          critical: localSeverity.critical,
+          high: localSeverity.high,
+          medium: localSeverity.warning,
+          low: 0
+        },
+        results: repoFindings,
+        duration: 4200
+      });
+      window.dispatchEvent(new CustomEvent('securify_scan_completed'));
+    } catch (e) {
+      console.error('Failed to persist GitHub scan history:', e);
+    }
 
     setLogs(prev => [...tempLogs, ...prev]);
     setScanning(false);
@@ -2075,6 +2093,27 @@ export const SecurifyDashboard = ({
         high_count: localSeverity.high,
         warning_count: localSeverity.warning
       });
+    }
+
+    // Save local scan record into IndexedDB for persistent Enterprise Analytics
+    try {
+      await saveScanHistory({
+        timestamp: Date.now(),
+        repoName: folderName,
+        scanType: 'local',
+        findings: leaksFound,
+        severity: {
+          critical: localSeverity.critical,
+          high: localSeverity.high,
+          medium: localSeverity.warning,
+          low: 0
+        },
+        results: tempLogs,
+        duration: durationMs
+      });
+      window.dispatchEvent(new CustomEvent('securify_scan_completed'));
+    } catch (e) {
+      console.error('Failed to persist local scan history:', e);
     }
 
     setLogs(tempLogs);
@@ -2546,6 +2585,11 @@ Report generated cryptographically via Securify SaaS platform.
             </div>
           </div>
         )}
+
+        {/* Enterprise Security Analytics Dashboard */}
+        <div className="mb-12 print:hidden">
+          <EnterpriseAnalytics />
+        </div>
 
         {/* Real Scan Control Banner with Tabs */}
         <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl mb-8 overflow-hidden print:hidden">

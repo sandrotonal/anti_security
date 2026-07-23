@@ -285,3 +285,53 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string; bran
     return null;
   }
 }
+
+// Validate GitHub token type (Classic vs Fine-Grained)
+export function validateGitHubToken(token: string): { isValid: boolean; type?: 'classic' | 'fine-grained' | 'oauth' | 'app' } {
+  if (!token || typeof token !== 'string') return { isValid: false };
+  const trimmed = token.trim();
+  
+  if (trimmed.startsWith('github_pat_')) {
+    return { isValid: true, type: 'fine-grained' };
+  }
+  if (trimmed.startsWith('ghp_')) {
+    return { isValid: true, type: 'classic' };
+  }
+  if (trimmed.startsWith('gho_')) {
+    return { isValid: true, type: 'oauth' };
+  }
+  if (trimmed.startsWith('ghu_') || trimmed.startsWith('ghs_')) {
+    return { isValid: true, type: 'app' };
+  }
+  // Generic length check for older legacy tokens
+  if (trimmed.length === 40 && /^[a-f0-9]+$/i.test(trimmed)) {
+    return { isValid: true, type: 'classic' };
+  }
+  
+  return { isValid: false };
+}
+
+// Generate GitHub Pull Request Comment Payload in Markdown
+export function generatePRCommentPayload(findings: Array<{ file: string; line: number; type: string; severity: string; description: string; redacted: string }>, repoName: string): string {
+  if (!findings || findings.length === 0) {
+    return `### 🛡️ Securify Security Check: PASSED\n\nNo secret leaks or credentials were detected in this Pull Request for **${repoName}**. All clean!`;
+  }
+
+  let body = `### ⚠️ Securify Security Guard: Action Required\n\n`;
+  body += `Securify detected **${findings.length} potential secret leak(s)** in repository **${repoName}**:\n\n`;
+  body += `| Severity | Type | File & Line | Redacted Match |\n`;
+  body += `| :--- | :--- | :--- | :--- |\n`;
+
+  findings.slice(0, 15).forEach(f => {
+    const badge = f.severity === 'critical' ? '🔴 CRITICAL' : f.severity === 'high' ? '🟠 HIGH' : '🟡 MEDIUM';
+    body += `| ${badge} | **${f.type}** | \`${f.file}:${f.line}\` | \`${f.redacted}\` |\n`;
+  });
+
+  if (findings.length > 15) {
+    body += `\n*...and ${findings.length - 15} more finding(s) omitted for brevity.*\n`;
+  }
+
+  body += `\n> **Remediation Tip:** Revoke any leaked credentials immediately and rotate secret keys before merging this branch.`;
+  return body;
+}
+
