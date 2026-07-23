@@ -2,7 +2,7 @@
 // Real-time statistics, trends, and insights for teams
 // No mock data - all real calculations
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { DonutChart, SeverityChart } from './Charts';
 import { getScanHistory } from '../lib/storage';
 
@@ -105,7 +105,6 @@ export const EnterpriseAnalytics = () => {
 
       // Calculate security score (0-100)
       const totalScansCount = recentScans.length;
-      const avgFindingsPerScan = totalFindings / totalScansCount;
       const criticalWeight = criticalCount * 10;
       const highWeight = highCount * 5;
       const mediumWeight = mediumCount * 2;

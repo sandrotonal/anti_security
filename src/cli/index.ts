@@ -3,13 +3,11 @@
 // Securify CLI - Real Security Scanner
 // No mock data - production-ready tool
 
-import { scanContent, SECRET_PATTERNS, calculateEntropy } from '../lib/scanEngine';
+import { scanContent } from '../lib/scanEngine';
 import { parseDependencyFile } from '../lib/dependencyParser';
 import { batchQueryVulnerabilities } from '../lib/cveDatabase';
-import { exportAsJSON, exportAsSARIF, exportAsMarkdown } from '../lib/exportUtils';
 import * as fs from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
 
 interface CLIOptions {
   path?: string;
@@ -114,25 +112,55 @@ FEATURES:
 `);
 }
 
+// Native recursive directory scanner
+function getFilesRecursive(dir: string, ignorePatterns: string[]): string[] {
+  let results: string[] = [];
+  if (!fs.existsSync(dir)) return [];
+  
+  const list = fs.readdirSync(dir);
+  for (const file of list) {
+    const filePath = path.resolve(dir, file);
+    const stat = fs.statSync(filePath);
+    
+    // Check if path matches any ignore patterns
+    const isIgnored = ignorePatterns.some(pattern => {
+      const cleanPattern = pattern
+        .replace(/^\*\*\//, '')
+        .replace(/\/\*\*$/, '')
+        .replace(/\*/g, '');
+      if (!cleanPattern) return false;
+      return file === cleanPattern || filePath.includes(cleanPattern);
+    });
+    
+    if (isIgnored) continue;
+    
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getFilesRecursive(filePath, ignorePatterns));
+    } else {
+      const ext = path.extname(file).toLowerCase();
+      const isEnvFile = file.startsWith('.env');
+      const validExtensions = [
+        '.js', '.ts', '.jsx', '.tsx',
+        '.py', '.go', '.java', '.rb', '.php',
+        '.yml', '.yaml', '.json',
+        '.sh', '.bash', '.conf', '.config'
+      ];
+      if (validExtensions.includes(ext) || isEnvFile) {
+        results.push(filePath);
+      }
+    }
+  }
+  return results;
+}
+
 // Scan files in directory
 async function scanDirectory(dirPath: string, options: CLIOptions): Promise<any[]> {
-  const patterns = [
-    '**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx',
-    '**/*.py', '**/*.go', '**/*.java', '**/*.rb', '**/*.php',
-    '**/*.env*', '**/*.yml', '**/*.yaml', '**/*.json',
-    '**/*.sh', '**/*.bash', '**/*.conf', '**/*.config'
-  ];
-
   const ignore = options.exclude || [];
   if (!options.includeTests) {
     ignore.push('**/*.test.*', '**/*.spec.*', '**/test/**', '**/tests/**');
   }
 
-  const files = await glob(patterns, {
-    cwd: dirPath,
-    ignore,
-    absolute: true,
-  });
+  const files = getFilesRecursive(dirPath, ignore);
 
   if (options.verbose) {
     console.log(`Found ${files.length} files to scan`);
