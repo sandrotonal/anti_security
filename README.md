@@ -20,6 +20,9 @@ Securify, OWASP Top 10 güvenlik standartlarına ve sıfır bilgi (Zero-Knowledg
 
 ---
 
+<img width="1919" height="921" alt="image" src="https://github.com/user-attachments/assets/564f2526-b2a0-4f9f-abc1-846b669eae44" />
+
+
 ## Temel Özellikler ve Modüller
 
 ### 1. Gerçek Zamanlı CVE Veritabanı Entegrasyonu
@@ -51,6 +54,8 @@ Aşağıdaki manifest dosyalarını yerel olarak ayrıştırarak kütüphane ad�
 - Paddle entegrasyonu ve abonelik durumu kaybolduğunda geri yükleme sağlayan doğrulama mekanizması.
 
 ---
+<img width="1916" height="920" alt="image" src="https://github.com/user-attachments/assets/c1477a2d-e302-43cd-b257-e089f49c139f" />
+
 
 ## Proje Dizini Yapısı
 
