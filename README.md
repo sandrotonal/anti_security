@@ -1,37 +1,107 @@
 # Securify
 
-<p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-black?style=flat-round" alt="License" />
-  <img src="https://img.shields.io/badge/version-1.0.0-black?style=flat-round" alt="Version" />
-  <img src="https://img.shields.io/badge/platform-Vite%20%7C%20React%20%7C%20Tailwind-blue?style=flat-round" alt="Platform" />
-  <img src="https://img.shields.io/badge/CLI-Rust-orange?style=flat-round" alt="CLI" />
-</p>
+Securify, kod tabanlarındaki hassas veri sızıntılarını (API anahtarları, veri tabanı kimlik bilgileri, bulut erişim tokenları) yerel makinede tespit eden, güvenlik odaklı bir istemci taraflı statik kod analiz ve bağımlılık denetleme yazılımıdır. 
 
-**Securify** is a client-side credential leak detection suite. It scans codebases for API keys, database credentials, and cloud tokens before they reach production — all running locally on your machine.
+Yazılım hem bir komut satırı arayüzü (CLI) hem de gelişmiş bir web uygulamasından oluşur. Kod analizi, güvenlik taraması ve harici entegrasyonlar tamamen tarayıcı üzerinde ve yerel makinede çalışacak şekilde yapılandırılmıştır.
 
 ---
 
-## Core Features & Web Application
+## Mimari Prensipler ve Güvenlik Tasarımı
 
-The interactive web interface features a premium dark-mode developer experience, optimized for speed, clarity, and product-led growth (PLG):
+Securify, OWASP Top 10 güvenlik standartlarına ve sıfır bilgi (Zero-Knowledge) prensibine uygun olarak tasarlanmıştır:
 
-- **Interactive Sandbox & Git Pre-Commit Simulator** — Test core rules on standard code templates. Includes a 3-step visual stepper (`01 choose/edit code`, `02 trigger git commit`, `03 auto-fix credentials`), file-type tab icons (TS, Py, JSON, Go, YAML, Env), and semantic color-coded CLI status consoles (red for blocked, green for passed, yellow for bypassed).
-- **Background Web Worker Scanning Engine** — Offloads folder audits to a concurrent pool of up to 8 Web Workers, preventing main browser thread freezes during large directory scans.
-- **Active Token Verification Serverless API** — Securely checks whether flagged credentials (Stripe, GitHub PAT, AWS, GCP, Supabase, Slack Webhooks) are active or revoked in real-time by querying provider endpoints via `/api/verify-secret.ts`.
-- **One-Click PLG Evaluation (Demo Project)** — Simulates staging scans with pre-configured mock credentials in the browser, showing the Web Worker scanning and active validation badges instantly.
-- **Interactive Sandbox & CSPRNG Generator** — Generate cryptographically secure secrets with configurable lengths, character sets, and custom signature prefixes. Includes real-time Shannon Entropy computation and brute-force cracking estimates.
-- **Custom Rule Tester & YAML Generator** — Test custom regular expressions against code payloads. Validates regex syntax and generates `.securify.toml` rule configurations.
-- **Signature Database (Rules Reference)** — Browse built-in security signatures with remediation guides and emergency rotation steps.
-- **Dashboard Onboarding & Ignore Glob Parser** — Visually guides new users with an onboarding banner. The folder scanner automatically parses `.gitignore` and `.securifyignore` configurations, dynamically converting glob rules to regex rules to skip files in Web Worker scans.
-- **CI/CD Pipeline Generator** — Visually construct workflow YAML configuration templates for GitHub Actions and GitLab CI/CD with customizable event triggers and branch targeting.
-- **Official Audit PDF Print Template** — Clean, high-contrast `@media print` CSS template optimized for printing official compliance reports directly from the browser (Ctrl+P / Save as PDF).
-- **Brand Integrations Marquee** — Sleek infinite scroll marquee containing authentic brand SVG icons (GitHub, AWS, Supabase, Stripe, Slack, Vercel, GitLab, GCP, PostgreSQL) with interactive brand-specific neon drop-shadows and hover animations.
+1. **Sıfır Bilgi Tabanlı Kod Analizi (Zero-Knowledge Analysis):** Taranan kaynak kodlar hiçbir şekilde uzak sunuculara gönderilmez. Düzenli ifade (regex) taramaları ve Shannon Entropi hesaplamaları tamamen kullanıcının tarayıcısında (Web Workers aracılığıyla) veya yerel CLI üzerinde gerçekleştirilir.
+2. **Aktif Doğrulama Güvenliği (Active Token Verification):** Tespit edilen gizli anahtarların aktif olup olmadığını sorgulamak için tasarlanan sunucusuz işlevler (/api/verify-secret.ts), ilgili anahtarı doğrudan sağlayıcının (Stripe, AWS, GitHub vb.) resmi API uç noktalarıyla sunucu tarafında güvenli bir şekilde eşleştirir. Bu sayede tarayıcı tarafına hassas istemci sırları sızdırılmaz.
+3. **SSRF (Server-Side Request Forgery) Koruması:** Web sitesi tarayıcısı API'si, hedef alan adlarını çözümlemek için dinamik DNS çözümlemesi uygular. Loopback (127.0.0.1, ::1) ve RFC 1918 kapsamındaki özel IP aralıklarına yapılan istekleri engelleyerek iç ağ taraması saldırılarını engeller.
+4. **Kriptografik İşlem Doğrulama (Shopier Integration):** Tüm ödeme ve abonelik onay süreçleri HMAC-SHA256 imzaları ile güvence altına alınmıştır. Webhook geri çağrıları, sağlayıcının gizli token değeriyle doğrulanarak sahte sipariş onaylarının önüne geçilir.
+5. **Erişim Kontrolü ve JWT:** Hesap doğrulama ve oturum yönetimi, sunucu tarafında oluşturulan kriptografik JWT (JSON Web Token) yapılarını kullanır.
 
 ---
 
-## CLI Installation
+## Temel Özellikler ve Modüller
 
-### Cargo
+### 1. Gerçek Zamanlı CVE Veritabanı Entegrasyonu
+- OSV.dev ve GitHub Advisory API'leri ile doğrudan entegrasyon.
+- Projedeki bağımlılıkların güvenlik açıklarını paralel sorgularla (10'lu paketler halinde) analiz eden mekanizma.
+- Farklı veri tabanlarından dönen açıkların çakışmasını engelleyen tekilleştirme ve önceliklendirme algoritması.
+
+### 2. Çoklu Dil Bağımlılık Ayrıştırıcısı (Dependency Parser)
+Aşağıdaki manifest dosyalarını yerel olarak ayrıştırarak kütüphane adı, sürüm ve ekosistem bilgisini çıkarır:
+- **npm / yarn / pnpm:** package.json
+- **Python pip / pipenv:** requirements.txt, Pipfile.lock
+- **Go Modules:** go.mod
+- **Rust Crates:** Cargo.toml
+- **Java Maven:** pom.xml
+- **PHP Composer:** composer.json
+- **Ruby:** Gemfile.lock
+
+### 3. Web Worker Tabanlı Eşzamanlı Tarama Motoru
+- Büyük dizinlerin taranması sırasında ana tarayıcı arayüzünün (main thread) kilitlenmesini önlemek için arka planda çalışan çoklu Web Worker yapısı.
+- Dizin taramalarında `.gitignore` ve `.securifyignore` kurallarını otomatik olarak Regex desenlerine dönüştürerek hariç tutulacak dosyaları süzebilen glob parser yapısı.
+
+### 4. Gelişmiş Şifreleme ve Entropi Analizi
+- Rastgele, kriptografik olarak güvenli (CSPRNG) gizli anahtar oluşturucu.
+- Parola ve anahtarların Shannon Entropi değerini hesaplayarak karmaşıklık analizi yapan araç.
+- Olası kaba kuvvet (brute-force) kırılma sürelerini hesaplayan tahminleme algoritması.
+
+### 5. Özelleştirilmiş Fiyatlandırma ve Performans Simülatörü
+- Kullanıcılara yerel taramanın hızını görselleştiren, kod tabanı boyutuna bağlı olarak yerel tarayıcı motoru ile bulut tabanlı tarayıcıların performansını karşılaştıran interaktif simülasyon aracı.
+- Paddle entegrasyonu ve abonelik durumu kaybolduğunda geri yükleme sağlayan doğrulama mekanizması.
+
+---
+
+## Proje Dizini Yapısı
+
+```
+/
+├── api/                  # Vercel Sunucusuz (Serverless) Fonksiyonları
+│   └── verify-secret.ts  # Aktif API anahtarı doğrulama servisi
+├── cli/                  # Rust CLI Kod Tabanı
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs       # CLI giriş noktası
+│       ├── scanner.rs    # Dosya tarama motoru
+│       ├── rules.rs      # Gizli veri tespit kuralları
+│       ├── entropy.rs    # Shannon entropi hesaplayıcısı
+│       ├── hook.rs       # Git commit hook yöneticisi
+│       ├── report.rs     # Rapor biçimlendirici
+│       └── config.rs     # TOML yapılandırma ayrıştırıcısı
+├── src/                  # React + TypeScript Frontend Uygulaması
+│   ├── components/       # Kullanıcı Arayüzü Bileşenleri
+│   ├── lib/              # Çekirdek Kütüphaneler (CVE, Analiz, Ayrıştırıcı vb.)
+│   ├── workers/          # Web Worker Tarama Motoru
+│   └── ...
+├── index.html
+├── package.json
+└── vite.config.ts
+```
+
+---
+
+## Kurulum ve Geliştirme Ortamı
+
+### İstemci Uygulaması (Frontend)
+
+Gerekli paketleri yüklemek için:
+```bash
+npm install
+```
+
+Yerel geliştirme sunucusunu başlatmak için:
+```bash
+npm run dev
+```
+
+Üretim derlemesi (Production build) almak için:
+```bash
+npm run build
+```
+
+---
+
+## CLI Kurulumu ve Kullanımı
+
+### Cargo (Rust)
 ```bash
 cargo install securify
 ```
@@ -41,90 +111,32 @@ cargo install securify
 npm install -g @securify/cli
 ```
 
-### Homebrew
+### Temel CLI Komutları
 ```bash
-brew install securify-cli/securify/securify
-```
-
-### From Source
-```bash
-git clone https://github.com/sandrotonal/anti_security
-cd anti_security/cli
-cargo build --release
-./target/release/securify --help
-```
-
----
-
-## CLI Usage
-
-```bash
-# Scan current directory
+# Bulunulan dizinde hassas veri taraması başlatır
 securify scan .
 
-# Scan with JSON output
+# Taramayı JSON formatında dışa aktarır
 securify scan ./src --format json
 
-# List all detection rules
-securify rules
-
-# Initialize git pre-commit hook
+# Git pre-commit kancasını aktif eder
 securify init-hook
 
-# Check entropy of a string
-securify entropy "sk_test_51N34ghJkL90AcdSfErtYuiOp"
+# Belirli bir dize için entropi analizi yapar
+securify entropy "sk_test_51N34ghJkL90"
 ```
 
 ---
 
-## Web App Development
+## Son Yapılan İyileştirmeler ve Hata Düzeltmeleri
 
-```bash
-npm install
-npm run dev
-```
-
----
-
-## Project Structure
-
-```
-/
-├── api/                  # Vercel serverless functions
-│   └── verify-secret.ts  # Active secret token verifier
-├── cli/                  # Rust CLI
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs       # CLI entry point
-│       ├── scanner.rs    # Scanning engine
-│       ├── rules.rs      # Detection rules
-│       ├── entropy.rs    # Shannon entropy calculator
-│       ├── hook.rs       # Git hook manager
-│       ├── report.rs     # Output formatter
-│       └── config.rs     # TOML config parser
-├── src/                  # React web app
-│   ├── components/       # UI components
-│   └── ...
-├── index.html
-├── package.json
-└── vite.config.ts
-```
+1. **Vite Runtime Import Hatalarının Çözümü:** İstemci tarafında yalnızca tip/arayüz olarak kullanılan `PackageVersion` gibi yapıların runtime modülü olarak algılanıp hata vermesini engellemek için tüm dosyalarda tip tanımlı import modeline (`import type`) geçilmiştir.
+2. **verbatimModuleSyntax ve Derleme Hataları:** TypeScript'in katı modül sözdizimi kuralları gereği oluşan derleme hataları temizlenmiştir. Web Worker ve analiz motorlarındaki tip dışa aktarımları standartlaştırılmıştır.
+3. **Kullanılmayan Kodların Temizlenmesi:** Proje genelindeki gereksiz import bildirimleri, kullanılmayan parametreler ve atıl kalmış arayüzler temizlenerek derleme süresi ve bundle boyutu optimize edilmiştir.
+4. **Syntax Hatalarının Çözümü:** `storage.ts` üzerinde yer alan yazım hataları düzeltilerek derleyicinin dosyayı sorunsuz işlemesi sağlanmıştır.
 
 ---
 
-## Security & Architecture Audit
-
-Securify is designed with a **Security-First** methodology, conforming to OWASP Top 10 guidelines and strict cryptographic validation patterns:
-
-1. **Zero-Knowledge Code Processing:** Your source code never leaves your local machine. Scanning, regular expression checks, and Shannon Entropy calculations run entirely client-side inside a secure browser context or via local CLI commands.
-2. **SSRF (Server-Side Request Forgery) Defenses:** The site auditor API ([scan-site.ts](api/scan-site.ts)) resolves target domains using dynamic DNS lookup and filters out all loopback (127.0.0.1, ::1) and private IP ranges (RFC 1918) before initiating requests, preventing internal network scanning exploits.
-3. **Active API Verification Endpoint:** The serverless active token verifier ([verify-secret.ts](api/verify-secret.ts)) securely queries third-party credential providers server-side to prevent exposing developer API keys or bypassing checks.
-4. **Payment Integrity & Cryptographic Validation:** All Shopier transactions are cryptographically signed. The checkout API ([create-checkout.ts](api/create-checkout.ts)) calculates HMAC-SHA256 signatures, and the webhook callback API ([shopier-callback.ts](api/shopier-callback.ts)) validates incoming payloads with the merchant `SHOPIER_WEBHOOK_TOKEN` to prevent fake order completion.
-5. **Access Control & Session Tokens:** Account activations utilize standard cryptographically signed JSON Web Tokens (JWT) signed with a securely generated `JWT_SECRET` environment variable, ensuring token integrity and preventing modification.
-6. **XSS & Injection Protection:** Output rendering is managed by React's native safe encoding layer, escaping potentially malicious strings.
-
----
-
-## License
+## Lisans
 
 MIT

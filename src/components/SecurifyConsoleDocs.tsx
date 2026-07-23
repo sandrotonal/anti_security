@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-type TerminalCommand = '--help' | 'rules' | 'bypass' | 'faq';
+type TerminalCommand = '--help' | 'rules' | 'bypass' | 'faq' | 'github-ci' | 'gitlab-ci' | 'bitbucket-ci' | 'circle-ci';
 
 export const SecurifyConsoleDocs = () => {
   const [activeCommand, setActiveCommand] = useState<TerminalCommand>('--help');
@@ -15,10 +15,14 @@ export const SecurifyConsoleDocs = () => {
   const [success, setSuccess] = useState<string>('');
 
   const docOutputs: Record<TerminalCommand, string> = {
-    '--help': `securify cli v2.4.0\n\nUsage:\n  securify [command] [flags]\n\nCommands:\n  scan       scan files or folder paths for exposed secrets\n  init-hook  generate pre-commit hook files inside .git/hooks\n  bypass     bypass pre-commit scanning check for specific hashes\n  rules      list active scanner detection templates\n\nFlags:\n  -h, --help      display help logs\n  -c, --config    path to securify.toml configuration file`,
+    '--help': `securify cli v2.4.0\n\nUsage:\n  securify [command] [flags]\n\nCommands:\n  scan          scan files or folder paths for exposed secrets\n  init-hook     generate pre-commit hook files inside .git/hooks\n  bypass        bypass pre-commit scanning check for specific hashes\n  rules         list active scanner detection templates\n  github-ci     output .github/workflows/securify.yml template\n  gitlab-ci     output .gitlab-ci.yml secret scanning pipeline\n  bitbucket-ci  output bitbucket-pipelines.yml configuration\n  circle-ci     output .circleci/config.yml audit workflow\n\nFlags:\n  -h, --help      display help logs\n  -c, --config    path to securify.toml configuration file`,
     'rules': `securify detection rules list:\n\n1. high-entropy-secrets (entropy threshold >4.5 bits)\n   matches database strings, private keys, jwt tokens\n\n2. provider-patterns (regex matching)\n   - aws-access-key-id: "AKIA[A-Z0-9]{16}"\n   - supabase-service-role: "eyJhbGciOiJIUzI1Ni..."\n   - stripe-secret-key: "sk_live_[a-zA-Z0-9]{24}"\n   - github-pat: "ghp_[a-zA-Z0-9]{36}"`,
     'bypass': `how to bypass pre-commit hooks for verified secrets:\n\n1. inline ignore comment:\n   add "# securify:ignore" at the end of the matching source line.\n\n2. secure bypass command:\n   $ securify bypass --commit-hash=b45fc29\n   (adds hash signature to .securify_bypass to skip next scan)`,
-    'faq': `frequently asked questions:\n\nQ: does securify upload my files to remote servers?\nA: no. scanning is 100% offline and runs on your local CPU. your credentials remain on your machine.\n\nQ: how fast is the scanning engine?\nA: written in Rust, it processes standard git staging pools in under 20ms.\n\nQ: is this tool free?\nA: yes. securify is licensed under the MIT open-source license and free forever.`
+    'faq': `frequently asked questions:\n\nQ: does securify upload my files to remote servers?\nA: no. scanning is 100% offline and runs on your local CPU. your credentials remain on your machine.\n\nQ: how fast is the scanning engine?\nA: written in Rust, it processes standard git staging pools in under 20ms.\n\nQ: is this tool free?\nA: yes. securify is licensed under the MIT open-source license and free forever.`,
+    'github-ci': `# .github/workflows/securify.yml\nname: Securify Secret Guard\non: [push, pull_request]\njobs:\n  security-audit:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Run Securify Local Scan\n        uses: securify-dev/action@v2\n        with:\n          fail_on_critical: true\n          output_format: sarif`,
+    'gitlab-ci': `# .gitlab-ci.yml\nsecurify_security_scan:\n  stage: test\n  image: securify/cli:latest\n  script:\n    - securify scan ./ --format json --output securify-report.json\n  artifacts:\n    reports:\n      secret_detection: securify-report.json`,
+    'bitbucket-ci': `# bitbucket-pipelines.yml\npipelines:\n  default:\n    - step:\n        name: Securify Security Check\n        image: securify/cli:latest\n        script:\n          - securify scan ./ -s high`,
+    'circle-ci': `# .circleci/config.yml\nversion: 2.1\njobs:\n  securify-audit:\n    docker:\n      - image: cimg/node:20.0\n    steps:\n      - checkout\n      - run: npx @securify/cli scan . --format sarif\nworkflows:\n  security:\n    jobs:\n      - securify-audit`
   };
 
   useEffect(() => {
@@ -66,7 +70,7 @@ export const SecurifyConsoleDocs = () => {
 
           {/* Preset CLI Buttons */}
           <div className="flex flex-wrap gap-2 py-2 select-none">
-            {(['--help', 'rules', 'bypass', 'faq'] as TerminalCommand[]).map((cmd) => (
+            {(['--help', 'rules', 'bypass', 'faq', 'github-ci', 'gitlab-ci', 'bitbucket-ci', 'circle-ci'] as TerminalCommand[]).map((cmd) => (
               <button
                 key={cmd}
                 onClick={() => !isTyping && setActiveCommand(cmd)}
