@@ -2,8 +2,6 @@
 // Real-time tutorial, guided tour, sample vulnerable code
 // Production-ready onboarding experience
 
-import { useState, useEffect } from 'react';
-
 export interface TourStep {
   id: string;
   target: string;

@@ -23,14 +23,14 @@ interface CommandHistoryItem {
 export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
   const [selectedPm, setSelectedPm] = useState<PackageManager>('npm');
   const [copied, setCopied] = useState<boolean>(false);
-  
+
   // Interactive Shell States
   const [inputText, setInputText] = useState<string>('');
   const [history, setHistory] = useState<CommandHistoryItem[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [rawHistory, setRawHistory] = useState<string[]>([]);
   const [themeColor, setThemeColor] = useState<string>('emerald'); // emerald, amber, cyan, white
-  
+
   const modalRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -126,7 +126,7 @@ export const TerminalModal = ({ isOpen, onClose }: TerminalModalProps) => {
     if (!trimmed) return;
 
     let output = '';
-    
+
     switch (trimmed) {
       case 'help':
       case '--help':
@@ -308,11 +308,10 @@ ${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
                   }
                 ]);
               }}
-              className={`px-4 py-2 text-xs font-mono border-r border-white/5 transition-all lowercase ${
-                selectedPm === pm
+              className={`px-4 py-2 text-xs font-mono border-r border-white/5 transition-all lowercase ${selectedPm === pm
                   ? 'bg-neutral-950 text-white font-medium border-t-2 border-t-white'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-900/30'
-              }`}
+                }`}
             >
               {pm}
             </button>
@@ -327,11 +326,10 @@ ${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
             </span>
             <button
               onClick={copyToClipboard}
-              className={`ml-4 px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                copied
+              className={`ml-4 px-3 py-1.5 rounded text-xs font-medium transition-all ${copied
                   ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-500/30'
                   : 'bg-white text-black hover:bg-neutral-200'
-              }`}
+                }`}
               aria-label="copy command"
             >
               {copied ? 'copied' : 'copy'}
@@ -340,7 +338,7 @@ ${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
 
           {/* Interactive Shell Output Simulation */}
           <div className="mt-4 bg-neutral-950 p-4 rounded-lg border border-white/5 min-h-[160px] max-h-[240px] overflow-y-auto font-mono text-[11px] md:text-xs leading-relaxed flex flex-col space-y-2">
-            
+
             {/* Command Logs history */}
             {history.map((item, idx) => (
               <div key={idx} className="space-y-1">
@@ -371,7 +369,7 @@ ${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
                 spellCheck={false}
               />
             </div>
-            
+
             <div ref={terminalEndRef} />
           </div>
         </div>
@@ -385,12 +383,11 @@ ${results.map(r => `  - ${r.type} at line ${r.line}`).join('\n')}
               <button
                 key={col}
                 onClick={() => setThemeColor(col)}
-                className={`w-2.5 h-2.5 rounded-full border transition-all ${
-                  col === 'emerald' ? 'bg-emerald-500 border-emerald-400' :
-                  col === 'amber' ? 'bg-amber-500 border-amber-400' :
-                  col === 'cyan' ? 'bg-cyan-500 border-cyan-400' :
-                  'bg-white border-neutral-300'
-                } ${themeColor === col ? 'scale-125 border-white' : 'opacity-60 hover:opacity-100'}`}
+                className={`w-2.5 h-2.5 rounded-full border transition-all ${col === 'emerald' ? 'bg-emerald-500 border-emerald-400' :
+                    col === 'amber' ? 'bg-amber-500 border-amber-400' :
+                      col === 'cyan' ? 'bg-cyan-500 border-cyan-400' :
+                        'bg-white border-neutral-300'
+                  } ${themeColor === col ? 'scale-125 border-white' : 'opacity-60 hover:opacity-100'}`}
                 title={`${col} theme`}
               />
             ))}

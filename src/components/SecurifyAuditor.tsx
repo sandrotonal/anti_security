@@ -47,7 +47,7 @@ export const SecurifyAuditor = () => {
   const [packageName, setPackageName] = useState<string>('');
   const [packageVersion, setPackageVersion] = useState<string>('');
   const [pasteContent, setPasteContent] = useState<string>('');
-  
+
   const [dependencies, setDependencies] = useState<Dependency[]>([]);
   const [scanning, setScanning] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; name: string } | null>(null);
@@ -70,7 +70,7 @@ export const SecurifyAuditor = () => {
           setDependencies(parsed.deps);
           setPasteContent(parsed.rawText || '');
           localStorage.removeItem('securify_detected_dependencies'); // Clear after loading
-          
+
           // Trigger scan automatically
           triggerOSVAudit(parsed.deps, parsed.ecosystem || 'npm');
         }
@@ -84,7 +84,7 @@ export const SecurifyAuditor = () => {
     try {
       const data = JSON.parse(text);
       const deps: Dependency[] = [];
-      
+
       const cleanVersion = (v: string) => v.replace(/^[\^~>=<]+/g, '').trim();
 
       if (data.dependencies) {
@@ -142,7 +142,7 @@ export const SecurifyAuditor = () => {
 
       if (inDepsSection) {
         if (!cleanLine || cleanLine.startsWith('#')) return;
-        
+
         let match = cleanLine.match(simpleRegex);
         if (match) {
           deps.push({ name: match[1], version: match[2] });
@@ -301,7 +301,7 @@ export const SecurifyAuditor = () => {
           while (index < listCopy.length) {
             const currentIdx = index++;
             const dep = listCopy[currentIdx];
-            
+
             setScanProgress({
               current: currentIdx + 1,
               total: listCopy.length,
@@ -390,7 +390,7 @@ export const SecurifyAuditor = () => {
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-neutral-900/40 border border-white/5 backdrop-blur-sm rounded-3xl p-6 space-y-6">
               <h3 className="text-sm font-mono font-medium text-white lowercase">input configurations</h3>
-              
+
               <div className="space-y-4">
                 {/* Ecosystem Selector */}
                 <div className="space-y-1 text-left">
@@ -459,7 +459,7 @@ export const SecurifyAuditor = () => {
                   </div>
                 )}
 
-                 {errorMsg && (
+                {errorMsg && (
                   <div className="bg-neutral-900/40 border border-white/10 text-neutral-300 rounded-xl p-4 text-xs font-mono lowercase text-left">
                     <div className="flex items-start gap-2">
                       <svg className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -533,13 +533,13 @@ export const SecurifyAuditor = () => {
                     <span className="text-white font-medium">{Math.round((scanProgress.current / scanProgress.total) * 100)}%</span>
                   </div>
                   <div className="w-full bg-neutral-950 h-1.5 rounded-full overflow-hidden border border-white/5">
-                    <div 
-                      className="bg-white h-full transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.4)]" 
+                    <div
+                      className="bg-white h-full transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.4)]"
                       style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
                     />
                   </div>
                 </div>
-                
+
                 <div className="bg-black border border-white/5 rounded-xl p-3 flex justify-between items-center">
                   <span className="text-[9px] font-mono text-neutral-500 lowercase truncate max-w-[250px]">
                     target: {scanProgress.name}

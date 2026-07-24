@@ -14,7 +14,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
   const [step, setStep] = useState<'input' | 'authorizing' | 'success'>('input');
   const [progressMsg, setProgressMsg] = useState<string>('');
   const [progressPercent, setProgressPercent] = useState<number>(0);
-  
+
   // Interactive scopes
   const [publicRepo, setPublicRepo] = useState<boolean>(true);
   const [privateRepo, setPrivateRepo] = useState<boolean>(() => {
@@ -22,7 +22,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
   });
   const [readUser, setReadUser] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string>('');
-  
+
   useEffect(() => {
     if (isOpen) {
       setStep('input');
@@ -82,6 +82,9 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
         if (!res.ok) {
           if (res.status === 404) {
             throw new Error(`github username @${username} does not exist.`);
+          } else if (res.status === 403) {
+            // Unauthenticated IP rate limit reached on GitHub API — allow fallback connection
+            console.warn('GitHub API rate limit hit (HTTP 403). Proceeding with fallback user profile.');
           } else {
             throw new Error('failed to verify user with github API.');
           }
@@ -101,7 +104,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
         setProgressMsg(steps[i].msg);
         const startPct = i === 0 ? 30 : steps[i - 1].pct;
         const endPct = steps[i].pct;
-        
+
         // Smooth transition for progress bar
         for (let p = startPct; p <= endPct; p += 2) {
           setProgressPercent(p);
@@ -113,7 +116,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
       setProgressPercent(100);
       setStep('success');
       await new Promise((resolve) => setTimeout(resolve, 800));
-      
+
       const trimmedToken = token.trim();
       if (trimmedToken) {
         localStorage.setItem('securify_github_pat', trimmedToken);
@@ -138,14 +141,14 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Modal Card */}
       <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Decorative Grid and Blur */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -230,9 +233,8 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                     required={privateRepo}
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    className={`w-full bg-neutral-900 border rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none transition-colors ${
-                      privateRepo && !token.trim() ? 'border-amber-500/40 focus:border-amber-500/75' : 'border-white/10 focus:border-white/25'
-                    }`}
+                    className={`w-full bg-neutral-900 border rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none transition-colors ${privateRepo && !token.trim() ? 'border-amber-500/40 focus:border-amber-500/75' : 'border-white/10 focus:border-white/25'
+                      }`}
                     placeholder={privateRepo ? "ghp_xxxxxxxxxxxx (required for private repos)" : "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
                   />
                 </div>
@@ -244,7 +246,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
               {/* Permissions scope checkboxes */}
               <div className="bg-neutral-900/40 border border-white/5 rounded-2xl p-4 space-y-3 select-none">
                 <span className="text-[9px] font-mono text-neutral-500 block uppercase">requested permissions</span>
-                
+
                 {/* publicRepo Checkbox */}
                 <div
                   role="button"
@@ -258,11 +260,10 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                   }}
                   className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
-                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
-                    publicRepo 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
+                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${publicRepo
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse'
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
-                  }`}>
+                    }`}>
                     ✓
                   </div>
                   <div className="space-y-0.5">
@@ -302,11 +303,10 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                   }}
                   className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
-                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
-                    privateRepo 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
+                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${privateRepo
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse'
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
-                  }`}>
+                    }`}>
                     ✓
                   </div>
                   <div className="space-y-0.5">
@@ -332,11 +332,10 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                   }}
                   className="flex items-start gap-3 text-left w-full hover:bg-white/5 p-1.5 rounded-lg transition-colors group cursor-pointer focus:outline-none"
                 >
-                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
-                    readUser 
-                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse' 
+                  <div className={`w-4 h-4 rounded mt-0.5 border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${readUser
+                      ? 'bg-emerald-950 border-emerald-500/50 text-emerald-400 animate-pulse'
                       : 'bg-neutral-900 border-white/10 text-transparent group-hover:border-white/20'
-                  }`}>
+                    }`}>
                     ✓
                   </div>
                   <div className="space-y-0.5">
@@ -411,9 +410,9 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
                 authorizing connection ({progressPercent}%)
               </h3>
               <div className="h-1.5 w-32 bg-neutral-900 border border-white/5 rounded-full mx-auto overflow-hidden relative">
-                <div 
-                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-150 ease-out" 
-                  style={{ width: `${progressPercent}%` }} 
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-150 ease-out"
+                  style={{ width: `${progressPercent}%` }}
                 />
               </div>
               <p className="text-neutral-400 font-mono text-[10px] lowercase animate-pulse mt-2 leading-relaxed min-h-[30px]">
@@ -429,7 +428,7 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
             <div className="w-12 h-12 bg-emerald-950 border border-emerald-500/30 rounded-full flex items-center justify-center text-emerald-400 text-lg shadow-lg">
               ✓
             </div>
-            
+
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-white lowercase">connected successfully</h3>
               <p className="text-neutral-400 text-xs lowercase">

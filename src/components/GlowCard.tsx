@@ -10,9 +10,8 @@ export function GlowCard({ children, className = '', onClick }: GlowCardProps) {
   return (
     <div
       onClick={onClick}
-      className={`group relative rounded-2xl overflow-hidden p-[1px] bg-gradient-to-br from-neutral-800/80 via-neutral-900/60 to-black/80 transition-all duration-350 hover:border-neutral-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md ${
-        onClick ? 'cursor-pointer select-none active:scale-[0.99]' : ''
-      } ${className}`}
+      className={`group relative rounded-2xl overflow-hidden p-[1px] bg-gradient-to-br from-neutral-800/80 via-neutral-900/60 to-black/80 transition-all duration-350 hover:border-neutral-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md ${onClick ? 'cursor-pointer select-none active:scale-[0.99]' : ''
+        } ${className}`}
     >
       {/* Moving Halo Behind the Inner Content */}
       <div className="absolute w-28 h-28 rounded-full bg-white/[0.03] blur-[22px] pointer-events-none animate-glow-halo z-0" />
