@@ -33,6 +33,8 @@ interface GitHubNativeSecuritySuiteProps {
   } | null;
   isLimitReached?: boolean;
   onUpgradeTrigger?: () => void;
+  usageCount?: number;
+  usageLimit?: number;
 }
 
 export const GitHubNativeSecuritySuite = ({
@@ -46,11 +48,14 @@ export const GitHubNativeSecuritySuite = ({
   findings,
   customScanResults,
   isLimitReached = false,
-  onUpgradeTrigger
+  onUpgradeTrigger,
+  usageCount,
+  usageLimit
 }: GitHubNativeSecuritySuiteProps) => {
   const [activeTab, setActiveTab] = useState<'security' | 'code_tree' | 'pr_bot' | 'actions'>('security');
   const [selectedFindingIndex, setSelectedFindingIndex] = useState<number | null>(findings.length > 0 ? 0 : null);
   const [copiedPrComment, setCopiedPrComment] = useState<boolean>(false);
+  const [badgeColor, setBadgeColor] = useState<'green' | 'blue' | 'black'>('green');
 
   const displayRepo = repoName || selectedRepo || 'select-a-repository';
   const repoParts = displayRepo.split('/');
@@ -178,6 +183,14 @@ ${finding.remediation || 'Immediately revoke this API key/secret and move it to 
                 <span>✓</span>
                 <span>securify suite active</span>
               </div>
+              {usageLimit !== undefined && usageCount !== undefined && (
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0d1117] border border-[#30363d] text-[10px] font-mono lowercase">
+                  <span className={`w-1.5 h-1.5 rounded-full ${usageCount >= usageLimit ? 'bg-[#f85149]' : usageCount >= usageLimit - 1 ? 'bg-[#d29922]' : 'bg-[#3fb950]'}`} />
+                  <span className="text-[#8b949e]">
+                    quota: <strong className="text-white">{usageCount}</strong> / {usageLimit === Infinity ? 'unlimited' : `${usageLimit} scans`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -304,14 +317,86 @@ ${finding.remediation || 'Immediately revoke this API key/secret and move it to 
         {activeTab === 'security' && (
           <div className="space-y-4">
             {findings.length === 0 ? (
-              <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-5 sm:p-8 text-center space-y-2.5">
-                <div className="w-10 h-10 rounded-full border border-[#30363d] text-[#3fb950] flex items-center justify-center mx-auto text-lg font-bold">
-                  ✓
+              <div className="space-y-4">
+                <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-5 sm:p-8 text-center space-y-2.5">
+                  <div className="w-10 h-10 rounded-full border border-[#30363d] text-[#3fb950] flex items-center justify-center mx-auto text-lg font-bold">
+                    ✓
+                  </div>
+                  <h3 className="text-xs sm:text-sm font-semibold text-white break-all">0 Vulnerabilities Found in {displayRepo}</h3>
+                  <p className="text-[11px] text-[#8b949e] max-w-md mx-auto leading-relaxed">
+                    Securify static code analysis engine completed repository scan on branch <span className="font-mono text-white">{branch}</span>. All files passed credentials leakage checks.
+                  </p>
                 </div>
-                <h3 className="text-xs sm:text-sm font-semibold text-white break-all">0 Vulnerabilities Found in {displayRepo}</h3>
-                <p className="text-[11px] text-[#8b949e] max-w-md mx-auto leading-relaxed">
-                  Securify static code analysis engine completed repository scan on branch <span className="font-mono text-white">{branch}</span>. All files passed credentials leakage checks.
-                </p>
+
+                {/* Interactive README Badge Generator */}
+                <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-4 sm:p-5 text-left space-y-3.5 animate-in fade-in duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-semibold text-white lowercase">share security compliance badge</h4>
+                      <p className="text-[11px] text-[#8b949e] lowercase font-light mt-0.5">
+                        display securify status directly on your github repository readme file.
+                      </p>
+                    </div>
+                    {/* Live SVG Preview */}
+                    <div className="flex items-center gap-4 shrink-0 self-start sm:self-center">
+                      {/* Color Picker Buttons */}
+                      <div className="flex items-center gap-1.5 border border-[#30363d] bg-[#0d1117] p-1 rounded-lg">
+                        {(['green', 'blue', 'black'] as const).map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setBadgeColor(color)}
+                            className={`w-3.5 h-3.5 rounded-full transition-transform hover:scale-110 active:scale-95 ${
+                              color === 'green' ? 'bg-[#3fb950]' : color === 'blue' ? 'bg-[#58a6ff]' : 'bg-[#8b949e]'
+                            } ${badgeColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0d1117]' : 'opacity-60'}`}
+                            aria-label={`Theme ${color}`}
+                          />
+                        ))}
+                      </div>
+
+                      <svg xmlns="http://www.w3.org/2000/svg" width="140" height="20" viewBox="0 0 140 20" className="select-none shrink-0">
+                        <linearGradient id="badge-grad" x2="0" y2="100%">
+                          <stop offset="0" stopColor="#1f242c"/>
+                          <stop offset="1" stopColor="#0d1117"/>
+                        </linearGradient>
+                        <rect width="140" height="20" rx="6" fill="url(#badge-grad)" stroke="#30363d" strokeWidth="1"/>
+                        <g transform="translate(8, 4) scale(0.046875)" fill="#58a6ff">
+                          <path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z" />
+                        </g>
+                        <text x="24" y="13" fill="#8b949e" fontFamily="Segoe UI,Arial,sans-serif" fontSize="9" fontWeight="bold">securify</text>
+                        <text 
+                          x="76" 
+                          y="13" 
+                          fill={badgeColor === 'green' ? '#3fb950' : badgeColor === 'blue' ? '#58a6ff' : '#8b949e'} 
+                          fontFamily="Segoe UI,Arial,sans-serif" 
+                          fontSize="9" 
+                          fontWeight="bold"
+                        >
+                          ● {badgeColor === 'black' ? 'secured' : 'verified'}
+                        </text>
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Copy Markdown Input */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`[![Securify Security Status](https://img.shields.io/badge/securify-${badgeColor === 'black' ? 'secured' : 'verified'}-${badgeColor === 'black' ? 'black' : badgeColor}?logo=data:image/svg%2bxml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="%2358a6ff"><path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z"/></svg>')})](https://securify.dev)`}
+                      className="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-[10px] font-mono text-[#8b949e] select-all focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const code = `[![Securify Security Status](https://img.shields.io/badge/securify-${badgeColor === 'black' ? 'secured' : 'verified'}-${badgeColor === 'black' ? 'black' : badgeColor}?logo=data:image/svg%2bxml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="%2358a6ff"><path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z"/></svg>')})](https://securify.dev)`;
+                        navigator.clipboard.writeText(code);
+                        alert('badge markdown copied to clipboard!');
+                      }}
+                      className="bg-[#21262d] hover:bg-[#30363d] text-white border border-[#30363d] text-[10px] font-mono px-3.5 py-2 rounded-lg transition-colors shrink-0"
+                    >
+                      copy markdown
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

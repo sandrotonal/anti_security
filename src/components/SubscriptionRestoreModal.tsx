@@ -110,39 +110,41 @@ export const SubscriptionRestoreModal = ({ isOpen, onClose, onSuccess }: Subscri
       setErrorMsg(err.message || 'bağlantı hatası oluştu. lütfen daha sonra tekrar deneyin.');
     }
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300"
+        className="absolute inset-0 bg-black/80 transition-opacity duration-200"
         onClick={onClose}
       />
 
       {/* Modal Card */}
-      <div className="bg-neutral-950/80 border border-white/10 backdrop-blur-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-black border border-white/10 rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Decorative Grid & Blur */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#080808_1px,transparent_1px),linear-gradient(to_bottom,#080808_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none opacity-20" />
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Subtle Animated Top Accent Line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#58a6ff] to-transparent opacity-75 animate-pulse" />
 
         {/* Close Button */}
         <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-neutral-400 hover:text-white transition-colors"
-          aria-label="Close"
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+          className="absolute top-4 right-4 z-50 text-[#8b949e] hover:text-white bg-black hover:bg-neutral-900 border border-white/10 p-2 rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+          aria-label="Close modal"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
         {step === 'input' && (
           <div className="relative z-10 space-y-6">
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-2 pt-2">
               <h3 className="text-lg font-medium text-white lowercase">restore premium subscription</h3>
-              <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed">
+              <p className="text-[#8b949e] text-xs font-light lowercase leading-relaxed">
                 enter your paddle transaction id and email address to activate pro or agency access on this device.
               </p>
             </div>
@@ -157,8 +159,8 @@ export const SubscriptionRestoreModal = ({ isOpen, onClose, onSuccess }: Subscri
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-white/25 transition-colors lowercase"
-                  placeholder="e.g. dev@yourdomain.com"
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff]/40 transition-all lowercase"
+                  placeholder="e.g. omeriletisimportfolyo@gmail.com"
                 />
               </div>
 
@@ -171,10 +173,10 @@ export const SubscriptionRestoreModal = ({ isOpen, onClose, onSuccess }: Subscri
                   required
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
-                  className="w-full bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-white/25 transition-colors"
+                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-neutral-600 focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff]/40 transition-all"
                   placeholder="e.g. txn_3d9c12a84fb..."
                 />
-                <span className="text-[9px] text-neutral-500 block pl-1 lowercase leading-relaxed font-light">
+                <span className="text-[9px] text-[#8b949e] block pl-1 lowercase leading-relaxed font-light">
                   found on checkout completion screen or receipt email.
                 </span>
               </div>

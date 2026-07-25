@@ -111,11 +111,12 @@ export const SecurifyConsoleDocs = () => {
 
         {/* Right Area - Support/Request Form (lg:col-span-5) */}
         <div className="lg:col-span-5">
-          <div className="bg-neutral-900/10 border border-white/5 backdrop-blur-sm rounded-2xl p-8 shadow-xl">
+          <div className="bg-black border border-white/10 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#58a6ff] to-transparent opacity-75 animate-pulse" />
             <h3 className="text-xl font-medium text-white mb-2 lowercase tracking-tight">
               direct inquiry
             </h3>
-            <p className="text-neutral-400 text-xs font-light lowercase mb-6 leading-relaxed">
+            <p className="text-[#8b949e] text-xs font-light lowercase mb-6 leading-relaxed">
               can't find a solution in our active command log? submit your developer request or question directly.
             </p>
 
@@ -137,7 +138,7 @@ export const SecurifyConsoleDocs = () => {
               className="space-y-4"
             >
               <div>
-                <label htmlFor="email" className="block text-[10px] text-neutral-500 lowercase mb-1 font-mono">
+                <label htmlFor="email" className="block text-[10px] text-[#8b949e] lowercase mb-1 font-mono">
                   developer email
                 </label>
                 <input
@@ -146,14 +147,14 @@ export const SecurifyConsoleDocs = () => {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase font-mono"
-                  placeholder="e.g. omer@securify.dev"
+                  className="w-full bg-black border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff]/40 transition-all lowercase font-mono placeholder:text-neutral-600"
+                  placeholder="e.g. omeriletisimportfolyo@gmail.com"
                   required
                 />
               </div>
 
               <div>
-                <label htmlFor="query" className="block text-[10px] text-neutral-500 lowercase mb-1 font-mono">
+                <label htmlFor="query" className="block text-[10px] text-[#8b949e] lowercase mb-1 font-mono">
                   inquiry detail
                 </label>
                 <textarea
@@ -162,7 +163,7 @@ export const SecurifyConsoleDocs = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   rows={4}
-                  className="w-full bg-black/60 border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-white/20 transition-colors lowercase resize-none font-mono"
+                  className="w-full bg-black border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff]/40 transition-all lowercase resize-none font-mono placeholder:text-neutral-600"
                   placeholder="write your secure inquiry payload here..."
                   required
                 />
@@ -171,8 +172,8 @@ export const SecurifyConsoleDocs = () => {
               {success && (
                 <div className={`rounded-lg p-3 text-[11px] font-mono lowercase border ${
                   success.includes('failed') 
-                    ? 'bg-red-950/40 border-red-500/30 text-red-400' 
-                    : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                    ? 'bg-[#161b22] border-[#30363d] text-[#f85149]' 
+                    : 'bg-[#161b22] border-[#30363d] text-[#3fb950]'
                 }`}>
                   {success}
                 </div>

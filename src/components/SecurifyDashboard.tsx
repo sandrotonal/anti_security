@@ -295,21 +295,41 @@ export const SecurifyDashboard = ({
   // Usage and API limits tracking state
   const [githubSyncCount, setGithubSyncCount] = useState<number>(() => {
     try {
-      const val = localStorage.getItem('securify_usage_github');
-      return val ? parseInt(val, 10) : 2;
+      const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+      const val = localStorage.getItem(`securify_usage_github${userSuffix}`);
+      return val ? parseInt(val, 10) : 0;
     } catch {
-      return 2;
+      return 0;
     }
   });
 
   const [websiteScanCount, setWebsiteScanCount] = useState<number>(() => {
     try {
-      const val = localStorage.getItem('securify_usage_website');
-      return val ? parseInt(val, 10) : 1;
+      const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+      const val = localStorage.getItem(`securify_usage_website${userSuffix}`);
+      return val ? parseInt(val, 10) : 0;
     } catch {
-      return 1;
+      return 0;
     }
   });
+
+  // User-scoped storage sync to prevent shared device lockouts
+  useEffect(() => {
+    const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+    try {
+      const gVal = localStorage.getItem(`securify_usage_github${userSuffix}`);
+      setGithubSyncCount(gVal ? parseInt(gVal, 10) : 0);
+    } catch {
+      setGithubSyncCount(0);
+    }
+
+    try {
+      const wVal = localStorage.getItem(`securify_usage_website${userSuffix}`);
+      setWebsiteScanCount(wVal ? parseInt(wVal, 10) : 0);
+    } catch {
+      setWebsiteScanCount(0);
+    }
+  }, [githubUser]);
   
   // Live website URL scanning states
   const [siteUrl, setSiteUrl] = useState<string>('');
@@ -1229,7 +1249,8 @@ export const SecurifyDashboard = ({
     setGithubSyncCount(prev => {
       const next = prev + 1;
       try {
-        localStorage.setItem('securify_usage_github', next.toString());
+        const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+        localStorage.setItem(`securify_usage_github${userSuffix}`, next.toString());
       } catch (e) {
         console.warn('Storage save warning:', e);
       }
@@ -2743,6 +2764,8 @@ Report generated cryptographically via Securify SaaS platform.
                       customScanResults={customScanResults}
                       isLimitReached={githubSyncCount >= githubLimit && planName !== 'agency'}
                       onUpgradeTrigger={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      usageCount={githubSyncCount}
+                      usageLimit={githubLimit}
                     />
                   </div>
                 )}
