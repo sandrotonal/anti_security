@@ -11,6 +11,11 @@ interface NavbarProps {
   onGithubLogout: () => void;
   premiumStatus?: { valid: boolean; email?: string; plan?: string; expiresAt?: number } | null;
   onRestoreSubscription?: () => void;
+  githubSyncCount?: number;
+  githubLimit?: number;
+  websiteScanCount?: number;
+  websiteLimit?: number;
+  onPurchaseTrigger?: (planId: string, planName: string, billing: 'monthly' | 'yearly') => void;
 }
 
 const UserAvatar = ({ username, avatarUrl, sizeClass = "w-7 h-7" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
@@ -56,7 +61,12 @@ export const SecurifyNavbar = ({
   onGithubLogin,
   onGithubLogout,
   premiumStatus,
-  onRestoreSubscription
+  onRestoreSubscription,
+  githubSyncCount = 0,
+  githubLimit = 5,
+  websiteScanCount = 0,
+  websiteLimit = 3,
+  onPurchaseTrigger
 }: NavbarProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -236,35 +246,161 @@ export const SecurifyNavbar = ({
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-3 w-52 bg-neutral-950/95 border border-white/10 backdrop-blur-xl rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="px-3 py-2.5 text-left">
-                      <span className="text-[9px] text-neutral-500 font-mono tracking-wider uppercase block">connected as</span>
-                      <span className="text-xs text-white font-mono font-medium block truncate lowercase mt-0.5">@{githubUser.username}</span>
+                  <div className="absolute right-0 mt-3 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-black border border-[#30363d] rounded-2xl p-3.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-left overflow-hidden select-none">
+                    
+                    {/* Top Animated Accent Bar */}
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#58a6ff] to-transparent opacity-80 animate-pulse" />
 
-                      {premiumStatus?.valid ? (
-                        <div className="text-[9px] text-neutral-300 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900 border border-white/10 px-2 py-1 rounded-lg w-fit">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          {premiumStatus.plan} plan
+                    {/* User Header with Avatar */}
+                    <div className="px-2.5 py-2 border-b border-[#30363d] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <UserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-8 h-8 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[9px] text-[#8b949e] font-mono tracking-wider uppercase block">connected as</span>
+                          <span className="text-xs text-white font-mono font-semibold block truncate lowercase">@{githubUser.username}</span>
                         </div>
-                      ) : githubUser.token ? (
-                        <div className="text-[9px] text-neutral-300 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900 border border-white/10 px-2 py-1 rounded-lg w-fit">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                          pat (5k/hr)
-                        </div>
-                      ) : (
-                        <div className="text-[9px] text-neutral-400 font-mono flex items-center gap-1.5 lowercase mt-2 bg-neutral-900/60 border border-white/5 px-2 py-1 rounded-lg w-fit">
-                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 animate-pulse" />
-                          public only (60/hr)
-                        </div>
-                      )}
+                      </div>
+                      <div className="shrink-0">
+                        {premiumStatus?.valid ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 lowercase font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            {premiumStatus.plan || 'pro'} active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[#161b22] border border-[#30363d] text-[#8b949e] lowercase">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#8b949e]" />
+                            free tier
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="border-t border-white/5 mt-1 pt-1">
+
+                    {/* Subscription & Expiration Status */}
+                    {premiumStatus?.valid && (
+                      <div className="px-3 py-2 border-b border-[#30363d] bg-[#0d1117]/60 rounded-xl my-2 text-[10px] font-mono space-y-1">
+                        <div className="flex items-center justify-between text-[#8b949e]">
+                          <span>subscription status</span>
+                          <span className="text-emerald-400 font-semibold">active</span>
+                        </div>
+                        {premiumStatus.expiresAt && (
+                          <div className="flex items-center justify-between text-[#8b949e]">
+                            <span>renewal date</span>
+                            <span className="text-white">{new Date(premiumStatus.expiresAt).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quota & Usage Credits Meter Section */}
+                    <div className="px-2.5 py-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] text-[#8b949e] font-mono tracking-wider uppercase font-medium">quota & credits status</span>
+                        <span className="text-[9px] text-[#58a6ff] font-mono lowercase">trial meter</span>
+                      </div>
+
+                      {/* GitHub Sync Scans Meter */}
+                      <div className="space-y-1.5 bg-[#0d1117] border border-[#30363d] p-2.5 rounded-xl">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-[#8b949e] flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#58a6ff]" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z" />
+                            </svg>
+                            github syncs
+                          </span>
+                          <span className="text-white font-medium">
+                            {githubSyncCount} / {githubLimit === Infinity ? '∞' : `${githubLimit}`}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-black border border-[#30363d] rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 rounded-full ${
+                              githubLimit === Infinity ? 'bg-[#58a6ff]' : (githubSyncCount / githubLimit) >= 1 ? 'bg-[#f85149]' : (githubSyncCount / githubLimit) >= 0.8 ? 'bg-[#d29922]' : 'bg-[#3fb950]'
+                            }`}
+                            style={{ width: `${githubLimit === Infinity ? 100 : Math.min(100, (githubSyncCount / githubLimit) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-[9px] font-mono text-right">
+                          {githubLimit === Infinity ? (
+                            <span className="text-[#58a6ff]">unlimited access</span>
+                          ) : githubSyncCount >= githubLimit ? (
+                            <span className="text-[#f85149]">limit reached (0 left)</span>
+                          ) : (
+                            <span className="text-[#3fb950]">{githubLimit - githubSyncCount} free scans left</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Website Audits Meter */}
+                      <div className="space-y-1.5 bg-[#0d1117] border border-[#30363d] p-2.5 rounded-xl">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-[#8b949e] flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-[#3fb950]" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm7.5-6.923c-2.26.416-4.07 2.14-4.52 4.423h9.04c-.45-2.283-2.26-4.007-4.52-4.423ZM2.5 8.5c.04 1.15.42 2.21 1.05 3.09h8.9c.63-.88 1.01-1.94 1.05-3.09H2.5Z" />
+                            </svg>
+                            website audits
+                          </span>
+                          <span className="text-white font-medium">
+                            {websiteScanCount} / {websiteLimit === Infinity ? '∞' : `${websiteLimit}`}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-black border border-[#30363d] rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 rounded-full ${
+                              websiteLimit === Infinity ? 'bg-[#3fb950]' : (websiteScanCount / websiteLimit) >= 1 ? 'bg-[#f85149]' : (websiteScanCount / websiteLimit) >= 0.8 ? 'bg-[#d29922]' : 'bg-[#3fb950]'
+                            }`}
+                            style={{ width: `${websiteLimit === Infinity ? 100 : Math.min(100, (websiteScanCount / websiteLimit) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-[9px] font-mono text-right">
+                          {websiteLimit === Infinity ? (
+                            <span className="text-[#3fb950]">unlimited access</span>
+                          ) : websiteScanCount >= websiteLimit ? (
+                            <span className="text-[#f85149]">limit reached (0 left)</span>
+                          ) : (
+                            <span className="text-[#3fb950]">{websiteLimit - websiteScanCount} free audits left</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Navigation Links */}
+                    <div className="px-1 py-1 border-t border-[#30363d] space-y-1">
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          onViewChange('dashboard');
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-[#8b949e] hover:text-white hover:bg-white/5 rounded-xl font-mono transition-colors lowercase flex items-center justify-between cursor-pointer"
+                      >
+                        view security dashboard
+                        <svg className="w-3.5 h-3.5 text-[#8b949e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      {/* Quick Upgrade / Manage Action */}
+                      {!premiumStatus?.valid && onPurchaseTrigger && (
+                        <button
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            onPurchaseTrigger('pro', 'Pro', 'monthly');
+                          }}
+                          className="w-full bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-mono font-semibold py-2.5 px-3 rounded-xl transition-all lowercase flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer mt-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          upgrade plan (unlimited)
+                        </button>
+                      )}
+
+                      {/* Disconnect Action */}
                       <button
                         onClick={() => {
                           setIsDropdownOpen(false);
                           onGithubLogout();
                         }}
-                        className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-white/5 rounded-xl font-mono transition-colors lowercase flex items-center justify-between"
+                        className="w-full text-left px-3 py-2 text-xs text-[#f85149] hover:text-red-300 hover:bg-white/5 rounded-xl font-mono transition-colors lowercase flex items-center justify-between cursor-pointer"
                       >
                         disconnect
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,6 +408,7 @@ export const SecurifyNavbar = ({
                         </svg>
                       </button>
                     </div>
+
                   </div>
                 )}
               </div>
