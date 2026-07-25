@@ -143,7 +143,7 @@ export const SecurifyContact = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-transparent border-b border-white/15 focus:border-white/40 focus:outline-none py-2 text-xs text-white placeholder-neutral-600 font-mono transition-colors rounded-none px-0"
-                  placeholder="e.g. omer@securify.dev"
+                  placeholder="e.g. omeriletisimportfolyo@gmail.com"
                 />
               </div>
 

@@ -575,6 +575,15 @@ function App() {
         onGithubLogout={handleGithubLogout}
         premiumStatus={premiumStatus}
         onRestoreSubscription={() => setIsRestoreModalOpen(true)}
+        githubSyncCount={parseInt(localStorage.getItem(`securify_usage_github_${githubUser?.username || 'anonymous'}`) || '0', 10)}
+        githubLimit={premiumStatus?.valid ? (premiumStatus.plan?.toLowerCase() === 'agency' ? Infinity : 50) : 5}
+        websiteScanCount={parseInt(localStorage.getItem(`securify_usage_website_${githubUser?.username || 'anonymous'}`) || '0', 10)}
+        websiteLimit={premiumStatus?.valid ? (premiumStatus.plan?.toLowerCase() === 'agency' ? Infinity : 100) : 3}
+        onPurchaseTrigger={(planId, planName, billingPeriod) => {
+          setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+          setCheckoutEmail('');
+          setCheckoutError('');
+        }}
       />
 
       {/* Main Pages Content routing */}

@@ -5,6 +5,7 @@ import { trackEvent } from '../lib/analytics';
 import { scanContent } from '../lib/scanEngine';
 import { EnterpriseAnalytics } from './EnterpriseAnalytics';
 import { saveScanHistory } from '../lib/storage';
+import { GitHubNativeSecuritySuite } from './GitHubNativeSecuritySuite';
 
 
 
@@ -245,41 +246,6 @@ const parseDependenciesCargo = (text: string) => {
   return deps;
 };
 
-const DashboardUserAvatar = ({ username, avatarUrl, sizeClass = "w-5 h-5" }: { username: string; avatarUrl: string; sizeClass?: string }) => {
-  const [imgSrc, setImgSrc] = useState<string>(avatarUrl);
-  const [hasError, setHasError] = useState<boolean>(false);
-
-  useEffect(() => {
-    setImgSrc(avatarUrl);
-    setHasError(false);
-  }, [avatarUrl, username]);
-
-  if (hasError || !imgSrc) {
-    const initial = username.charAt(0).toUpperCase();
-    return (
-      <div className={`${sizeClass} rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 border border-white/10 flex items-center justify-center font-mono text-white text-[8px] font-bold select-none uppercase`}>
-        {initial}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={imgSrc}
-      alt={username}
-      onError={() => {
-        const directUrl = `https://avatars.githubusercontent.com/${username}`;
-        if (imgSrc !== directUrl) {
-          setImgSrc(directUrl);
-        } else {
-          setHasError(true);
-        }
-      }}
-      className={`${sizeClass} rounded-full border border-white/20 object-cover`}
-    />
-  );
-};
-
 const parseFinancialRiskString = (str: string) => {
   if (!str) return { value: '', details: '' };
   const match = str.match(/^([^(]+)(?:\(([^)]+)\))?/);
@@ -329,21 +295,41 @@ export const SecurifyDashboard = ({
   // Usage and API limits tracking state
   const [githubSyncCount, setGithubSyncCount] = useState<number>(() => {
     try {
-      const val = localStorage.getItem('securify_usage_github');
-      return val ? parseInt(val, 10) : 2;
+      const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+      const val = localStorage.getItem(`securify_usage_github${userSuffix}`);
+      return val ? parseInt(val, 10) : 0;
     } catch {
-      return 2;
+      return 0;
     }
   });
 
   const [websiteScanCount, setWebsiteScanCount] = useState<number>(() => {
     try {
-      const val = localStorage.getItem('securify_usage_website');
-      return val ? parseInt(val, 10) : 1;
+      const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+      const val = localStorage.getItem(`securify_usage_website${userSuffix}`);
+      return val ? parseInt(val, 10) : 0;
     } catch {
-      return 1;
+      return 0;
     }
   });
+
+  // User-scoped storage sync to prevent shared device lockouts
+  useEffect(() => {
+    const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+    try {
+      const gVal = localStorage.getItem(`securify_usage_github${userSuffix}`);
+      setGithubSyncCount(gVal ? parseInt(gVal, 10) : 0);
+    } catch {
+      setGithubSyncCount(0);
+    }
+
+    try {
+      const wVal = localStorage.getItem(`securify_usage_website${userSuffix}`);
+      setWebsiteScanCount(wVal ? parseInt(wVal, 10) : 0);
+    } catch {
+      setWebsiteScanCount(0);
+    }
+  }, [githubUser]);
   
   // Live website URL scanning states
   const [siteUrl, setSiteUrl] = useState<string>('');
@@ -495,12 +481,6 @@ export const SecurifyDashboard = ({
   }, [initialWebsiteUrl]);
 
   const [githubRepos, setGithubRepos] = useState<string[]>([]);
-  const [customRepoName, setCustomRepoName] = useState<string>('');
-  const [isLabOpen, setIsLabOpen] = useState<boolean>(false);
-  const [injectStripe, setInjectStripe] = useState<boolean>(false);
-  const [injectAws, setInjectAws] = useState<boolean>(false);
-  const [injectDb, setInjectDb] = useState<boolean>(false);
-  const [injectSlack, setInjectSlack] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -536,10 +516,16 @@ export const SecurifyDashboard = ({
             }
           }
         } catch (err) {
-          console.error('API error while fetching repositories:', err);
+          console.warn('GitHub API rate limit or network warning. Using fallback user repositories:', err);
           if (active) {
-            setGithubRepos([]);
-            setSelectedGithubRepo('');
+            const fallbackRepos = [
+              `${githubUser.username}/python-test`,
+              `${githubUser.username}/api-service`,
+              `${githubUser.username}/security-audit-demo`,
+              `${githubUser.username}/web-app`
+            ];
+            setGithubRepos(fallbackRepos);
+            setSelectedGithubRepo(fallbackRepos[0]);
           }
         }
       };
@@ -1254,10 +1240,22 @@ export const SecurifyDashboard = ({
   }
 
   const handleGithubScan = async (repoName: string, _injectedLeaks?: InjectedLeaks) => {
-    if (githubSyncCount >= githubLimit) {
+    if (planName !== 'agency' && githubSyncCount >= githubLimit) {
       setLimitExceeded('github');
+      onPurchaseTrigger?.('pro', 'Pro', 'monthly');
       return;
     }
+
+    setGithubSyncCount(prev => {
+      const next = prev + 1;
+      try {
+        const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
+        localStorage.setItem(`securify_usage_github${userSuffix}`, next.toString());
+      } catch (e) {
+        console.warn('Storage save warning:', e);
+      }
+      return next;
+    });
 
     setIsLiveStream(false);
     setScanning(true);
@@ -1291,7 +1289,15 @@ export const SecurifyDashboard = ({
     let repoFindings: Finding[] = [];
 
     const fetchFileContent = async (path: string): Promise<string> => {
-      if (githubUser?.token) {
+        try {
+          const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${path}`);
+          if (rawRes.ok) {
+            return await rawRes.text();
+          }
+        } catch (e) {
+          console.warn(`Raw content fetch failed for ${path}, falling back to API:`, e);
+        }
+
         try {
           const apiRes = await fetch(`https://api.github.com/repos/${repoName}/contents/${path}?ref=${defaultBranch}`, {
             headers: getGithubHeaders()
@@ -1306,14 +1312,9 @@ export const SecurifyDashboard = ({
         } catch (e) {
           console.warn(`Failed to fetch file content via API for ${path}:`, e);
         }
-      }
-      
-      const rawRes = await fetch(`https://raw.githubusercontent.com/${repoName}/${defaultBranch}/${path}`);
-      if (rawRes.ok) {
-        return await rawRes.text();
-      }
-      throw new Error(`Failed to load file content`);
-    };
+
+        throw new Error(`Failed to load file content`);
+      };
 
     try {
       // Step 1: Connect and fetch repository details
@@ -1818,27 +1819,6 @@ export const SecurifyDashboard = ({
         clearInterval(interval);
       }
     }, 450);
-  };
-
-  const handleCreateCustomRepo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customRepoName.trim() || !githubUser) return;
-    
-    const fullRepoName = `${githubUser.username}/${customRepoName.trim().replace(/\s+/g, '-')}`;
-    
-    if (!githubRepos.includes(fullRepoName)) {
-      setGithubRepos(prev => [...prev, fullRepoName]);
-    }
-    
-    setSelectedGithubRepo(fullRepoName);
-    setIsLabOpen(false);
-    
-    handleGithubScan(fullRepoName, {
-      stripe: injectStripe,
-      aws: injectAws,
-      db: injectDb,
-      slack: injectSlack
-    });
   };
 
   // Live Stream - Disabled (no mock data)
@@ -2753,7 +2733,7 @@ Report generated cryptographically via Securify SaaS platform.
                 ) : limitExceeded === 'github' ? (
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full animate-in fade-in duration-200 text-left">
                     <div className="space-y-1.5 text-left">
-                      <span className="inline-block bg-red-950/40 border border-red-500/20 text-red-400 rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
+                      <span className="inline-block bg-[#161b22] border border-[#30363d] text-[#f85149] rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
                         usage limit exceeded
                       </span>
                       <h3 className="text-base font-semibold text-white lowercase">github repository sync limit reached</h3>
@@ -2763,190 +2743,31 @@ Report generated cryptographically via Securify SaaS platform.
                     </div>
                     <div className="flex gap-3 w-full md:w-auto shrink-0">
                       <button
-                        onClick={() => {
-                          setGithubSyncCount(0);
-                          localStorage.setItem('securify_usage_github', '0');
-                          setLimitExceeded(null);
-                        }}
-                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        reset limit (demo)
-                      </button>
-                      <button
                         onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                        className="w-full md:w-auto bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-mono font-bold rounded-xl px-8 py-3.5 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
-                        upgrade plan
+                        upgrade to pro plan (unlimited)
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="space-y-2 text-left">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <DashboardUserAvatar username={githubUser.username} avatarUrl={githubUser.avatarUrl} sizeClass="w-5 h-5" />
-                        <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
-                          remote workspaces for @{githubUser.username}
-                        </span>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border lowercase ${
-                          githubSyncCount >= githubLimit
-                            ? 'bg-red-950/20 border-red-500/20 text-red-400'
-                            : githubSyncCount >= githubLimit - 1
-                            ? 'bg-amber-950/20 border-amber-500/20 text-amber-400'
-                            : 'bg-white/5 border-white/10 text-neutral-300'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            githubSyncCount >= githubLimit ? 'bg-red-500' : githubSyncCount >= githubLimit - 1 ? 'bg-amber-500' : 'bg-emerald-400'
-                          }`} />
-                          {planName === 'agency' ? `syncs: ${githubSyncCount} / unlimited` : `syncs: ${githubSyncCount} / ${githubLimit} repos`}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-medium text-white lowercase">
-                        {customScanResults && customScanResults.folderName.includes('/')
-                          ? `synced repository: ${customScanResults.folderName}` 
-                          : "select repository to sync"}
-                      </h3>
-                      <p className="text-neutral-400 text-xs font-light lowercase leading-relaxed max-w-xl">
-                        {customScanResults && customScanResults.folderName.includes('/')
-                          ? `completed remote analysis in ${customScanResults.durationMs}ms. identified ${customScanResults.leaksFound} credentials.`
-                          : "securify will sync your selected remote repository structure, read index tree, and perform security scanning client-side."}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto sm:items-center">
-                      <select
-                        disabled={scanning || githubRepos.length === 0 || githubRepos[0] === 'loading repositories...'}
-                        value={selectedGithubRepo}
-                        onChange={(e) => setSelectedGithubRepo(e.target.value)}
-                        className="bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 lowercase disabled:opacity-50"
-                      >
-                        {githubRepos.length === 0 ? (
-                          <option value="">no repositories found</option>
-                        ) : githubRepos[0] === 'loading repositories...' ? (
-                          <option value="">loading repositories...</option>
-                        ) : (
-                          githubRepos.map(repo => (
-                            <option key={repo} value={repo}>{repo}</option>
-                          ))
-                        )}
-                      </select>
-                      <button
-                        onClick={() => handleGithubScan(selectedGithubRepo)}
-                        disabled={scanning || !selectedGithubRepo}
-                        className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
-                          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
-                        </svg>
-                        {scanning ? "syncing..." : (customScanResults && customScanResults.folderName.includes('/') ? "re-sync & scan" : "sync & scan")}
-                      </button>
-                      <button
-                        onClick={() => setIsLabOpen(!isLabOpen)}
-                        disabled={scanning}
-                        className="bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 text-xs font-mono rounded-xl px-5 py-3 lowercase transition-all select-none flex items-center justify-center gap-1.5 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 9.172V5L8 4z" />
-                        </svg>
-                        {isLabOpen ? "hide lab" : "custom repo lab"}
-                      </button>
-                    </div>
-                    
-                    {isLabOpen && (
-                      <div className="w-full mt-6 border-t border-white/5 pt-6">
-                        <form onSubmit={handleCreateCustomRepo} className="space-y-4 max-w-xl">
-                          <div className="space-y-2">
-                            <label className="block text-[10px] font-mono text-neutral-400 lowercase">
-                              mock repository name
-                            </label>
-                            <div className="flex gap-2">
-                              <span className="bg-neutral-950 border border-white/5 rounded-xl px-4 py-3 text-neutral-500 font-mono text-xs flex items-center select-none">
-                                github.com/{githubUser.username}/
-                              </span>
-                              <input
-                                type="text"
-                                required
-                                value={customRepoName}
-                                onChange={(e) => setCustomRepoName(e.target.value)}
-                                placeholder="e.g. secure-auth-api"
-                                className="flex-1 bg-neutral-950 border border-white/10 text-white text-xs font-mono rounded-xl px-4 py-3 focus:outline-none focus:border-white/20 placeholder-neutral-700 lowercase"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <label className="block text-[10px] font-mono text-neutral-400 lowercase">
-                              simulate and inject leak parameters (for testing lab)
-                            </label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={injectStripe}
-                                  onChange={(e) => setInjectStripe(e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
-                                />
-                                <div className="text-left">
-                                  <span className="block text-[11px] font-medium text-white lowercase">stripe API key</span>
-                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject sk_test_* leak</span>
-                                </div>
-                              </label>
-                              
-                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={injectAws}
-                                  onChange={(e) => setInjectAws(e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
-                                />
-                                <div className="text-left">
-                                  <span className="block text-[11px] font-medium text-white lowercase">aws credentials</span>
-                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject AWS_ACCESS_KEY_ID leak</span>
-                                </div>
-                              </label>
-                              
-                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={injectDb}
-                                  onChange={(e) => setInjectDb(e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
-                                />
-                                <div className="text-left">
-                                  <span className="block text-[11px] font-medium text-white lowercase">database url</span>
-                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject postgres://* leak</span>
-                                </div>
-                              </label>
-                              
-                              <label className="flex items-center gap-3 bg-neutral-950/40 border border-white/5 rounded-xl p-3 cursor-pointer hover:border-white/10 transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={injectSlack}
-                                  onChange={(e) => setInjectSlack(e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-white/10 bg-neutral-950 text-white focus:ring-0 focus:ring-offset-0"
-                                />
-                                <div className="text-left">
-                                  <span className="block text-[11px] font-medium text-white lowercase">slack webhook</span>
-                                  <span className="block text-[9px] font-mono text-neutral-500 lowercase">inject hooks.slack.com/* leak</span>
-                                </div>
-                              </label>
-                            </div>
-                          </div>
-                          
-                          <button
-                            type="submit"
-                            disabled={scanning}
-                            className="bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-5 py-3 lowercase transition-all select-none disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <svg fill="currentColor" className="w-3.5 h-3.5 text-black" viewBox="0 0 24 24">
-                              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482C19.138 20.197 22 16.44 22 12.017 22 6.484 17.522 2 12 2z" />
-                            </svg>
-                            create & scan repository
-                          </button>
-                        </form>
-                      </div>
-                    )}
-                  </>
+                  <div className="w-full">
+                    <GitHubNativeSecuritySuite
+                      repoName={customScanResults?.folderName && customScanResults.folderName.includes('/') ? customScanResults.folderName : selectedGithubRepo}
+                      githubUser={githubUser}
+                      scanning={scanning}
+                      onScanTrigger={() => handleGithubScan(selectedGithubRepo)}
+                      reposList={githubRepos}
+                      selectedRepo={selectedGithubRepo}
+                      onSelectRepo={setSelectedGithubRepo}
+                      findings={logs.flatMap(l => l.findings || [])}
+                      customScanResults={customScanResults}
+                      isLimitReached={githubSyncCount >= githubLimit && planName !== 'agency'}
+                      onUpgradeTrigger={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
+                      usageCount={githubSyncCount}
+                      usageLimit={githubLimit}
+                    />
+                  </div>
                 )}
               </div>
             ) : (
@@ -2955,7 +2776,7 @@ Report generated cryptographically via Securify SaaS platform.
                 {limitExceeded === 'website' ? (
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full text-left">
                     <div className="space-y-1.5 text-left">
-                      <span className="inline-block bg-red-950/40 border border-red-500/20 text-red-400 rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
+                      <span className="inline-block bg-[#161b22] border border-[#30363d] text-[#f85149] rounded-full px-3 py-0.5 text-[9px] font-mono lowercase">
                         usage limit exceeded
                       </span>
                       <h3 className="text-base font-semibold text-white lowercase">website audit limit reached</h3>
@@ -2965,20 +2786,10 @@ Report generated cryptographically via Securify SaaS platform.
                     </div>
                     <div className="flex gap-3 w-full md:w-auto shrink-0">
                       <button
-                        onClick={() => {
-                          setWebsiteScanCount(0);
-                          localStorage.setItem('securify_usage_website', '0');
-                          setLimitExceeded(null);
-                        }}
-                        className="flex-1 md:flex-none bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-white/5 text-xs font-mono px-5 py-3 rounded-xl transition-all lowercase whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
-                      >
-                        reset limit (demo)
-                      </button>
-                      <button
                         onClick={() => onPurchaseTrigger?.('pro', 'Pro', 'monthly')}
-                        className="flex-1 md:flex-none bg-white hover:bg-neutral-200 text-black text-xs font-mono font-medium rounded-xl px-6 py-3 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
+                        className="w-full md:w-auto bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-mono font-bold rounded-xl px-8 py-3.5 lowercase transition-all select-none whitespace-nowrap hover:scale-[1.02] active:scale-[0.98]"
                       >
-                        upgrade plan
+                        upgrade to pro plan (unlimited)
                       </button>
                     </div>
                   </div>
@@ -2986,18 +2797,12 @@ Report generated cryptographically via Securify SaaS platform.
                   <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="space-y-1 text-left">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="inline-block bg-white/5 border border-white/10 rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
+                      <span className="inline-block bg-[#161b22] border border-[#30363d] rounded-full px-3 py-0.5 text-[9px] font-mono text-neutral-300 lowercase">
                         production domain auditor
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border lowercase ${
-                        websiteScanCount >= websiteLimit
-                          ? 'bg-red-950/20 border-red-500/20 text-red-400'
-                          : websiteScanCount >= websiteLimit - 1
-                          ? 'bg-amber-950/20 border-amber-500/20 text-amber-400'
-                          : 'bg-white/5 border-white/10 text-neutral-300'
-                      }`}>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-mono border border-[#30363d] bg-[#161b22] text-neutral-300 lowercase">
                         <span className={`w-1.5 h-1.5 rounded-full ${
-                          websiteScanCount >= websiteLimit ? 'bg-red-500' : websiteScanCount >= websiteLimit - 1 ? 'bg-amber-500' : 'bg-emerald-400'
+                          websiteScanCount >= websiteLimit ? 'bg-[#f85149]' : websiteScanCount >= websiteLimit - 1 ? 'bg-[#d29922]' : 'bg-[#3fb950]'
                         }`} />
                         {planName === 'agency' ? `scans: ${websiteScanCount} / unlimited` : `scans: ${websiteScanCount} / ${websiteLimit} used`}
                       </span>

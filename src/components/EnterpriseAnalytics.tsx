@@ -40,11 +40,11 @@ export const EnterpriseAnalytics = () => {
 
   const loadAnalytics = async () => {
     setLoading(true);
-    
+
     try {
       // Load scan history from IndexedDB
       const scanHistory = await getScanHistory(1000); // Last 1000 scans
-      
+
       // Filter by time range
       const cutoffDate = Date.now() - getTimeRangeMs(timeRange);
       const recentScans = scanHistory.filter(s => s.timestamp >= cutoffDate);
@@ -197,15 +197,15 @@ export const EnterpriseAnalytics = () => {
     );
   }
 
-  const scoreColor = 
+  const scoreColor =
     analytics.securityScore >= 80 ? 'text-green-400' :
-    analytics.securityScore >= 60 ? 'text-yellow-400' :
-    analytics.securityScore >= 40 ? 'text-orange-400' : 'text-red-400';
+      analytics.securityScore >= 60 ? 'text-yellow-400' :
+        analytics.securityScore >= 40 ? 'text-orange-400' : 'text-red-400';
 
   const scoreLabel =
     analytics.securityScore >= 80 ? 'Excellent' :
-    analytics.securityScore >= 60 ? 'Good' :
-    analytics.securityScore >= 40 ? 'Fair' : 'Poor';
+      analytics.securityScore >= 60 ? 'Good' :
+        analytics.securityScore >= 40 ? 'Fair' : 'Poor';
 
   return (
     <div className="space-y-6">
@@ -219,11 +219,10 @@ export const EnterpriseAnalytics = () => {
             <button
               key={range}
               onClick={() => setTimeRange(range)}
-              className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-                timeRange === range
+              className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${timeRange === range
                   ? 'bg-white text-black'
                   : 'bg-neutral-900 text-neutral-400 hover:text-white'
-              }`}
+                }`}
             >
               {range}
             </button>
