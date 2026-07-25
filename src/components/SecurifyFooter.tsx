@@ -103,6 +103,16 @@ export const SecurifyFooter = ({ onSelectModal }: SecurifyFooterProps) => {
         </div>
 
       </div>
+
+      {/* Paddle Merchant of Record Compliance Notice */}
+      <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 text-[9px] text-neutral-600 font-mono">
+        <p className="lowercase">
+          our payment and order fulfillment process is conducted by our merchant of record partner <a href="https://paddle.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-neutral-400">paddle.com</a>. paddle provides customer support & invoice management.
+        </p>
+        <p className="lowercase shrink-0">
+          merchant support: <a href="mailto:omeriletisimportfolyo@gmail.com" className="text-neutral-400 hover:text-white underline">omeriletisimportfolyo@gmail.com</a>
+        </p>
+      </div>
     </footer>
   );
 };
