@@ -135,20 +135,34 @@ function App() {
     }
   }, [activeView]);
 
-  // Handle browser back/forward buttons (popstate)
+  // Handle browser back/forward buttons and initial URL query params/policies
   useEffect(() => {
-    const handlePopState = () => {
+    const handleUrlState = () => {
       const params = new URLSearchParams(window.location.search);
+      const pathname = window.location.pathname.toLowerCase();
+
+      const policyParam = params.get('policy') || params.get('modal');
       const viewParam = params.get('view') as ViewType;
+
+      if (policyParam === 'terms' || policyParam === 'sales_contract' || pathname.includes('/terms')) {
+        setActiveFooterModal('sales_contract');
+      } else if (policyParam === 'privacy' || policyParam === 'privacy_policy' || pathname.includes('/privacy')) {
+        setActiveFooterModal('privacy_policy');
+      } else if (policyParam === 'refund' || policyParam === 'returns' || policyParam === 'return_policy' || pathname.includes('/refund')) {
+        setActiveFooterModal('return_policy');
+      }
+
       const validViews: ViewType[] = ['home', 'rules', 'dashboard', 'sandbox', 'install', 'contact', 'auditor', 'pricing'];
       if (viewParam && validViews.includes(viewParam)) {
         setActiveView(viewParam);
-      } else {
-        setActiveView('home');
+      } else if (pathname.includes('/pricing')) {
+        setActiveView('pricing');
       }
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    handleUrlState();
+    window.addEventListener('popstate', handleUrlState);
+    return () => window.removeEventListener('popstate', handleUrlState);
   }, []);
 
   // Checkout Email Modal states
