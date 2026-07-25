@@ -144,6 +144,11 @@ securify entropy "sk_test_51N34ghJkL90"
 
 ---
 
+
+[![Securify Secured](https://securify.gucluyumhe.dev/badge.svg?domain=sandrotonal%2Fanti_security&grade=A)](https://securify.gucluyumhe.dev)
+
+
+
 ## Lisans
 
 MIT
