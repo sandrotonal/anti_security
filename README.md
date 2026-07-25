@@ -1,4 +1,4 @@
-# Securify
+# Securify        [![Securify Secured](https://securify.gucluyumhe.dev/badge.svg?domain=sandrotonal%2Fanti_security&grade=A)](https://securify.gucluyumhe.dev)
 
 Securify, kod tabanlarındaki hassas veri sızıntılarını (API anahtarları, veri tabanı kimlik bilgileri, bulut erişim tokenları) yerel makinede tespit eden, güvenlik odaklı bir istemci taraflı statik kod analiz ve bağımlılık denetleme yazılımıdır. 
 
