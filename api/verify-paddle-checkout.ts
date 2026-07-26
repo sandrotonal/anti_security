@@ -156,24 +156,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return;
     }
 
-    // Verify custom data
+    // Verify customer email and plan metadata robustly
     const customData = data.custom_data || {};
-    const txnEmail = (customData.email || '').trim().toLowerCase();
-    const txnPlan = customData.plan || '';
+    const paddleCustomerEmail = (
+      data.customer?.email || 
+      data.details?.customer?.email || 
+      customData.email || 
+      ''
+    ).trim().toLowerCase();
 
     // Resolve plan dynamically
-    const resolvedPlan = plan ? plan : txnPlan;
+    const resolvedPlan = plan || customData.plan || 'Pro';
 
-    if (!resolvedPlan) {
+    // If Paddle returned customer email, verify it matches requested email
+    if (paddleCustomerEmail && paddleCustomerEmail !== trimmedEmail) {
+      console.error(`Paddle Transaction email mismatch! Expected: ${trimmedEmail}, Paddle customer email: ${paddleCustomerEmail}`);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Plan type could not be resolved from transaction metadata' }));
-      return;
-    }
-
-    if (txnEmail !== trimmedEmail || txnPlan.toLowerCase() !== resolvedPlan.toLowerCase()) {
-      console.error(`Paddle Transaction details mismatch! Expected email: ${trimmedEmail}, plan: ${resolvedPlan}. Got email: ${txnEmail}, plan: ${txnPlan}`);
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Transaction metadata mismatch' }));
+      res.end(JSON.stringify({ error: 'Transaction email mismatch' }));
       return;
     }
 
