@@ -3182,24 +3182,27 @@ Report generated cryptographically via Securify SaaS platform.
                     close terminal
                   </button>
                 </div>
-                
+
                 <div className="bg-black border border-white/5 rounded-2xl p-4 min-h-[160px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-1.5 text-left text-neutral-400 font-mono text-[11px] leading-relaxed">
-                  {activeSiteExploitSim.logs.map((log, lIdx) => (
-                    <div 
-                      key={lIdx} 
-                      className={
-                        log.startsWith('[!]') 
-                          ? 'text-red-400 font-semibold font-mono' 
-                          : log.startsWith('[+]') 
-                            ? 'text-emerald-400 font-mono' 
-                            : log.startsWith('$') 
-                              ? 'text-white font-mono' 
-                              : 'text-neutral-500 font-mono'
-                      }
-                    >
-                      {log}
-                    </div>
-                  ))}
+                  {activeSiteExploitSim.logs.map((log, lIdx) => {
+                    const safeLog = String(log || '');
+                    return (
+                      <div 
+                        key={lIdx} 
+                        className={
+                          safeLog.startsWith('[!]') 
+                            ? 'text-red-400 font-semibold font-mono' 
+                            : safeLog.startsWith('[+]') 
+                              ? 'text-emerald-400 font-mono' 
+                              : safeLog.startsWith('$') 
+                                ? 'text-white font-mono' 
+                                : 'text-neutral-500 font-mono'
+                        }
+                      >
+                        {log || ''}
+                      </div>
+                    );
+                  })}
                   {activeSiteExploitSim.logs.length < 8 && (
                     <div className="text-neutral-600 animate-pulse font-mono">_ executing simulation payload...</div>
                   )}
@@ -5049,14 +5052,15 @@ ServerTokens Prod`}</pre>
               <div className="p-5 bg-black overflow-y-auto flex-1 font-mono text-[11px] leading-relaxed text-neutral-300 select-text min-h-[300px] max-h-[450px] space-y-2 custom-scrollbar">
                 {simulatedConsoleLogs.map((log, index) => {
                   let logClass = 'text-neutral-300';
-                  if (log.startsWith('[!]')) logClass = 'text-red-500 font-bold';
-                  else if (log.startsWith('[+]')) logClass = 'text-emerald-400';
-                  else if (log.startsWith('$')) logClass = 'text-sky-400 font-bold';
-                  else if (log.startsWith('[~]')) logClass = 'text-amber-400 animate-pulse';
+                  const strLog = String(log || '');
+                  if (strLog.startsWith('[!]')) logClass = 'text-red-500 font-bold';
+                  else if (strLog.startsWith('[+]')) logClass = 'text-emerald-400';
+                  else if (strLog.startsWith('$')) logClass = 'text-sky-400 font-bold';
+                  else if (strLog.startsWith('[~]')) logClass = 'text-amber-400 animate-pulse';
 
                   return (
                     <div key={index} className={`${logClass} whitespace-pre-wrap break-all`}>
-                      {log}
+                      {log || ''}
                     </div>
                   );
                 })}
