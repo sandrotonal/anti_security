@@ -490,7 +490,7 @@ export const SecurifySandbox = () => {
   const runDependencyScan = () => {
     setDependencyScanning(true);
     setTimeout(() => {
-      let detectedDeps: { name: string; version: string }[] = [];
+      const detectedDeps: { name: string; version: string }[] = [];
       
       const isJson = dependencyCode.trim().startsWith('{');
       const isCargo = dependencyCode.includes('[dependencies]') || dependencyCode.includes('[package]');

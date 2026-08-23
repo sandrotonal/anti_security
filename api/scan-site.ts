@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { Resolver } from 'dns';
+import * as dns from 'dns';
+import * as net from 'net';
 import { URL } from 'url';
 
 interface VercelRequest extends IncomingMessage {
@@ -13,31 +14,219 @@ interface VercelResponse extends ServerResponse {
   send: (body: any) => void;
 }
 
-// SSRF Mitigation: Check if the IP is in private address ranges
-function isPrivateIp(ip: string): boolean {
-  if (!ip) return true;
-  const ipv4PrivateRegex = /^(?:10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|127\.\d+\.\d+\.\d+|0\.\d+\.\d+\.\d+)$/;
-  const ipv6PrivateRegex = /^(?:::1|fe80::.*|fc00::.*|fd00::.*)$/i;
-  return ipv4PrivateRegex.test(ip) || ipv6PrivateRegex.test(ip);
+// Convert IPv4 string to 32-bit unsigned number
+function ipv4ToNumber(ip: string): number {
+  return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
 }
 
-function resolveDns(hostname: string): Promise<string[]> {
-  return new Promise((resolve) => {
-    const resolver = new Resolver();
-    resolver.resolve4(hostname, (err, addresses) => {
-      if (err || !addresses || addresses.length === 0) {
-        resolver.resolve6(hostname, (err6, addresses6) => {
-          if (err6 || !addresses6 || addresses6.length === 0) {
-            resolve([]);
-          } else {
-            resolve(addresses6);
-          }
-        });
-      } else {
-        resolve(addresses);
+// Comprehensive SSRF IP Blacklist Checker (IPv4 & IPv6)
+export function isForbiddenIp(ip: string): boolean {
+  if (!ip) return true;
+  const cleanIp = ip.replace(/%.+$/, '').trim(); // Remove IPv6 zone index
+
+  // Check for IPv4 mapped IPv6 (::ffff:127.0.0.1 or ::ffff:7f00:1)
+  if (cleanIp.startsWith('::ffff:')) {
+    const v4Part = cleanIp.substring(7);
+    if (net.isIPv4(v4Part)) {
+      return isForbiddenIp(v4Part);
+    }
+  }
+
+  // IPv4 Checks
+  if (net.isIPv4(cleanIp)) {
+    const octets = cleanIp.split('.').map(Number);
+    const [o1, o2, o3, o4] = octets;
+
+    // 0.0.0.0/8 (Broadcast/Current network)
+    if (o1 === 0) return true;
+    // 10.0.0.0/8 (RFC 1918 Private)
+    if (o1 === 10) return true;
+    // 100.64.0.0/10 (Shared Address Space / CGNAT: 100.64.0.0 to 100.127.255.255)
+    if (o1 === 100 && o2 >= 64 && o2 <= 127) return true;
+    // 127.0.0.0/8 (Loopback)
+    if (o1 === 127) return true;
+    // 169.254.0.0/16 (Link-Local & Cloud Metadata: 169.254.169.254)
+    if (o1 === 169 && o2 === 254) return true;
+    // 172.16.0.0/12 (RFC 1918 Private: 172.16.0.0 to 172.31.255.255)
+    if (o1 === 172 && o2 >= 16 && o2 <= 31) return true;
+    // 192.0.0.0/24 (IETF Protocol Assignments)
+    if (o1 === 192 && o2 === 0 && o3 === 0) return true;
+    // 192.0.2.0/24 (TEST-NET-1 / Documentation)
+    if (o1 === 192 && o2 === 0 && o3 === 2) return true;
+    // 192.88.99.0/24 (6to4 Relay Anycast)
+    if (o1 === 192 && o2 === 88 && o3 === 99) return true;
+    // 192.168.0.0/16 (RFC 1918 Private)
+    if (o1 === 192 && o2 === 168) return true;
+    // 198.18.0.0/15 (Network Interconnect Device Benchmark: 198.18.0.0 to 198.19.255.255)
+    if (o1 === 198 && (o2 === 18 || o2 === 19)) return true;
+    // 198.51.100.0/24 (TEST-NET-2 / Documentation)
+    if (o1 === 198 && o2 === 51 && o3 === 100) return true;
+    // 203.0.113.0/24 (TEST-NET-3 / Documentation)
+    if (o1 === 203 && o2 === 0 && o3 === 113) return true;
+    // 224.0.0.0/4 (Multicast 224.0.0.0 to 239.255.255.255)
+    if (o1 >= 224 && o1 <= 239) return true;
+    // 240.0.0.0/4 (Reserved for future use 240.0.0.0 to 255.255.255.255)
+    if (o1 >= 240) return true;
+
+    return false;
+  }
+
+  // IPv6 Checks
+  if (net.isIPv6(cleanIp)) {
+    const lower = cleanIp.toLowerCase();
+    // Unspecified :: or Loopback ::1
+    if (lower === '::' || lower === '::1' || lower === '0000:0000:0000:0000:0000:0000:0000:0001' || lower === '0:0:0:0:0:0:0:1') return true;
+    // Link-local unicast fe80::/10
+    if (/^fe[89ab]/i.test(lower)) return true;
+    // Unique Local Address (ULA) fc00::/7 (fc00:: - fdff::)
+    if (/^f[cd]/i.test(lower)) return true;
+    // Multicast ff00::/8
+    if (/^ff/i.test(lower)) return true;
+    // Documentation 2001:db8::/32
+    if (/^2001:0?db8/i.test(lower)) return true;
+    // Discard-only prefix 100::/64
+    if (/^0?100:/i.test(lower)) return true;
+
+    return false;
+  }
+
+  // Non-standard format or unparseable IP -> Treat as forbidden (fail-closed)
+  return true;
+}
+
+// Validate Target URL and resolve DNS with strict SSRF controls
+export async function validateTargetUrl(rawUrl: string): Promise<{ safe: boolean; error?: string; url?: URL }> {
+  let cleanUrl = rawUrl.trim();
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    cleanUrl = 'https://' + cleanUrl;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(cleanUrl);
+  } catch {
+    return { safe: false, error: 'Invalid URL format' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { safe: false, error: `Disallowed protocol '${parsed.protocol}'. Only HTTP and HTTPS are permitted.` };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost and standard internal domain names
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.corp') ||
+    hostname.endsWith('.lan') ||
+    hostname === 'metadata.google.internal' ||
+    hostname === 'instance-data'
+  ) {
+    return { safe: false, error: 'Access to local or internal domain names is forbidden' };
+  }
+
+  // Restrict allowed ports to standard web ports
+  const port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80);
+  const allowedPorts = [80, 443, 8080, 8443, 3000, 5000, 8000, 8008];
+  if (!allowedPorts.includes(port)) {
+    return { safe: false, error: `Scanning port ${port} is forbidden for security reasons.` };
+  }
+
+  // If hostname is literal IP
+  if (net.isIP(hostname)) {
+    if (isForbiddenIp(hostname)) {
+      return { safe: false, error: 'Access to private, loopback, or reserved IP addresses is forbidden' };
+    }
+    return { safe: true, url: parsed };
+  }
+
+  // Resolve hostname via DNS for both IPv4 and IPv6 in parallel
+  try {
+    const [v4Result, v6Result] = await Promise.allSettled([
+      dns.promises.resolve4(hostname),
+      dns.promises.resolve6(hostname)
+    ]);
+
+    const resolvedIps: string[] = [];
+    if (v4Result.status === 'fulfilled' && Array.isArray(v4Result.value)) {
+      resolvedIps.push(...v4Result.value);
+    }
+    if (v6Result.status === 'fulfilled' && Array.isArray(v6Result.value)) {
+      resolvedIps.push(...v6Result.value);
+    }
+
+    if (resolvedIps.length === 0) {
+      return { safe: false, error: `Could not resolve domain '${hostname}'. DNS lookup failed.` };
+    }
+
+    // Check every resolved IP address against the blacklist (fail-closed if any IP is private)
+    for (const ip of resolvedIps) {
+      if (isForbiddenIp(ip)) {
+        return { safe: false, error: `Domain '${hostname}' resolved to a forbidden/private IP space (${ip}). Access blocked.` };
       }
-    });
-  });
+    }
+
+    return { safe: true, url: parsed };
+  } catch (err: any) {
+    return { safe: false, error: `DNS resolution error for '${hostname}': ${err.message}` };
+  }
+}
+
+// Fetch target URL with per-hop SSRF validation on redirects (up to 3 hops)
+async function safeFetchWithRedirects(initialUrl: string): Promise<{ response: Response; finalUrl: string }> {
+  let currentUrl = initialUrl;
+  let hops = 0;
+  const maxHops = 3;
+
+  while (hops <= maxHops) {
+    const validation = await validateTargetUrl(currentUrl);
+    if (!validation.safe || !validation.url) {
+      throw new Error(validation.error || 'SSRF validation failed');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    let res: Response;
+    try {
+      res = await fetch(validation.url.toString(), {
+        method: 'GET',
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'Securify-Auditor-Engine/3.0 (SaaS Scanner; https://securify.gucluyumhe.dev)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw new Error(`Connection to target failed: ${err.message}`);
+    }
+
+    // Check if redirect
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) {
+        return { response: res, finalUrl: currentUrl };
+      }
+      hops++;
+      if (hops > maxHops) {
+        throw new Error('Too many redirects (maximum 3 hops allowed)');
+      }
+      // Resolve relative redirect URL against current URL
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+
+    return { response: res, finalUrl: currentUrl };
+  }
+
+  throw new Error('Too many redirects');
 }
 
 // Advanced CSP quality scoring: a present but weak CSP is still a finding
@@ -132,67 +321,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cleanUrl = 'https://' + cleanUrl;
     }
 
-    let parsedTarget: URL;
-    try {
-      parsedTarget = new URL(cleanUrl);
-    } catch {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'invalid url format' }));
-      return;
-    }
-
-    const hostname = parsedTarget.hostname;
-
-    const ips = await resolveDns(hostname);
-    if (ips.length > 0) {
-      const containsPrivateIp = ips.some(ip => isPrivateIp(ip));
-      if (containsPrivateIp) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'access to internal or private IP address spaces is forbidden' }));
-        return;
-      }
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
     let fetchRes: Response;
+    let finalUrl: string;
     try {
-      fetchRes = await fetch(cleanUrl, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Securify-Auditor-Engine/3.0 (SaaS Scanner; https://securify.gucluyumhe.dev)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9'
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-    } catch (fetchErr: any) {
-      clearTimeout(timeoutId);
-      if (cleanUrl.startsWith('https://')) {
-        const fallbackUrl = cleanUrl.replace(/^https:\/\//i, 'http://');
-        const fallbackController = new AbortController();
-        const fallbackTimeout = setTimeout(() => fallbackController.abort(), 5000);
-        try {
-          fetchRes = await fetch(fallbackUrl, {
-            method: 'GET',
-            headers: {
-              'User-Agent': 'Securify-Auditor-Engine/3.0 (SaaS Scanner; https://securify.gucluyumhe.dev)',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-            },
-            signal: fallbackController.signal
-          });
-          clearTimeout(fallbackTimeout);
-          cleanUrl = fallbackUrl;
-        } catch {
-          clearTimeout(fallbackTimeout);
-          throw new Error('target host unreachable or connection timed out');
-        }
-      } else {
-        throw new Error('target host unreachable or connection timed out');
-      }
+      const result = await safeFetchWithRedirects(cleanUrl);
+      fetchRes = result.response;
+      finalUrl = result.finalUrl;
+    } catch (err: any) {
+      const msg = err.message || 'Target host unreachable or forbidden';
+      const isForbidden = msg.includes('forbidden') || msg.includes('SSRF') || msg.includes('blocked') || msg.includes('internal');
+      res.writeHead(isForbidden ? 403 : 502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: msg }));
+      return;
     }
 
     const rawHeaders: { [key: string]: string } = {};
@@ -447,10 +587,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const riskLevel = failedCritical >= 1 ? 'CRITICAL' : failedHigh >= 2 ? 'HIGH' : totalFailed >= 3 ? 'MEDIUM' : 'LOW';
 
+    const finalHostname = new URL(finalUrl).hostname;
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      url: cleanUrl,
-      domain: hostname,
+      url: finalUrl,
+      domain: finalHostname,
       scannedAt: new Date().toISOString(),
       sslActive,
       headers: rawHeaders,

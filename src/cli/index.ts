@@ -3,9 +3,9 @@
 // Securify CLI - Real Security Scanner
 // No mock data - production-ready tool
 
-import { scanContent } from '../lib/scanEngine';
-import { parseDependencyFile } from '../lib/dependencyParser';
-import { batchQueryVulnerabilities } from '../lib/cveDatabase';
+import { scanContent } from '../lib/scanEngine.ts';
+import { parseDependencyFile } from '../lib/dependencyParser.ts';
+import { batchQueryVulnerabilities } from '../lib/cveDatabase.ts';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -246,6 +246,92 @@ async function scanDependencies(dirPath: string, options: CLIOptions): Promise<a
   return vulnerabilities;
 }
 
+// Generate SARIF 2.1.0 report
+export function generateSarifReport(findings: any[], _depVulns: any[] = []): string {
+  const sarif = {
+    $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    version: '2.1.0',
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: 'Securify',
+            version: '2.4.0',
+            informationUri: 'https://securify.gucluyumhe.dev',
+            rules: Array.from(new Set(findings.map(f => f.type))).map(type => ({
+              id: type.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              name: type,
+              shortDescription: { text: `Hardcoded credential leak: ${type}` },
+              help: { text: `Revoke this secret immediately and store in environment variables or a secrets manager.` },
+              defaultConfiguration: {
+                level: findings.find(f => f.type === type)?.severity === 'critical' || findings.find(f => f.type === type)?.severity === 'high' ? 'error' : 'warning'
+              }
+            }))
+          }
+        },
+        results: findings.map(f => ({
+          ruleId: f.type.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          level: f.severity === 'critical' || f.severity === 'high' ? 'error' : 'warning',
+          message: {
+            text: `Hardcoded ${f.type} credential detected (${f.redacted || '***'}).`
+          },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: {
+                  uri: f.file.replace(/\\/g, '/')
+                },
+                region: {
+                  startLine: f.line || 1,
+                  startColumn: f.column || 1
+                }
+              }
+            }
+          ]
+        }))
+      }
+    ]
+  };
+
+  return JSON.stringify(sarif, null, 2);
+}
+
+// Generate Markdown table report
+export function generateMarkdownReport(findings: any[], depVulns: any[], stats: { total: number; critical: number; high: number; medium: number; low: number }): string {
+  let md = '# Securify Security Audit Report\n\n';
+  md += `**Scan Date:** ${new Date().toUTCString()}  \n`;
+  md += `**Total Issues:** ${stats.total} (🔴 Critical: ${stats.critical}, 🟠 High: ${stats.high}, 🟡 Medium: ${stats.medium}, 🔵 Low: ${stats.low})\n\n`;
+
+  if (findings.length > 0) {
+    md += '## Hardcoded Secrets Detected\n\n';
+    md += '| Severity | Type | File:Line | Secret Sample | Action Required |\n';
+    md += '| :--- | :--- | :--- | :--- | :--- |\n';
+    findings.forEach(f => {
+      const badge = f.severity === 'critical' ? '🔴 Critical' :
+                    f.severity === 'high' ? '🟠 High' :
+                    f.severity === 'medium' ? '🟡 Medium' : '🔵 Low';
+      md += `| ${badge} | ${f.type} | \`${f.file}:${f.line}\` | \`${f.redacted || '***'}\` | Revoke & Rotate |\n`;
+    });
+    md += '\n';
+  }
+
+  if (depVulns.length > 0) {
+    md += '## Dependency Vulnerabilities (CVE / OSV)\n\n';
+    md += '| Manifest | Package | Vulnerability Count |\n';
+    md += '| :--- | :--- | :--- |\n';
+    depVulns.forEach(dv => {
+      md += `| \`${dv.file}\` | \`${dv.package}\` | ${dv.vulnerabilities.length} issue(s) |\n`;
+    });
+    md += '\n';
+  }
+
+  if (findings.length === 0 && depVulns.length === 0) {
+    md += '## Status: Clean\n\nNo credential leaks or known dependency vulnerabilities were detected.\n';
+  }
+
+  return md;
+}
+
 // Format and output results
 function outputResults(findings: any[], depVulns: any[], options: CLIOptions) {
   const stats = {
@@ -275,15 +361,16 @@ function outputResults(findings: any[], depVulns: any[], options: CLIOptions) {
     dependencies: depVulns,
   };
 
-  if (options.format === 'json') {
-    const output = JSON.stringify(exportData, null, 2);
-    if (options.output) {
-      fs.writeFileSync(options.output, output);
-      console.log(`Results written to ${options.output}`);
-    } else {
-      console.log(output);
-    }
-  } else if (options.format === 'text') {
+  let contentToWrite = '';
+
+  if (options.format === 'sarif') {
+    contentToWrite = generateSarifReport(findings, depVulns);
+  } else if (options.format === 'markdown') {
+    contentToWrite = generateMarkdownReport(findings, depVulns, stats);
+  } else if (options.format === 'json') {
+    contentToWrite = JSON.stringify(exportData, null, 2);
+  } else {
+    // Default: text/terminal format
     console.log('\n═══════════════════════════════════════════════════════════');
     console.log('              SECURIFY SECURITY SCAN RESULTS');
     console.log('═══════════════════════════════════════════════════════════\n');
@@ -317,11 +404,20 @@ function outputResults(findings: any[], depVulns: any[], options: CLIOptions) {
     }
 
     console.log('═══════════════════════════════════════════════════════════\n');
+  }
 
-    // Exit with error code if critical/high findings
-    if (stats.critical > 0 || stats.high > 0) {
-      process.exit(1);
+  if (contentToWrite) {
+    if (options.output) {
+      fs.writeFileSync(options.output, contentToWrite, 'utf-8');
+      console.log(`Scan report successfully written to: ${options.output}`);
+    } else {
+      console.log(contentToWrite);
     }
+  }
+
+  // Unified exit code policy across ALL formats: exit with error code if critical/high findings exist
+  if (stats.critical > 0 || stats.high > 0) {
+    process.exit(1);
   }
 }
 
@@ -329,7 +425,9 @@ function outputResults(findings: any[], depVulns: any[], options: CLIOptions) {
 async function main() {
   const options = parseArgs();
 
-  console.log('Securify CLI - Starting scan...\n');
+  if (options.verbose || options.format === 'text') {
+    console.log('Securify CLI - Starting scan...\n');
+  }
 
   if (!fs.existsSync(options.path!)) {
     console.error(`Error: Path '${options.path}' does not exist`);
@@ -349,7 +447,24 @@ async function main() {
   outputResults(findings, depVulns, options);
 }
 
-main().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+import { fileURLToPath } from 'url';
+
+// Run only when executed directly via CLI
+const isDirectCliRun = Boolean(
+  process.argv[1] && (
+    fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) ||
+    process.argv[1].endsWith('src/cli/index.ts') ||
+    process.argv[1].endsWith('src\\cli\\index.ts') ||
+    process.argv[1].endsWith('bin/securify.js') ||
+    process.argv[1].endsWith('bin\\securify.js') ||
+    process.argv[1].endsWith('dist/cli/index.js') ||
+    process.argv[1].endsWith('dist\\cli\\index.js')
+  )
+);
+
+if (isDirectCliRun) {
+  main().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}

@@ -1,142 +1,265 @@
+<div align="center">
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="96" height="96" fill="none">
+  <path d="M 128 192 L 128 256 L 64.5 256 L 32 223 L 0 192 L 0 128 L 64 128 Z M 256 192 L 256 256 L 192.5 256 L 160 223 L 128 192 L 128 128 L 192 128 Z M 128 64 L 128 128 L 64.5 128 L 32 95 L 0 64 L 0 0 L 64 0 Z M 256 64 L 256 128 L 192.5 128 L 160 95 L 128 64 L 128 0 L 192 0 Z" fill="#10b981"/>
+</svg>
+
 # Securify
 
-Securify, kod tabanlarındaki hassas veri sızıntılarını (API anahtarları, veri tabanı kimlik bilgileri, bulut erişim tokenları) yerel makinede tespit eden, güvenlik odaklı bir istemci taraflı statik kod analiz ve bağımlılık denetleme yazılımıdır. 
+### Enterprise-Grade Zero-Knowledge Secret Scanner & CVE Dependency Auditor
 
-Yazılım hem bir komut satırı arayüzü (CLI) hem de gelişmiş bir web uygulamasından oluşur. Kod analizi, güvenlik taraması ve harici entegrasyonlar tamamen tarayıcı üzerinde ve yerel makinede çalışacak şekilde yapılandırılmıştır.
+[![npm version](https://img.shields.io/npm/v/securify-cli.svg?style=flat-square&color=10b981)](https://www.npmjs.com/package/securify-cli)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Rust](https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&logo=rust&logoColor=black)](https://www.rust-lang.org/)
+[![SARIF 2.1.0](https://img.shields.io/badge/SARIF-2.1.0-8A2BE2?style=flat-square)](https://sarifweb.azurewebsites.net/)
+[![OWASP Top 10](https://img.shields.io/badge/OWASP-Compliant-000000?style=flat-square&logo=owasp&logoColor=white)](https://owasp.org/)
 
----
+**Securify** is a high-performance, client-side static security analysis platform and command-line tool designed to detect hardcoded secrets, credential leaks, and supply chain CVE vulnerabilities before they reach production.
 
-## Mimari Prensipler ve Güvenlik Tasarımı
+[Live Web Platform](https://securify.gucluyumhe.dev) &bull; [npm Package](https://www.npmjs.com/package/securify-cli) &bull; [Documentation](https://securify.gucluyumhe.dev) &bull; [Security Policy](public/security-policy.html)
 
-Securify, OWASP Top 10 güvenlik standartlarına ve sıfır bilgi (Zero-Knowledge) prensibine uygun olarak tasarlanmıştır:
-
-1. **Sıfır Bilgi Tabanlı Kod Analizi (Zero-Knowledge Analysis):** Taranan kaynak kodlar hiçbir şekilde uzak sunuculara gönderilmez. Düzenli ifade (regex) taramaları ve Shannon Entropi hesaplamaları tamamen kullanıcının tarayıcısında (Web Workers aracılığıyla) veya yerel CLI üzerinde gerçekleştirilir.
-2. **Aktif Doğrulama Güvenliği (Active Token Verification):** Tespit edilen gizli anahtarların aktif olup olmadığını sorgulamak için tasarlanan sunucusuz işlevler (/api/verify-secret.ts), ilgili anahtarı doğrudan sağlayıcının (Stripe, AWS, GitHub vb.) resmi API uç noktalarıyla sunucu tarafında güvenli bir şekilde eşleştirir. Bu sayede tarayıcı tarafına hassas istemci sırları sızdırılmaz.
-3. **SSRF (Server-Side Request Forgery) Koruması:** Web sitesi tarayıcısı API'si, hedef alan adlarını çözümlemek için dinamik DNS çözümlemesi uygular. Loopback (127.0.0.1, ::1) ve RFC 1918 kapsamındaki özel IP aralıklarına yapılan istekleri engelleyerek iç ağ taraması saldırılarını engeller.
-4. **Kriptografik İşlem Doğrulama (Shopier Integration):** Tüm ödeme ve abonelik onay süreçleri HMAC-SHA256 imzaları ile güvence altına alınmıştır. Webhook geri çağrıları, sağlayıcının gizli token değeriyle doğrulanarak sahte sipariş onaylarının önüne geçilir.
-5. **Erişim Kontrolü ve JWT:** Hesap doğrulama ve oturum yönetimi, sunucu tarafında oluşturulan kriptografik JWT (JSON Web Token) yapılarını kullanır.
-
----
-
-## Temel Özellikler ve Modüller
-
-### 1. Gerçek Zamanlı CVE Veritabanı Entegrasyonu
-- OSV.dev ve GitHub Advisory API'leri ile doğrudan entegrasyon.
-- Projedeki bağımlılıkların güvenlik açıklarını paralel sorgularla (10'lu paketler halinde) analiz eden mekanizma.
-- Farklı veri tabanlarından dönen açıkların çakışmasını engelleyen tekilleştirme ve önceliklendirme algoritması.
-
-### 2. Çoklu Dil Bağımlılık Ayrıştırıcısı (Dependency Parser)
-Aşağıdaki manifest dosyalarını yerel olarak ayrıştırarak kütüphane adı, sürüm ve ekosistem bilgisini çıkarır:
-- **npm / yarn / pnpm:** package.json
-- **Python pip / pipenv:** requirements.txt, Pipfile.lock
-- **Go Modules:** go.mod
-- **Rust Crates:** Cargo.toml
-- **Java Maven:** pom.xml
-- **PHP Composer:** composer.json
-- **Ruby:** Gemfile.lock
-
-### 3. Web Worker Tabanlı Eşzamanlı Tarama Motoru
-- Büyük dizinlerin taranması sırasında ana tarayıcı arayüzünün (main thread) kilitlenmesini önlemek için arka planda çalışan çoklu Web Worker yapısı.
-- Dizin taramalarında `.gitignore` ve `.securifyignore` kurallarını otomatik olarak Regex desenlerine dönüştürerek hariç tutulacak dosyaları süzebilen glob parser yapısı.
-
-### 4. Gelişmiş Şifreleme ve Entropi Analizi
-- Rastgele, kriptografik olarak güvenli (CSPRNG) gizli anahtar oluşturucu.
-- Parola ve anahtarların Shannon Entropi değerini hesaplayarak karmaşıklık analizi yapan araç.
-- Olası kaba kuvvet (brute-force) kırılma sürelerini hesaplayan tahminleme algoritması.
-
-### 5. Özelleştirilmiş Fiyatlandırma ve Performans Simülatörü
-- Kullanıcılara yerel taramanın hızını görselleştiren, kod tabanı boyutuna bağlı olarak yerel tarayıcı motoru ile bulut tabanlı tarayıcıların performansını karşılaştıran interaktif simülasyon aracı.
-- Paddle entegrasyonu ve abonelik durumu kaybolduğunda geri yükleme sağlayan doğrulama mekanizması.
+</div>
 
 ---
 
-## Proje Dizini Yapısı
+## Overview
+
+Securify delivers zero-knowledge security scanning directly in the browser and across modern CI/CD pipelines. Source code never leaves the local execution boundary: pattern matching, Shannon entropy calculations, and git diff audits are performed entirely on-device or within sandboxed Web Workers.
+
+### Core Capabilities
+
+- **Zero-Knowledge SAST Engine**: Audits 40+ credential types across 30+ file formats without transmitting source code to external servers.
+- **Supply Chain CVE/OSV Auditing**: Resolves dependencies against OSV.dev and GitHub Advisory databases using an internal semver range engine.
+- **SARIF 2.1.0 & Code Scanning Export**: Emits standardized SARIF output compatible with GitHub Code Scanning, SonarQube, and GitLab Security Center.
+- **Git Sentinel & Pre-Commit Hardening**: Intercepts committed secrets with stage-only (`--staged`) delta scans and automated git hook generation.
+- **Enterprise Web Interface**: Interactive terminal sandbox, live website SSRF-safe vulnerability inspector, and real-time GitHub repository scanning.
+
+---
+
+## Quick Start
+
+### 1. Instant Execution (Zero Installation)
+
+Run a zero-configuration audit against your current working directory:
+
+```bash
+npx securify-cli scan .
+```
+
+### 2. Dependency Vulnerability Audit
+
+Scan package manifests for known CVEs and supply chain advisories:
+
+```bash
+npx securify-cli scan . --dependencies
+```
+
+### 3. Generate SARIF for CI/CD Pipelines
+
+Export structured findings for GitHub Code Scanning or security dashboards:
+
+```bash
+npx securify-cli scan . --format sarif --output securify-report.sarif
+```
+
+### 4. Generate Markdown Summary Table
+
+Export formatted audit tables for pull request comments or documentation:
+
+```bash
+npx securify-cli scan . --format markdown --output audit-report.md
+```
+
+### 5. Global Installation
+
+Install globally on your workstation:
+
+```bash
+npm install -g securify-cli
+securify scan .
+```
+
+---
+
+## Command-Line Interface (CLI)
 
 ```
-/
-├── api/                  # Vercel Sunucusuz (Serverless) Fonksiyonları
-│   └── verify-secret.ts  # Aktif API anahtarı doğrulama servisi
-├── cli/                  # Rust CLI Kod Tabanı
+USAGE:
+  securify [options]
+
+OPTIONS:
+  -p, --path <path>          Target directory to scan (default: current directory)
+  -o, --output <file>        Output file destination
+  -f, --format <format>      Output format: text, json, sarif, markdown (default: text)
+  -s, --severity <level>     Minimum severity threshold: critical, high, medium, low
+  -e, --exclude <pattern>    Exclude pattern or directory path
+  --include-tests            Include test suites and fixtures in analysis
+  -d, --dependencies         Enable dependency vulnerability scanning (CVE / OSV)
+  --verbose                  Enable verbose debugging output
+  -h, --help                 Display help information
+  -v, --version              Display CLI version
+```
+
+---
+
+## GitHub Actions CI/CD Integration
+
+Embed Securify directly into your deployment pipeline with automated pull request comments and GitHub Security alerts:
+
+```yaml
+name: Securify Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  security-scan:
+    name: Secrets & CVE Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Securify Scanner
+        run: |
+          mkdir -p scan-results
+          npx securify-cli scan . --format sarif --output scan-results/securify.sarif --dependencies
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scan-results/securify.sarif
+          category: securify-scanner
+```
+
+---
+
+## Detection Coverage
+
+Securify includes curated regular expression patterns calibrated with Shannon entropy thresholds and confidence scoring:
+
+| Category | Target Secret / Credential Type | Confidence | Severity |
+| :--- | :--- | :--- | :--- |
+| **Cloud Infrastructure** | AWS Access Key ID (`AKIA...`), AWS Secret Access Key | High | Critical |
+| **Cloud Infrastructure** | Google Cloud API Keys (`AIzaSy...`), GCP Service Account Keys | High | High |
+| **Cloud Infrastructure** | Azure Shared Access Keys, Azure DevOps Tokens | High | Critical |
+| **Payment Processors** | Stripe Secret Keys (`sk_live_...`, `sk_test_...`), Webhook Secrets | High | Critical |
+| **Payment Processors** | Square Access Tokens, PayPal Client Credentials | High | Critical |
+| **Source Control** | GitHub Personal Access Tokens (`ghp_...`, `gho_...`), Fine-Grained Tokens | High | High |
+| **Source Control** | GitLab Personal & Pipeline Tokens (`glpat-...`) | High | High |
+| **Databases** | PostgreSQL, MySQL, MongoDB, Redis, Supabase Service Role JWTs | High | Critical |
+| **Cryptographic Keys** | RSA, DSA, EC, PGP, OpenSSH Private Key Blocks | High | Critical |
+| **Messaging & SaaS** | Slack Webhook URLs, SendGrid API Keys, Twilio Tokens | High | High |
+| **Generic Secrets** | High-Entropy Passwords, Auth Tokens, Generic API Keys | Medium | Medium |
+
+### False Positive Suppression
+
+To intentionally bypass detection on specific lines (such as mock fixtures or documentation references), add an inline suppression comment:
+
+```javascript
+const exampleKey = "AKIAIOSFODNN7EXAMPLE"; // securify:ignore
+```
+
+---
+
+## Supported Ecosystems & Manifests
+
+Securify audits supply chain risks across all primary language ecosystems:
+
+| Ecosystem | Manifest File | Vulnerability Source |
+| :--- | :--- | :--- |
+| **Node.js** | `package.json`, `package-lock.json` | OSV.dev, GitHub Advisory |
+| **Python** | `requirements.txt`, `Pipfile.lock` | PyPI OSV, GitHub Advisory |
+| **Go** | `go.mod` | Go Vulnerability Database |
+| **Rust** | `Cargo.toml`, `Cargo.lock` | RustSec Advisory Database |
+| **Java** | `pom.xml` | Maven Central Advisory |
+| **PHP** | `composer.json`, `composer.lock` | Packagist Advisory |
+| **Ruby** | `Gemfile.lock` | RubySec Advisory Database |
+
+---
+
+## Architectural & Security Standards
+
+### 1. Server-Side Request Forgery (SSRF) Defense
+The website scanner API (`api/scan-site.ts`) implements strict octet-based CIDR validation:
+- Rejects RFC 1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
+- Rejects Loopback (`127.0.0.0/8`, `::1`), Cloud Metadata (`169.254.169.254`), and CGNAT (`100.64.0.0/10`).
+- Performs literal IP parsing prior to DNS queries to defeat DNS rebinding.
+- Enforces per-hop IP verification across manual HTTP redirect chains.
+
+### 2. Live Secret Verification
+Active secret verification endpoints (`api/verify-secret.ts`) strictly isolate verified providers (GitHub, Stripe, Google, Supabase) and return structured status contracts (`active`, `inactive`, `unsupported`) without exposing internal server tokens.
+
+### 3. Cryptographic Verification
+Payment and billing verification pipelines are protected by HMAC-SHA256 signature checking and fail-closed JSON Web Token (JWT) secret validation.
+
+---
+
+## Project Structure
+
+```
+.
+├── api/                  # Vercel serverless edge functions
+│   ├── scan-site.ts      # SSRF-protected website vulnerability analyzer
+│   ├── verify-secret.ts  # Active provider credential validator
+│   ├── verify-token.ts   # Cryptographic JWT authentication handler
+│   └── webhook.ts        # Payment webhook HMAC-SHA256 receiver
+├── bin/                  # Standalone CLI executables
+│   └── securify.mjs      # Zero-dependency bundled CLI binary
+├── cli/                  # Native Rust CLI engine
 │   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs       # CLI giriş noktası
-│       ├── scanner.rs    # Dosya tarama motoru
-│       ├── rules.rs      # Gizli veri tespit kuralları
-│       ├── entropy.rs    # Shannon entropi hesaplayıcısı
-│       ├── hook.rs       # Git commit hook yöneticisi
-│       ├── report.rs     # Rapor biçimlendirici
-│       └── config.rs     # TOML yapılandırma ayrıştırıcısı
-├── src/                  # React + TypeScript Frontend Uygulaması
-│   ├── components/       # Kullanıcı Arayüzü Bileşenleri
-│   ├── lib/              # Çekirdek Kütüphaneler (CVE, Analiz, Ayrıştırıcı vb.)
-│   ├── workers/          # Web Worker Tarama Motoru
-│   └── ...
-├── index.html
+│   └── src/              # Native scanner, rules, and hook modules
+├── src/
+│   ├── cli/              # TypeScript CLI source & SARIF/Markdown exporters
+│   ├── components/       # Enterprise React 18 UI components
+│   ├── lib/              # Scan engine, CVE database, and filter utilities
+│   └── workers/          # Multithreaded Web Worker scan pipelines
+├── tests/                # Node.js native security test suite
 ├── package.json
 └── vite.config.ts
 ```
 
 ---
 
-## Kurulum ve Geliştirme Ortamı
+## Verification & Quality Gates
 
-### İstemci Uygulaması (Frontend)
+Securify enforces rigorous static analysis and automated security tests:
 
-Gerekli paketleri yüklemek için:
 ```bash
-npm install
-```
+# Execute native security test suite (SSRF, Semver, Engine, SARIF)
+npm test
 
-Yerel geliştirme sunucusunu başlatmak için:
-```bash
-npm run dev
-```
+# Verify strict TypeScript type checking
+npm run typecheck
 
-Üretim derlemesi (Production build) almak için:
-```bash
+# Execute ESLint static analysis
+npm run lint
+
+# Compile production web bundles and standalone CLI binary
 npm run build
 ```
 
 ---
 
-## CLI Kurulumu ve Kullanımı
+## License
 
-### Cargo (Rust)
-```bash
-cargo install securify
-```
-
-### npm
-```bash
-npm install -g @securify/cli
-```
-
-### Temel CLI Komutları
-```bash
-# Bulunulan dizinde hassas veri taraması başlatır
-securify scan .
-
-# Taramayı JSON formatında dışa aktarır
-securify scan ./src --format json
-
-# Git pre-commit kancasını aktif eder
-securify init-hook
-
-# Belirli bir dize için entropi analizi yapar
-securify entropy "sk_test_51N34ghJkL90"
-```
-
----
-
-## Son Yapılan İyileştirmeler ve Hata Düzeltmeleri
-
-1. **Vite Runtime Import Hatalarının Çözümü:** İstemci tarafında yalnızca tip/arayüz olarak kullanılan `PackageVersion` gibi yapıların runtime modülü olarak algılanıp hata vermesini engellemek için tüm dosyalarda tip tanımlı import modeline (`import type`) geçilmiştir.
-2. **verbatimModuleSyntax ve Derleme Hataları:** TypeScript'in katı modül sözdizimi kuralları gereği oluşan derleme hataları temizlenmiştir. Web Worker ve analiz motorlarındaki tip dışa aktarımları standartlaştırılmıştır.
-3. **Kullanılmayan Kodların Temizlenmesi:** Proje genelindeki gereksiz import bildirimleri, kullanılmayan parametreler ve atıl kalmış arayüzler temizlenerek derleme süresi ve bundle boyutu optimize edilmiştir.
-4. **Syntax Hatalarının Çözümü:** `storage.ts` üzerinde yer alan yazım hataları düzeltilerek derleyicinin dosyayı sorunsuz işlemesi sağlanmıştır.
-
----
-
-## Lisans
-
-MIT
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for complete details.

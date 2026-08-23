@@ -97,28 +97,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    // Local Sandbox environment fallback: Bypass API validation if PADDLE_API_KEY is not defined
-    if (environment === 'sandbox' && !PADDLE_API_KEY) {
-      console.log(`[Paddle Sandbox Bypass] Simulating transaction verification for: ${transaction_id}`);
-      
-      const resolvedPlan = plan || 'Pro';
-      const duration = 30 * 24 * 60 * 60 * 1000; // 30 days
-      const expiresAt = Date.now() + duration;
-      const token = signToken({ email: trimmedEmail, plan: resolvedPlan, expiresAt }, JWT_SECRET);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        success: true,
-        token,
-        email: trimmedEmail,
-        plan: resolvedPlan
-      }));
-      return;
-    }
-
     if (!PADDLE_API_KEY) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Paddle API Key is not configured on the server' }));
+      res.end(JSON.stringify({ error: 'Paddle API Key is not configured on the server. Transaction verification unavailable.' }));
       return;
     }
 

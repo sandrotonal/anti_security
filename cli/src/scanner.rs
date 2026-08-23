@@ -25,7 +25,7 @@ pub struct ScannerConfig {
 impl Default for ScannerConfig {
     fn default() -> Self {
         ScannerConfig {
-            entropy_threshold: 4.5,
+            entropy_threshold: 2.8,
             fail_on_severity: "critical".to_string(),
             exclude_dirs: vec![
                 "node_modules".into(),
@@ -115,6 +115,59 @@ pub fn scan_path(path: &Path, config: &ScannerConfig) -> ScanResult {
     }
 }
 
+pub fn scan_staged(repo_path: &Path, config: &ScannerConfig) -> Result<ScanResult, String> {
+    let start = std::time::Instant::now();
+    let rules = get_rules();
+    let mut matches = Vec::new();
+    let mut total_files = 0;
+    let compiled_rules: Vec<(Rule, regex::Regex)> = rules
+        .into_iter()
+        .map(|r| {
+            let re = regex::Regex::new(r.pattern).expect("invalid rule pattern");
+            (r, re)
+        })
+        .collect();
+
+    let output = std::process::Command::new("git")
+        .args(&["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| format!("Failed to execute git command: {}", e))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    let files_str = String::from_utf8_lossy(&output.stdout);
+    for line in files_str.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let file_path = repo_path.join(trimmed);
+        if file_path.is_file() {
+            let ext = file_path
+                .extension()
+                .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+                .unwrap_or_default();
+            if !config.exclude_exts.contains(&ext) {
+                total_files += 1;
+                scan_file(&file_path, &compiled_rules, config, &mut matches);
+            }
+        }
+    }
+
+    let duration_ms = start.elapsed().as_millis() as u64;
+    let total_leaks = matches.len() as u64;
+
+    Ok(ScanResult {
+        total_files,
+        total_leaks,
+        matches,
+        duration_ms,
+    })
+}
+
 fn scan_file(
     path: &Path,
     rules: &[(Rule, regex::Regex)],
@@ -140,7 +193,8 @@ fn scan_file(
                 let matched_bit = if has_ignore { "bypassed" } else { "blocked" };
                 let matched_entropy = entropy::calculate_entropy(cap.as_str());
 
-                if !has_ignore && matched_entropy >= config.entropy_threshold {
+                // Structured rules are always captured; entropy is applied for confidence without vetoing
+                if !has_ignore {
                     results.push(ScanMatch {
                         rule_id: rule.id.to_string(),
                         rule_name: rule.name.to_string(),
