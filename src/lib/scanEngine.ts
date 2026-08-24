@@ -91,7 +91,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
     name: 'GCP Service Account Key',
     category: 'cloud',
     isStructured: true,
-    pattern: /"type":\s*"service_account"|"private_key":\s*"-----BEGIN PRIVATE KEY-----/g,
+    pattern: /"type":\s*"service_account"|"private_key":\s*"-----BEGIN PRIVATE KEY-----/g, // securify:ignore
   },
 
   // GitHub
@@ -241,35 +241,35 @@ export const SECRET_PATTERNS: SecretPattern[] = [
     name: 'RSA Private Key',
     category: 'crypto',
     isStructured: true,
-    pattern: /-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----/g,
+    pattern: /-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----/g, // securify:ignore
   },
   {
     id: 'dsa-private-key',
     name: 'DSA Private Key',
     category: 'crypto',
     isStructured: true,
-    pattern: /-----BEGIN DSA PRIVATE KEY-----/g,
+    pattern: /-----BEGIN DSA PRIVATE KEY-----/g, // securify:ignore
   },
   {
     id: 'ec-private-key',
     name: 'EC Private Key',
     category: 'crypto',
     isStructured: true,
-    pattern: /-----BEGIN EC PRIVATE KEY-----/g,
+    pattern: /-----BEGIN EC PRIVATE KEY-----/g, // securify:ignore
   },
   {
     id: 'pgp-private-key',
     name: 'PGP Private Key',
     category: 'crypto',
     isStructured: true,
-    pattern: /-----BEGIN PGP PRIVATE KEY BLOCK-----/g,
+    pattern: /-----BEGIN PGP PRIVATE KEY BLOCK-----/g, // securify:ignore
   },
   {
     id: 'ssh-private-key',
     name: 'SSH Private Key',
     category: 'crypto',
     isStructured: true,
-    pattern: /-----BEGIN OPENSSH PRIVATE KEY-----/g,
+    pattern: /-----BEGIN OPENSSH PRIVATE KEY-----/g, // securify:ignore
   },
 
   // Database Connection Strings

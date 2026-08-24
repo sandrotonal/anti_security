@@ -52,6 +52,7 @@ var SECRET_PATTERNS = [
     category: "cloud",
     isStructured: true,
     pattern: /"type":\s*"service_account"|"private_key":\s*"-----BEGIN PRIVATE KEY-----/g
+    // securify:ignore
   },
   // GitHub
   {
@@ -190,6 +191,7 @@ var SECRET_PATTERNS = [
     category: "crypto",
     isStructured: true,
     pattern: /-----BEGIN (?:RSA |OPENSSH )?PRIVATE KEY-----/g
+    // securify:ignore
   },
   {
     id: "dsa-private-key",
@@ -197,6 +199,7 @@ var SECRET_PATTERNS = [
     category: "crypto",
     isStructured: true,
     pattern: /-----BEGIN DSA PRIVATE KEY-----/g
+    // securify:ignore
   },
   {
     id: "ec-private-key",
@@ -204,6 +207,7 @@ var SECRET_PATTERNS = [
     category: "crypto",
     isStructured: true,
     pattern: /-----BEGIN EC PRIVATE KEY-----/g
+    // securify:ignore
   },
   {
     id: "pgp-private-key",
@@ -211,6 +215,7 @@ var SECRET_PATTERNS = [
     category: "crypto",
     isStructured: true,
     pattern: /-----BEGIN PGP PRIVATE KEY BLOCK-----/g
+    // securify:ignore
   },
   {
     id: "ssh-private-key",
@@ -218,6 +223,7 @@ var SECRET_PATTERNS = [
     category: "crypto",
     isStructured: true,
     pattern: /-----BEGIN OPENSSH PRIVATE KEY-----/g
+    // securify:ignore
   },
   // Database Connection Strings
   {
