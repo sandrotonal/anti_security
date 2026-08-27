@@ -1,32 +1,66 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { SecurifyNavbar } from './components/SecurifyNavbar';
 import type { ViewType } from './components/SecurifyNavbar';
 import { SecurifyBanner } from './components/SecurifyBanner';
 import { SecurifyHero } from './components/SecurifyHero';
 import { SecurifyTrust } from './components/SecurifyTrust';
-import { SecurifySimulator } from './components/SecurifySimulator';
-import { SecurifyFeatures } from './components/SecurifyFeatures';
-import { SecurifyIntegrations } from './components/SecurifyIntegrations';
-import { SecurifyROI } from './components/SecurifyROI';
-import { SecurifyTestimonials } from './components/SecurifyTestimonials';
-import { SecurifyConsoleDocs } from './components/SecurifyConsoleDocs';
-import { SecurifyRules } from './components/SecurifyRules';
-import { SecurifyDashboard } from './components/SecurifyDashboard';
-import { SecurifySandbox } from './components/SecurifySandbox';
-import { SecurifyInstall } from './components/SecurifyInstall';
-import { SecurifyContact } from './components/SecurifyContact';
-import { SecurifyFAQ } from './components/SecurifyFAQ';
 import { SecurifyFooter } from './components/SecurifyFooter';
-import { TerminalModal } from './components/TerminalModal';
 import { CookieBanner } from './components/CookieBanner';
-import { FooterModal } from './components/FooterModal';
-import { SecurifyShortcuts } from './components/SecurifyShortcuts';
-import { GithubAuthModal } from './components/GithubAuthModal';
-import { SecurifyAuditor } from './components/SecurifyAuditor';
-import { SecurifyPricing } from './components/SecurifyPricing';
-import { SecurifyHomeScanner } from './components/SecurifyHomeScanner';
-import { SubscriptionRestoreModal } from './components/SubscriptionRestoreModal';
-import { EnterpriseAnalytics } from './components/EnterpriseAnalytics';
+
+// Route-level and on-demand lazy loaded components
+const SecurifySimulator = lazy(() => import('./components/SecurifySimulator').then(m => ({ default: m.SecurifySimulator })));
+const SecurifyFeatures = lazy(() => import('./components/SecurifyFeatures').then(m => ({ default: m.SecurifyFeatures })));
+const SecurifyIntegrations = lazy(() => import('./components/SecurifyIntegrations').then(m => ({ default: m.SecurifyIntegrations })));
+const SecurifyROI = lazy(() => import('./components/SecurifyROI').then(m => ({ default: m.SecurifyROI })));
+const SecurifyTestimonials = lazy(() => import('./components/SecurifyTestimonials').then(m => ({ default: m.SecurifyTestimonials })));
+const SecurifyConsoleDocs = lazy(() => import('./components/SecurifyConsoleDocs').then(m => ({ default: m.SecurifyConsoleDocs })));
+const SecurifyHomeScanner = lazy(() => import('./components/SecurifyHomeScanner').then(m => ({ default: m.SecurifyHomeScanner })));
+const SecurifyFAQ = lazy(() => import('./components/SecurifyFAQ').then(m => ({ default: m.SecurifyFAQ })));
+const SecurifyRules = lazy(() => import('./components/SecurifyRules').then(m => ({ default: m.SecurifyRules })));
+const SecurifyDashboard = lazy(() => import('./components/SecurifyDashboard').then(m => ({ default: m.SecurifyDashboard })));
+const SecurifySandbox = lazy(() => import('./components/SecurifySandbox').then(m => ({ default: m.SecurifySandbox })));
+const SecurifyInstall = lazy(() => import('./components/SecurifyInstall').then(m => ({ default: m.SecurifyInstall })));
+const SecurifyContact = lazy(() => import('./components/SecurifyContact').then(m => ({ default: m.SecurifyContact })));
+const SecurifyAuditor = lazy(() => import('./components/SecurifyAuditor').then(m => ({ default: m.SecurifyAuditor })));
+const SecurifyPricing = lazy(() => import('./components/SecurifyPricing').then(m => ({ default: m.SecurifyPricing })));
+const EnterpriseAnalytics = lazy(() => import('./components/EnterpriseAnalytics').then(m => ({ default: m.EnterpriseAnalytics })));
+const TerminalModal = lazy(() => import('./components/TerminalModal').then(m => ({ default: m.TerminalModal })));
+const FooterModal = lazy(() => import('./components/FooterModal').then(m => ({ default: m.FooterModal })));
+const SecurifyShortcuts = lazy(() => import('./components/SecurifyShortcuts').then(m => ({ default: m.SecurifyShortcuts })));
+const GithubAuthModal = lazy(() => import('./components/GithubAuthModal').then(m => ({ default: m.GithubAuthModal })));
+const SubscriptionRestoreModal = lazy(() => import('./components/SubscriptionRestoreModal').then(m => ({ default: m.SubscriptionRestoreModal })));
+
+// Helper to load Paddle SDK asynchronously on demand
+function ensurePaddleLoaded(): Promise<any> {
+  if (typeof window !== 'undefined' && (window as any).Paddle) {
+    return Promise.resolve((window as any).Paddle);
+  }
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="paddle.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve((window as any).Paddle));
+      existing.addEventListener('error', () => reject(new Error('Failed to load Paddle SDK')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+    script.async = true;
+    script.onload = () => resolve((window as any).Paddle);
+    script.onerror = () => reject(new Error('Paddle ödeme altyapısı yüklenemedi. Lütfen internet bağlantınızı kontrol edin.'));
+    document.head.appendChild(script);
+  });
+}
+
+function ComponentFallback() {
+  return (
+    <div className="min-h-[30vh] w-full flex items-center justify-center p-8 text-neutral-600 font-mono text-xs">
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+        <span>loading component...</span>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const paddleInitializedRef = useRef<boolean>(false);
@@ -256,9 +290,9 @@ function App() {
         console.warn(`[Securify Paddle Warning] priceId is "${priceId}" (mock). This indicates that the Vercel environment variable PADDLE_PRICE_${plan.toUpperCase()}_${billing.toUpperCase()} is not set. Paddle Sandbox API will reject mock IDs with a 400 Bad Request. Please configure your Vercel Environment Variables and re-deploy.`);
       }
 
-      const paddle = (window as any).Paddle;
+      const paddle = await ensurePaddleLoaded();
       if (!paddle) {
-        throw new Error('ödeme altyapısı yüklenemedi. lütfen reklam engelleyicinizi (adblocker) kontrol edin.');
+        throw new Error('ödeme altyapısı yüklenemedi. lütfen internet bağlantınızı veya reklam engelleyicinizi (adblocker) kontrol edin.');
       }
 
       // Initialize Paddle if not done already
@@ -602,155 +636,164 @@ function App() {
 
       {/* Main Pages Content routing */}
       <main className="transition-all duration-300">
-        {activeView === 'home' && (
-          <div className="animate-page-entrance">
-            <SecurifyHero onViewChange={setActiveView} />
-            <SecurifyTrust />
-            <div className="relative z-10 bg-black">
-              <SecurifySimulator />
-              <SecurifyFeatures />
-              <SecurifyIntegrations />
-              <SecurifyConsoleDocs />
-              <SecurifyROI />
-              <SecurifyTestimonials />
-              <SecurifyHomeScanner onScanSite={(url) => {
-                setInitialWebsiteUrl(url);
-                setActiveView('dashboard');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }} />
+        <Suspense fallback={<ComponentFallback />}>
+          {activeView === 'home' && (
+            <div className="animate-page-entrance">
+              <SecurifyHero onViewChange={setActiveView} />
+              <SecurifyTrust />
+              <div className="relative z-10 bg-black">
+                <SecurifySimulator />
+                <SecurifyFeatures />
+                <SecurifyIntegrations />
+                <SecurifyConsoleDocs />
+                <SecurifyROI />
+                <SecurifyTestimonials />
+                <SecurifyHomeScanner onScanSite={(url) => {
+                  setInitialWebsiteUrl(url);
+                  setActiveView('dashboard');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }} />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeView === 'rules' && (
-          <div className="animate-page-entrance">
-            <SecurifyRules onViewChange={setActiveView} />
-          </div>
-        )}
+          {activeView === 'rules' && (
+            <div className="animate-page-entrance">
+              <SecurifyRules onViewChange={setActiveView} />
+            </div>
+          )}
 
-        {activeView === 'dashboard' && (
-          <div className="animate-page-entrance">
-            <SecurifyDashboard
-              githubUser={githubUser}
-              onGithubLogin={() => setIsGithubModalOpen(true)}
-              onViewChange={setActiveView}
-              premiumStatus={premiumStatus}
-              onPurchaseTrigger={(planId, planName, billingPeriod) => {
-                setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
-                setCheckoutEmail('');
-                setCheckoutError('');
-              }}
-              initialWebsiteUrl={initialWebsiteUrl}
-              onClearInitialWebsiteUrl={() => setInitialWebsiteUrl('')}
-            />
-          </div>
-        )}
+          {activeView === 'dashboard' && (
+            <div className="animate-page-entrance">
+              <SecurifyDashboard
+                githubUser={githubUser}
+                onGithubLogin={() => setIsGithubModalOpen(true)}
+                onViewChange={setActiveView}
+                premiumStatus={premiumStatus}
+                onPurchaseTrigger={(planId, planName, billingPeriod) => {
+                  setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+                  setCheckoutEmail('');
+                  setCheckoutError('');
+                }}
+                initialWebsiteUrl={initialWebsiteUrl}
+                onClearInitialWebsiteUrl={() => setInitialWebsiteUrl('')}
+              />
+            </div>
+          )}
 
-        {activeView === 'analytics' && (
-          <div className="animate-page-entrance max-w-7xl mx-auto px-6 py-28">
-            <EnterpriseAnalytics />
-          </div>
-        )}
+          {activeView === 'analytics' && (
+            <div className="animate-page-entrance max-w-7xl mx-auto px-6 py-28">
+              <EnterpriseAnalytics />
+            </div>
+          )}
 
-        {activeView === 'integrations' && (
-          <div className="animate-page-entrance">
-            <SecurifyIntegrations />
-          </div>
-        )}
+          {activeView === 'integrations' && (
+            <div className="animate-page-entrance">
+              <SecurifyIntegrations />
+            </div>
+          )}
 
-        {activeView === 'sandbox' && (
-          <div className="animate-page-entrance">
-            <SecurifySandbox />
-          </div>
-        )}
+          {activeView === 'sandbox' && (
+            <div className="animate-page-entrance">
+              <SecurifySandbox />
+            </div>
+          )}
 
-        {activeView === 'install' && (
-          <div className="animate-page-entrance">
-            <SecurifyInstall />
-          </div>
-        )}
+          {activeView === 'install' && (
+            <div className="animate-page-entrance">
+              <SecurifyInstall />
+            </div>
+          )}
 
-        {activeView === 'contact' && (
-          <div className="animate-page-entrance">
-            <SecurifyContact />
-          </div>
-        )}
+          {activeView === 'contact' && (
+            <div className="animate-page-entrance">
+              <SecurifyContact />
+            </div>
+          )}
 
-        {activeView === 'auditor' && (
-          <div className="animate-page-entrance">
-            <SecurifyAuditor />
-          </div>
-        )}
+          {activeView === 'auditor' && (
+            <div className="animate-page-entrance">
+              <SecurifyAuditor />
+            </div>
+          )}
 
-        {activeView === 'pricing' && (
-          <div className="animate-page-entrance">
-            <SecurifyPricing
-              onViewChange={setActiveView}
-              onPurchase={(planId, planName, billingPeriod) => {
-                setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
-                setCheckoutEmail('');
-                setCheckoutError('');
-              }}
-            />
-          </div>
-        )}
+          {activeView === 'pricing' && (
+            <div className="animate-page-entrance">
+              <SecurifyPricing
+                onViewChange={setActiveView}
+                onPurchase={(planId, planName, billingPeriod) => {
+                  setCheckoutPlan({ id: planId, name: planName, billing: billingPeriod });
+                  setCheckoutEmail('');
+                  setCheckoutError('');
+                }}
+              />
+            </div>
+          )}
+        </Suspense>
       </main>
 
       {/* FAQ — before footer, always visible at bottom */}
-      {activeView === 'home' && <SecurifyFAQ />}
+      {activeView === 'home' && (
+        <Suspense fallback={null}>
+          <SecurifyFAQ />
+        </Suspense>
+      )}
 
       {/* Persistent Footer */}
       <SecurifyFooter
         onSelectModal={setActiveFooterModal}
       />
 
-      {/* Global Terminal Modal Dialog */}
-      <TerminalModal
-        isOpen={isTerminalOpen}
-        onClose={() => setIsTerminalOpen(false)}
-      />
+      <Suspense fallback={null}>
+        {/* Global Terminal Modal Dialog */}
+        <TerminalModal
+          isOpen={isTerminalOpen}
+          onClose={() => setIsTerminalOpen(false)}
+        />
 
-      {/* Keyboard Shortcuts Help Overlay */}
-      <SecurifyShortcuts
-        isOpen={isShortcutsOpen}
-        onClose={() => setIsShortcutsOpen(false)}
-      />
+        {/* Keyboard Shortcuts Help Overlay */}
+        <SecurifyShortcuts
+          isOpen={isShortcutsOpen}
+          onClose={() => setIsShortcutsOpen(false)}
+        />
+
+        {/* Footer Modals */}
+        {activeFooterModal && (
+          <FooterModal
+            type={activeFooterModal}
+            onClose={() => setActiveFooterModal(null)}
+          />
+        )}
+
+        {/* GitHub Auth Simulator Modal */}
+        <GithubAuthModal
+          isOpen={isGithubModalOpen}
+          onClose={() => setIsGithubModalOpen(false)}
+          onSuccess={(user) => {
+            setGithubUser(user);
+            localStorage.setItem('securify_github_user', JSON.stringify(user));
+          }}
+        />
+
+        {/* Subscription Restore Modal */}
+        <SubscriptionRestoreModal
+          isOpen={isRestoreModalOpen}
+          onClose={() => setIsRestoreModalOpen(false)}
+          onSuccess={(token, details) => {
+            setPremiumToken(token);
+            setPremiumStatus({
+              valid: true,
+              email: details.email,
+              plan: details.plan,
+              expiresAt: details.expiresAt
+            });
+            setIsRestoreModalOpen(false);
+          }}
+        />
+      </Suspense>
 
       {/* Cookie Banner */}
       <CookieBanner />
-
-      {/* Footer Modals */}
-      {activeFooterModal && (
-        <FooterModal
-          type={activeFooterModal}
-          onClose={() => setActiveFooterModal(null)}
-        />
-      )}
-
-      {/* GitHub Auth Simulator Modal */}
-      <GithubAuthModal
-        isOpen={isGithubModalOpen}
-        onClose={() => setIsGithubModalOpen(false)}
-        onSuccess={(user) => {
-          setGithubUser(user);
-          localStorage.setItem('securify_github_user', JSON.stringify(user));
-        }}
-      />
-
-      {/* Subscription Restore Modal */}
-      <SubscriptionRestoreModal
-        isOpen={isRestoreModalOpen}
-        onClose={() => setIsRestoreModalOpen(false)}
-        onSuccess={(token, details) => {
-          setPremiumToken(token);
-          setPremiumStatus({
-            valid: true,
-            email: details.email,
-            plan: details.plan,
-            expiresAt: details.expiresAt
-          });
-        }}
-      />
 
       {/* Payment Result Modal */}
       {paymentModal && paymentModal.show && (

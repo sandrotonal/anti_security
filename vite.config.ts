@@ -80,21 +80,23 @@ export default defineConfig({
   ],
 
   build: {
-    // Raise warning threshold to avoid noisy output
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 600,
     cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // React core
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
           }
-          // Separate large page components into lazy chunks
-          if (id.includes('SecurifyDashboard')) return 'page-dashboard';
-          if (id.includes('SecurifySandbox')) return 'page-sandbox';
-          if (id.includes('SecurifyAuditor')) return 'page-auditor';
-          if (id.includes('SecurifyInstall')) return 'page-install';
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/motion') || id.includes('node_modules/gsap')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('node_modules/maplibre-gl')) {
+            return 'vendor-maps';
+          }
         },
       },
     },

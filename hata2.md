@@ -1,194 +1,198 @@
-# anti_security / Securify Teknik İnceleme Raporu
+# Securify Son Analiz Raporu
 
-**Hazırlayan:** Manus AI**İnceleme tarihi:** 21 Ağustos 2026**İncelenen repo:** [sandrotonal/anti_security][1]**Canlı site:** [securify.gucluyumhe.dev][2]
+**İncelenen adres:** [https://securify.gucluyumhe.dev/](https://securify.gucluyumhe.dev/)**İnceleme kapsamı:** Canlı ana sayfa, HTTP yanıtı, SEO dosyaları, güvenlik başlıkları, statik kaynaklar, temel içerik ve PageSpeed erişimi.
 
 ## Yönetici özeti
 
-Securify, görsel olarak güçlü bir güvenlik ürünü demosu ve çalışır bir MVP iskeleti. React/Vite tabanlı web arayüzü, Rust CLI, yerel secret taraması, Git hook, OSV bağımlılık denetimi, GitHub senkronizasyonu ve domain header audit gibi doğru ürün parçalarını bir araya getiriyor. Rust CLI’nin güncel toolchain ile derlenmesi ve beş birim testinin geçmesi, projenin tamamen sahte bir arayüzden ibaret olmadığını gösteriyor.
+Sitede önceki önerilerin önemli bir bölümü uygulanmış görünüyor. Özellikle güvenlik başlıkları güçlü; **CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Permissions-Policy ve Referrer-Policy** canlı yanıtta mevcut. Ana sayfanın içerik ve ürün mesajı da net: yerel çalışan secret scanning, pre-commit hook, sandbox, dependency auditor ve pipeline entegrasyonu öne çıkarılıyor.
 
-Bununla birlikte, **mevcut haliyle üretim ortamında gerçek güvenlik ürünü veya ödeme alan bir SaaS olarak güvenli kabul edilmemeli**. En ciddi konu ödeme doğrulamasında sandbox fallback’inin ödeme yapılmadan premium JWT üretebilmesi ve JWT secret’ın varsayılan sabit bir değere düşebilmesi. Buna ek olarak domain scanner’da localhost SSRF filtresinin atlatılabildiğini doğrudan test ettim. CI workflow’u mevcut frontend build çıktısıyla uyuşmuyor; JavaScript test script’i yok ve lint komutu ESLint 9 flat-config hatasıyla çalışmıyor.
+Buna rağmen canlı ölçümlerde puanı aşağı çekebilecek birkaç somut nokta tespit ettim. En önemlileri şunlar: başlangıç HTML yanıtında yaklaşık **12.4 KB** içerik bulunmasına rağmen ilk bayt süresinin bu kontrolde yaklaşık **3.0 saniye**, toplam yanıt süresinin yaklaşık **3.4 saniye** ölçülmesi; ana JavaScript paketinin yaklaşık **233 KB**, React vendor paketinin yaklaşık **142 KB**, CSS'in yaklaşık **83 KB** olması; Paddle, Google Analytics, Google Fonts ve CloudFront gibi üçüncü taraf kaynakların başlangıç yüküne dahil edilmesi; ayrıca `og-image.png` dosyasının canlıda **404** dönmesi ve `manifest.json` isteğinin **404** vermesi.
 
-> **Net karar:** Demo/MVP olarak değerli; ancak **P0/P1 güvenlik ve teslimat sorunları düzeltilmeden canlı satış, abonelik ve “production-grade security” iddiası için hazır değil.**
+PageSpeed Insights sayfası bu oturumda rapor kartlarını zaman aşımı nedeniyle göstermedi. Bu nedenle güncel mobil/masaüstü puanı veya LCP/FCP sayısını uydurmuyorum. Aşağıdaki sonuçlar canlı sunucu kontrolleri ve kaynak incelemesiyle doğrulanmış bulgulardır. PageSpeed raporu tamamlandığında skorların yanında özellikle **LCP, TTFB, render-blocking resources, unused JavaScript ve image delivery** denetimlerini tekrar karşılaştırmak gerekir.
 
-## Proje ne yapıyor?
+## Doğrulanmış bulgular
 
-README’ye göre proje, kaynak kodlarında API anahtarı, veritabanı bilgisi ve cloud token sızıntılarını yerelde tespit eden bir web uygulaması ve CLI’dan oluşuyor.[3] Kod tabanı pratikte dört ana yüzeye ayrılıyor: Vite + React + TypeScript frontend, Vercel-style serverless API fonksiyonları, OSV tabanlı dependency auditor ve Rust ile yazılmış `securify` CLI. README’de local browser scan, Web Worker, entropy analizi, Git hook, CVE sorgusu, GitHub entegrasyonu ve Paddle abonelik akışları birlikte pazarlanıyor.[3]
+| Öncelik | Bulgular | Kanıt / durum | Etki |
+| --- | --- | --- | --- |
+| P0 | `og-image.png` yok | `https://securify.gucluyumhe.dev/og-image.png` → 404 | Sosyal paylaşım önizlemesi bozulur; SEO puanında değil ama paylaşım dönüşümünde kayıp yaratır |
+| P0 | İlk sunucu yanıtı yavaş | Bu kontrolde TTFB yaklaşık 3.0 sn, toplam yaklaşık 3.4 sn | Mobil LCP/FCP ve gerçek kullanıcı deneyimi olumsuz etkilenebilir |
+| P1 | Başlangıç JS paketi büyük | `index-B0oiPjHN.js` yaklaşık 233 KB | Parse/compile/execute maliyeti ve mobil CPU yükü artar |
+| P1 | React vendor paketi ayrıca büyük | Yaklaşık 142 KB | İlk yüklemede gereksiz JavaScript çalışabilir |
+| P1 | CSS paketi büyük | Yaklaşık 83 KB | CSS indirme ve stil hesaplama maliyeti artar |
+| P1 | Tüm özellik chunk'ları için preload/bağlantı izi var | Dashboard, sandbox, install ve auditor chunk'ları HTML'de referanslanıyor | Kullanıcı ana sayfada bunlara ihtiyaç duymadan kaynak keşfi yapılabilir |
+| P1 | Üçüncü taraflar başlangıçta mevcut | Paddle, Google Analytics, Google Fonts, CloudFront ve Vercel kaynakları | DNS/TLS bağlantıları ve üçüncü taraf gecikmesi eklenir |
+| P1 | `manifest.json` bulunamadı | `/manifest.json` → 404 | PWA kurulumu ve uygulama meta verileri eksik kalır |
+| P2 | robots.txt içinde Crawl-delay var | Dosyada `Crawl-delay: 2` ve Googlebot için `1` bulunuyor | Googlebot bunu dikkate almayabilir; gereksiz ve standart dışı bir sinyal olabilir |
+| P2 | Sitemap query-string URL'leri içeriyor | `/?view=rules`, `/?view=sandbox` gibi adresler | SPA içindeki görünümler gerçek, ayrı indekslenebilir sayfalar değilse canonical/duplicate karmaşası doğabilir |
+| P2 | Placeholder GA ölçüm kimliği HTML'de görünüyor | `G-XXXXXXXXXX` | Gerçek ölçüm yapılmaz; ağ isteği ve konsol gürültüsü oluşturabilir |
+| P2 | HTML'de harici Google Fonts CSS'i var | Readex Pro bağlantısı mevcut | Render-blocking veya font gecikmesi oluşturabilir |
+| P2 | Erişilebilirlik manuel olarak tekrar doğrulanmalı | Görsel denetimde otomatik sonuç alınmadı | İkon butonları, modal kapanışları, sekmeler ve editör kontrolleri hata üretebilir |
 
-| Yüzey | Gerçek durum | Değerlendirme |
-| --- | --- | --- |
-| Web arayüzü | Vite build başarılı, canlı site erişilebilir | Görsel kalite yüksek; bazı state akışları kırık |
-| Local secret scanner | TypeScript engine ve Web Worker mevcut | Kapsam geniş; entropy filtreleri false negative üretiyor |
-| Rust CLI | Güncel Rust ile derleniyor; 5 test geçti | Temel iskelet sağlam; `--staged` gerçek anlamda kullanılmıyor |
-| Dependency auditor | Canlı OSV sorgusu çalıştı | İşlevsel; lodash örneğinde 6 bulgu döndürdü |
-| Domain security audit | Backend cevap veriyor | SSRF koruması eksik; frontend sonucu gizleyebiliyor |
-| GitHub sync | Token ile GitHub API çağrısı var | Gerçek token kapsamı ve rate-limit davranışı dikkatle sınırlandırılmalı |
-| Ödeme/abonelik | Paddle akışı ve JWT var | Kritik sandbox bypass ve default secret riski mevcut |
-| CI/CD | Workflow dosyası var | Mevcut build çıktısıyla uyumsuz ve çalışması beklenmiyor |
+## Performans analizi
 
-## Gerçekleştirilen testler
+### 1. TTFB ve CDN davranışı
 
-Repo `/home/ubuntu/anti_security` altına çekildi. Kaynak dosyalarda kalıcı değişiklik yapılmadı; build çıktıları ve test fixture’ları izole geçici alanlarda tutuldu. Aşağıdaki sonuçlar gerçek komut çalıştırmalarına ve canlı site smoke testlerine dayanıyor.
+Canlı ana sayfa Vercel üzerinden 200 döndü. Yanıt başlığında `cache-control: public, max-age=0, must-revalidate` ve bu ölçümde `x-vercel-cache: MISS` görüldü. Bu tek ölçüm cache'in her zaman MISS olduğu anlamına gelmez; ancak ana HTML'in cache davranışı ve sunucu tarafı üretim süresi mutlaka Vercel deployment/observability ekranından kontrol edilmelidir.
 
-| Test | Sonuç | Not |
-| --- | --- | --- |
-| `npm ci` | Başarılı | Bağımlılıklar kuruldu |
-| `npm run build` | Başarılı | TypeScript derlemesi ve Vite production bundle tamamlandı |
-| `npm run lint` | **Başarısız** | ESLint 9, `extends` kullanan config’i flat-config olarak kabul etmedi |
-| `npm test` | **Başarısız** | `package.json` içinde `test` script’i yok |
-| `cargo check` | Başarılı | Rust 1.98.0 ile |
-| `cargo test` | Başarılı | **5 passed, 0 failed** |
-| Rust CLI `scan` | Kısmen başarılı | Komut çalışıyor; varsayılan eşik bilinen örnekleri kaçırdı |
-| Rust CLI `--format json` | Başarılı | Makine okunabilir rapor üretiyor |
-| Rust CLI `init-hook` | Başarılı | `.git/hooks/pre-commit` oluşturuyor |
-| Rust CLI `--staged` | **Hatalı davranış** | Untracked secret dosyasını da taradı; flag ana kodda yok sayılıyor |
-| Canlı OSV auditor | Başarılı | `lodash@4.17.15`: 1 vulnerable package, 6 issue, yaklaşık 2.7 saniye |
-| Canlı domain audit | Kısmen başarılı | Backend sonucunu üretiyor; homepage → dashboard akışında sonuç tab’ı gizleniyor |
-| Local `verify-paddle-checkout` | **Kritik açık doğrulandı** | Sahte transaction ile premium token üretildi |
-| Live `verify-secret` | Kısmen hatalı | Generic secret türü dummy değer için `active: true` döndü |
-| Local `scan-site` localhost testi | **SSRF filtresi atlandı** | `127.0.0.1` için 403 yerine 200 audit cevabı döndü |
+İlk byte süresi yaklaşık 3 saniye seviyesinde ölçüldü. Bu değer PageSpeed'in emüle ettiği yavaş mobil ağda daha da belirginleşebilir. Site statik SPA olarak servis ediliyorsa hedef, HTML'in mümkün olduğunca CDN'den cache'lenmesi ve ilk byte'ın belirgin biçimde düşürülmesidir.
 
-### Rust CLI false-negative testi
+**AI IDE'ye verilecek görev:**
 
-İzole fixture’da AWS Access Key ID, Stripe secret key, PostgreSQL connection string ve GitHub token örnekleri bulunan `src/secrets.js` tarandı. Varsayılan `entropy_threshold = 4.5` ile CLI **0 leak ve exit code 0** verdi. Aynı fixture’a geçici `entropy_threshold = 0.0` konduğunda AWS, Stripe ve PostgreSQL bulguları çıktı; CLI **3 leak ve exit code 1** verdi. Bu, kural regex’lerinin var olduğunu fakat entropy kapısının biçimsel olarak gerçek görünen bazı anahtarları sessizce filtrelediğini gösteriyor.
+> Canlı Securify landing page için TTFB optimizasyonu yap. Vercel deployment ayarlarını ve build çıktısını incele. Ana landing page'in gereksiz server-side bekleme yapmadığını doğrula, mümkün olan statik içerikleri pre-render et, cache-control stratejisini güvenli biçimde iyileştir ve dinamik kullanıcı verisi gerektirmeyen içerikleri ilk istekte API'lerden bekletme. UI/UX ve route davranışı değişmesin. Değişiklik sonrası production build ile TTFB ve Lighthouse karşılaştırması yap.
 
-Daha sonra yalnızca temiz `src/clean.js` dosyası staged, secret dosyası untracked iken `scan . --staged` çalıştırıldı. Sonuç yine untracked secret dosyasını taradı ve düşük eşikte 3 bulgu üretti. Bunun nedeni `main.rs` içinde `staged: _` ile parametrenin açıkça yok sayılmasıdır.[4]
+### 2. JavaScript code-splitting
 
-### Canlı dependency auditor testi
+Ana JavaScript yaklaşık 233 KB, React vendor yaklaşık 142 KB ve dashboard gibi özellik chunk'ları da ayrı dosyalar halinde sunuluyor. Bu olumlu bir code-splitting başlangıcıdır; fakat ana HTML'deki kaynak keşfi ve router davranışı incelenmelidir. Kullanıcı yalnızca landing page'e girdiğinde dashboard, sandbox ve auditor kodunun indirilmediğinden emin olunmalıdır.
 
-Canlı auditor ekranında `lodash` ve `4.17.15` ile quick query çalıştırıldı. Sistem bir paketi audit etti, paketi vulnerable olarak işaretledi ve altı OSV bulgusu gösterdi. ReDoS ve prototype pollution bulguları için 4.17.21, 4.17.23 ve 4.18.0 gibi remediation sürümleri sunuldu. Bu akış, ürünün en hazır ve doğrulanabilir parçalarından biri.[2] [8]
+**Önerilen düzeltmeler:**
 
-## Kritik güvenlik bulguları
+1. Dashboard, sandbox scanner, dependency auditor, pricing/pipeline gibi sayfaları route-level lazy loading ile ayır.
 
-### P0 — Ödeme yapılmadan premium token üretilebiliyor
+1. Monaco/CodeMirror benzeri editör, syntax highlighter, chart ve GitHub API modüllerini yalnızca ilgili görünüm açıldığında yükle.
 
-`api/verify-paddle-checkout.ts`, `environment === 'sandbox' && !PADDLE_API_KEY` durumunda Paddle’a transaction doğrulaması göndermeden doğrudan JWT üretip `success: true` döndürüyor.[5] Aynı dosyada `JWT_SECRET` tanımsızsa sabit bir development secret kullanılıyor. Yerel API’ye gerçek olmayan `txn_fake_without_payment` transaction ID’si, sahte e-posta ve `Agency` planı gönderildi; endpoint 200 ile token üretti. Üretilen token daha sonra `verify-token` endpoint’inde `valid: true` ve `plan: Agency` olarak kabul edildi.
+1. Landing page'de yalnızca hero, navigation, ilk CTA ve gerekli interaktif demo kodunu başlangıç bundle'ında tut.
 
-Bu fallback yalnızca tamamen izole local development için korunacaksa bile production deploy’da kesin bir fail-closed kontrolü bulunmalı. Ortam yanlışlıkla sandbox kalırsa veya `PADDLE_API_KEY` yüklenmezse saldırgan ödeme yapmadan Pro/Agency token alabilir.
+1. `vite build --report` veya bundle analyzer ile ana chunk'ın neden 233 KB olduğunu ölç; tahmin ederek paket silme.
 
-**Düzeltme:** Production’da `PADDLE_API_KEY`, `JWT_SECRET`, Paddle environment ve server-side price mapping yoksa endpoint 500 ile durmalı; sandbox bypass yalnızca ayrı bir local flag ile ve production build’den tamamen dışlanarak çalışmalı. Gelen `plan`, `billing` ve transaction içindeki gerçek price ID ayrıca karşılaştırılmalı. Default secret kaldırılmalı ve mevcut secret’lar döndürülmelidir.
+1. Kullanıcı etkileşimi olmadan gereken üçüncü taraf Paddle/analytics kodunu yükleme.
 
-### P0 — Varsayılan JWT secret token sahteciliğine açık kapı bırakıyor
+**AI IDE görevi:**
 
-Hem ödeme doğrulama hem token doğrulama tarafında `process.env.JWT_SECRET || 'securify-local-development-secret-key-2026'` biçiminde sabit fallback bulunuyor.[5] [9] Bir production ortamında `JWT_SECRET` unutulursa, saldırgan kaynak kodda görünen secret ile kendi e-posta, plan ve expiry alanlarını imzalayabilir. Bu yalnızca “development kolaylığı” değildir; premium yetkilendirme mekanizmasının temel güven köküdür.
+> Vite/React uygulamasının bundle analizini yap. Landing page ilk yüklemesinde sadece gerekli modüller kalsın. Dashboard, sandbox, auditor, pipeline ve ağır editör/highlighter modüllerini route-level dynamic import ile lazy-load et. Uygulama davranışını ve tasarımı değiştirme; loading fallback ekle; production build sonrası ana JS boyutunu, request sayısını ve Lighthouse mobil skorunu karşılaştır. SSR olmadığı için `window` kullanan modüllerde hydration/initialization hatası oluşturma.
 
-**Düzeltme:** Secret yoksa uygulama başlatılmamalı; environment validation ile deploy başarısız olmalı. JWT için key rotation, kısa ömürlü access token, server-side subscription lookup ve mümkünse token içine plan bilgisini tek yetki kaynağı olarak koymama yaklaşımı kullanılmalı.
+### 3. Font ve üçüncü taraf kaynaklar
 
-### P0/P1 — Domain scanner’da localhost SSRF filtresi atlatılabiliyor
+HTML'de Readex Pro Google Fonts CSS'i, Paddle script'i ve Google Analytics script'i için bağlantılar bulunuyor. Bu kaynaklar özellikle mobil PageSpeed testinde DNS, TLS ve bekleme maliyeti doğurabilir.
 
-`api/scan-site.ts` önce hostname’i DNS ile çözümleyip private IP aralıklarını kontrol ediyor; ancak literal IP’nin DNS resolver’dan boş dönebildiği durumda `127.0.0.1` doğrudan bu kontrolden geçebiliyor. Testte local Vite API’ye `url=http://127.0.0.1:5173` gönderildi ve beklenen 403 yerine 200 ile tam audit JSON’u döndü.[4]
+**Güvenli uygulama sırası:**
 
-Ek olarak fetch `redirect: 'follow'` kullanıyor ve her redirect hedefi için yeniden IP doğrulaması yapmıyor. Public bir hostname’in private adrese yönlendirilmesi veya DNS rebinding senaryosu bu kontrolü aşabilir. IPv4 çözümlemesi varsa IPv6 fallback’ine hiç bakılmaması da ek bir eksiklik.
+1. Kullanılmayan Google Fonts ağırlıklarını kaldır; gerçekten kullanılan ağırlıkları sınırla.
 
-**Düzeltme:** Önce URL hostname’inin kendisini `net.isIP` ile parse edip literal private/loopback IP’leri reddedin. A ve AAAA kayıtlarının tamamını çözün; her adresi RFC1918, loopback, link-local, multicast, metadata ve IPv6 özel aralıklarıyla karşılaştırın. Redirect’leri kapatıp elle takip edin ve her hop’ta tekrar doğrulayın. Production egress firewall ile RFC1918, loopback, link-local ve cloud metadata adreslerini ayrıca engelleyin.
+1. Mümkünse fontu self-host et ve `font-display: swap` kullan.
 
-### P1 — CI workflow mevcut build ile çalışmıyor
+1. Paddle'ı yalnızca fiyatlandırma veya ödeme bileşeni görüntülendiğinde yükle.
 
-`.github/workflows/securify-scan.yml`, tarama adımında `require('./dist/lib/scanEngine.js' )` ve `require('glob')` bekliyor.[6] Mevcut `npm run build` ise `dist/assets/...` bundle’ları üretiyor; `dist/lib/scanEngine.js` üretmiyor. Root `node_modules` altında `glob` paketi de yok. Bu nedenle workflow’un gerçek scanner adımında module-not-found hatası vermesi bekleniyor. Üstelik adım `continue-on-error: true` ile işaretlenmiş; sonraki SARIF adımı dosya üretilememiş olsa bile çalışmaya çalışıyor.
+1. Analytics kimliği gerçek değilse script'i tamamen kaldır; gerçek kimlik varsa kullanıcı onayı ve `lazyOnload`/etkileşim sonrası yükleme yaklaşımı kullan.
 
-**Düzeltme:** CI’da ya Rust CLI binary’sini derleyip çağırın ya da TypeScript scanner’ı ayrı bir Node library build’i olarak paketleyin. `glob` bağımlılığını manifestoya ekleyin veya Node 20’nin mevcut dosya API’lerini kullanın. `continue-on-error` kaldırılmalı; sonuç dosyası üretilmeden SARIF/upload adımı çalışmamalı. Workflow’a temiz checkout üzerinde gerçek bir secret fixture ve temiz fixture testi eklenmeli.
+1. `preconnect` yalnızca gerçekten ilk ekranda ihtiyaç duyulan origin'ler için bırak.
 
-### P1 — `--staged` gerçekten staged dosyaları taramıyor
+## SEO ve sosyal paylaşım
 
-Rust CLI `main.rs` içinde `staged` alanı destructuring sırasında `_` ile atılıyor ve scanner her zaman verilen path’in tamamını WalkDir ile geziyor.[4] Bu, pre-commit hook’un untracked ve ignored olmayan tüm dosyaları taramasına yol açıyor. Daha önemlisi ürün dokümantasyonundaki “staged files” vaadi ile uygulama davranışı uyuşmuyor.
+Title ve description güçlü ve ürünün ne yaptığını anlatıyor. Open Graph alanları da mevcut; fakat en önemli görsel dosyası 404 döndüğü için sosyal kartlar güvenilir değil.
 
-**Düzeltme:** `git diff --cached --name-only --diff-filter=ACMR` çıktısını alıp yalnızca staged dosyaları scanner’a verin. Git repo dışında `--staged` için açık hata döndürün. Bu davranış için gerçek git fixture testi ekleyin.
+### Öncelikli SEO düzeltmeleri
 
-### P1 — Secret detection entropy filtresi gerçek anahtarları kaçırıyor
+| İşlem | Öneri |
+| --- | --- |
+| OG görseli | Gerçek bir 1200×630 `public/og-image.png` ekle veya metadata'daki URL'yi mevcut dosya adına düzelt |
+| Manifest | Gerçekten PWA hedefleniyorsa `/manifest.webmanifest` oluştur ve `<link rel="manifest">` URL'sini buna göre düzelt; PWA hedeflenmiyorsa kırık link üretme |
+| Sitemap | Query-string görünümleri ayrı, indekslenebilir içerik değilse sitemap'ten çıkar; gerçek route'lar varsa ayrı canonical ve metadata oluştur |
+| Dil | Ana içerik İngilizce ise `lang="en"` ve `og:locale=en_US` tutarlı; Türkçe alternatif varsa `hreflang` kullan |
+| Structured data | SaaS ürün bilgisi gerçekten sayfada destekleniyorsa `SoftwareApplication` veya `WebApplication` şeması ekle; gerçeği yansıtmayan review/rating ekleme |
+| Analytics | `G-XXXXXXXXXX` placeholder'ını kaldır veya gerçek ID ile değiştir; sahte/placeholder ölçüm kullanma |
 
-TypeScript engine’de çok sayıda pattern’den sonra entropy filtresi uygulanıyor.[10] Rust CLI’da varsayılan eşik 4.5 bits/symbol.[4] AWS access key ID gibi yapısı büyük ölçüde sabit alfanümerik olan gerçek görünümlü değerler bu eşiği geçmeyebiliyor. Test fixture’ı bu problemi doğrudan gösterdi: default config 0 leak, threshold 0 config ise AWS/Stripe/PostgreSQL bulguları verdi.
+## Güvenlik başlıkları
 
-**Düzeltme:** Provider-specific pattern eşiklerini secret formatının gerçek entropy dağılımına göre ayarlayın; biçimsel olarak güçlü tanımlayıcılarda entropy’yi veto değil confidence sinyali yapın. Regex eşleşmesini düşük güvenli warning olarak raporlayıp dosyayı rule severity’ye göre işaretleyin. Canary ve test fixture’ları gerçek provider formatlarını kapsamalı.
+Canlı yanıtta güvenlik seviyesi iyi. Mevcut CSP'de `script-src 'unsafe-inline'` ve `style-src 'unsafe-inline'` bulunuyor. SPA, inline event veya runtime stil gerektiriyorsa bu tercih anlaşılabilir; ancak güvenlik seviyesi artırılmak istenirse nonce/hash tabanlı CSP'ye geçiş ayrı ve kontrollü bir çalışma olarak ele alınmalı. Mevcut CSP'de `frame-ancestors 'self'`, HSTS, `nosniff`, SAMEORIGIN ve Permissions-Policy zaten olumlu.
 
-### P1 — `verify-secret` generic türlerde otomatik yanlış pozitif üretiyor
+CSP'yi bir kerede sertleştirip ödeme, analytics veya GitHub entegrasyonlarını bozma. Önce `Content-Security-Policy-Report-Only` ile ihlalleri gözlemle, ardından kademeli olarak production CSP'ye geçir.
 
-`api/verify-secret.ts`, GitHub, Stripe, Google ve Supabase dışındaki her tür için `active = true` yapıyor.[7] Canlı endpoint’e `type: generic entropy key` ve `secret: not-a-secret` gönderildi; cevap `{"active":true}` oldu. Bu, generic entropy bulgusunu “aktif anahtar” gibi gösterir ve dashboard’daki risk değerlendirmesini yanlış yükseltir.
+## Erişilebilirlik kontrol listesi
 
-Ayrıca local Vite API adapter request body’sini önceden tükettiği için endpoint raw stream’i yeniden okumaya çalışıyor; local testte geçerli JSON body bile `missing request body` ile 400 döndü. Live Vercel deploy’da bu kısım farklı davranabilir, fakat handler’ın `req.body` ile raw stream arasında tek bir sözleşmeye indirilmesi gerekir.
+Sitede editör, terminal simülasyonu, sekmeler, modal/panel ve ikon tabanlı kontroller bulunduğu için şu kontrolleri yap:
 
-**Düzeltme:** Doğrulanamayan tiplerde `active: unknown` veya `verified: false` döndürün; “active” yalnızca sağlayıcının kesin 2xx/401 semantiğiyle atanmalı. Secret’ları provider API’sine gönderdiğiniz açıkça belirtilmeli ve raw request/body parse tek biçime indirilmeli.
+1. Sadece ikon içeren her button'a anlamlı `aria-label` ekle.
 
-### P1 — Homepage → dashboard domain audit sonucu kullanıcıdan gizlenebiliyor
+1. Modal açıldığında focus'u modal içine taşı; kapanınca önceki butona geri ver.
 
-`SecurifyHomeScanner` callback’i `initialWebsiteUrl` set edip dashboard’a geçiyor. Dashboard effect’i önce `setScanTab('website')` ve `performSiteScan()` çağırıyor; ancak guest kullanıcı için başka bir mount effect’i `setScanTab('local')` yapıyor.[11] Canlı testte Enter ile gönderim gerçekten dashboard’a geçti, progress 1/9’dan 9/9’a ulaştı ve website usage `1 / 3` oldu; fakat ekran local scanner tab’ında kaldı ve site report görünmedi.
+1. Escape ile modal ve panel kapanmasını sağla.
 
-**Düzeltme:** Initial website scan state’ini tek effect içinde yönetin; guest initialization effect’i scan tab’ını resetlememeli. Scan sonucu geldikten sonra tab’ı koşulsuz tekrar `website` yapın ve API hata state’ini görünür kılın.
+1. Sekmelerde `role="tablist"`, `role="tab"`, `aria-selected` ve `aria-controls` kullan.
 
-## Orta seviye güvenilirlik ve ürün bulguları
+1. Terminal çıktısı ve tarama sonucu için `aria-live="polite"` veya kritik hata için `assertive` kullan.
 
-### Lint ve test altyapısı eksik
+1. Klavye ile tüm CTA, editör ve scanner kontrollerine erişilebildiğini test et.
 
-`npm run lint`, ESLint 9 flat-config sisteminde `extends` kullanan `eslint.config.js` nedeniyle çalışmıyor. Root `package.json` içinde `test` script’i yok; bu yüzden frontend için otomatik test suite’i bulunmuyor. TypeScript build’in başarılı olması olumlu, fakat build tek başına UI state, API sözleşmesi veya güvenlik davranışlarını doğrulamaz.
+1. Kontrastta normal metin için WCAG AA seviyesini hedefle; düşük opaklıklı gri metinleri özellikle kontrol et.
 
-Önerilen minimum pipeline `typecheck`, `lint`, unit tests, API contract tests, Rust tests, fixture-based secret tests, SSRF regression tests ve clean production build’den oluşmalı. `npm test` komutu mutlaka gerçek bir test runner’a bağlanmalı.
+1. Hareket azaltma tercihi için `prefers-reduced-motion` desteği ekle.
 
-### Kullanım limitleri ve localStorage sayaçları tutarsız
+## Yapılacaklar sırası
 
-Pricing ekranında Free plan için günde 5 scan yazarken dashboard local directory scan’i unlimited gösteriyor.[2] Ayrıca `websiteScanCount` kullanıcı suffix’iyle okunurken scan tamamlandığında `securify_usage_website` anahtarına suffix olmadan yazılıyor. Bu nedenle kullanıcılar arasında kullanım sayacı karışabilir ve limit enforcement güvenilirliğini kaybedebilir.
+### P0 — Önce bunları düzelt
 
-**Düzeltme:** Plan limitlerini tek bir shared config’ten üretin. Kullanıcı bazlı sayaçları aynı key formatıyla okuyup yazın; gerçek SaaS limitlerini yalnızca client-side localStorage’a bırakmayın, server-side kullanıcı/abonelik kimliğiyle uygulayın.
+1. `og-image.png` 404 problemini gider.
 
-### README ile implementation arasında tutarsızlıklar var
+1. Gerçek olmayan `G-XXXXXXXXXX` analytics script'ini kaldır veya gerçek ID ile koşullu yükle.
 
-README, ödeme kısmında Shopier integration ifadesi kullanırken canlı site ve kaynak kod Paddle kullanıyor.[3] README aktif secret verification ve SSRF korumasını güvenlik prensibi olarak sunuyor; testler ise generic verification’ın her şeyi active sayabildiğini ve localhost filtresinin atlanabildiğini gösterdi. README’deki “kod ve konfigürasyonlar hiçbir şekilde uzak sunucuya gönderilmez” iddiası da domain scan, OSV sorgusu, GitHub API, Paddle ve provider secret verification akışlarıyla aynı kapsamda okunmamalı.[3] Local dosya scan’in browser’da yapılması ile aktif provider doğrulamasının secret’ı üçüncü taraf API’ye göndermesi farklı şeylerdir.
+1. İlk HTML isteğinde üçüncü taraf scriptlerin gereksiz çalışmadığını doğrula.
 
-### CORS ve veri minimizasyonu
+1. TTFB için Vercel cache/build davranışını ölç.
 
-Birçok API endpoint’i `Access-Control-Allow-Origin: *` ile birlikte `Access-Control-Allow-Credentials: true` yayıyor.[4] [5] [7] Bu kombinasyon tarayıcıların credential paylaşımında kısıtlanabilse de gereksiz geniş bir CORS politikasıdır ve endpoint’leri açık internetten çağrılabilir bırakır. Kullanılan endpoint’e göre yalnızca kendi origin’inizi allowlist’e almak, OPTIONS davranışını sınırlamak ve server-side rate limit uygulamak daha güvenli olur.
+### P1 — Sonraki performans turu
 
-`verify-token` token’ı Authorization header yerine query parameter’dan da kabul ediyor.[9] JWT’nin URL’de taşınması access log, browser history ve Referer sızıntısı riskini artırır. Bu fallback kaldırılmalı; token yalnızca Authorization header veya HttpOnly, Secure, SameSite cookie ile taşınmalıdır.
+1. Route-level lazy loading ve bundle analyzer uygula.
 
-### Frontend’in ürün sunumu güçlü, fakat bazı pazarlama iddiaları ölçümle desteklenmiyor
+1. Paddle, fontlar ve analytics'i etkileşim/izin sonrasına taşı.
 
-Canlı site görsel olarak tutarlı bir dark terminal estetiğine, anlaşılır navigasyona, pricing kartlarına, auditor’a ve dashboard’a sahip. OSV auditor gerçekten çalışıyor. Buna karşın “1,200+ developers trust”, “4.9/5”, “0 leaks”, “SOC 2 Type II certified” ve “GDPR verified” gibi metrik/uyumluluk ifadeleri için repo içinde doğrulanabilir kanıt bulunamadı. Bunlar gerçek denetim veya müşteri kanıtı olmadan kullanılıyorsa güven ve hukuki risk oluşturabilir.
+1. CSS'i küçült ve kullanılmayan stilleri temizle.
 
-Domain scanner’ın finansal risk kartları da gerçek bir hukuki/finansal değerlendirme değil, kod içine yazılmış model metinleri ve sabit aralıklardır.[4] Bu bölüm “illustrative estimate” olarak açıkça etiketlenmeli; garanti, resmi compliance sertifikası veya kesin ceza tahmini gibi sunulmamalı.
+1. Ana landing page JS'ini mümkün olduğunca küçült.
 
-## Güçlü taraflar
+### P2 — Kalite ve SEO
 
-İlk güçlü taraf ürün fikrinin anlaşılır olmasıdır: secret leak detection, pre-commit gate, dependency audit ve live header audit tek bir deneyimde birleştirilmiş. İkinci güçlü taraf local scan iddiasının önemli bir kısmının gerçekten client-side Web Worker ve Rust CLI ile desteklenmesidir. Üçüncü güçlü taraf Rust CLI’nin güncel Rust 1.98 ile derlenmesi, beş unit testin geçmesi, terminal/JSON çıktı üretmesi ve hook oluşturabilmesidir. Dördüncü güçlü taraf dependency auditor’ın canlı OSV sorgusunun gerçek eski bir lodash sürümünde beklenen bulguları göstermesidir. Beşinci güçlü taraf ise frontend build’inin 1.814 modül transform edip production bundle üretebilmesidir.
+1. Manifest yolunu düzelt veya kırık manifest linkini kaldır.
 
-Bu nedenle proje çöpe atılacak bir prototip değil. Doğru önceliklendirmeyle güvenlik aracı olarak işe yarayan bir çekirdek çıkarılabilir; fakat şu anki durum “security product” iddiasından çok “security product prototype” seviyesindedir.
+1. Sitemap'i gerçek canonical sayfalarla sınırla.
 
-## Öncelikli düzeltme planı
+1. Editör, scanner ve modal bileşenlerinde klavye/ARIA testleri yap.
 
-| Öncelik | Yapılacak iş | Kabul kriteri |
-| --- | --- | --- |
-| 0 | Paddle sandbox bypass ve default JWT secret kaldırılmalı | Sahte transaction hiçbir ortamda premium token üretmiyor; secret yoksa deploy fail ediyor |
-| 0 | JWT yetkilendirmesi server-side subscription state’e bağlanmalı | Plan yalnızca doğrulanmış Paddle price/status üzerinden veriliyor |
-| 0 | SSRF engeli yeniden tasarlanmalı | Literal/private IPv4-IPv6, redirect, DNS rebinding ve metadata adresleri testleri 403 veriyor |
-| 1 | CI workflow gerçek build ile uyumlu hale getirilmeli | Temiz checkout’ta workflow fail/success durumu doğru; SARIF dosyası gerçekten üretiliyor |
-| 1 | Rust `--staged` uygulanmalı | Staged clean + untracked secret fixture’ında scan exit 0 |
-| 1 | Entropy veto olmaktan çıkarılmalı | Gerçek format fixture’ları default config ile bulunuyor; false negative regression testleri var |
-| 1 | `verify-secret` unknown sonucu düzeltmeli | Generic dummy secret `active: true` dönmüyor; `unknown` ayrı gösteriliyor |
-| 1 | Domain result tab race düzeltilmeli | Homepage’den gönderilen domain audit sonucu otomatik website tab’ında görünüyor |
-| 2 | ESLint config migrate edilmeli ve JS test runner eklenmeli | `npm run lint` ve `npm test` temiz checkout’ta başarılı |
-| 2 | Plan ve sayaç mantığı tek kaynağa alınmalı | Free/Pro limitleri pricing, dashboard ve backend’de aynı |
-| 2 | README, privacy ve compliance metinleri gerçek implementation’a göre güncellenmeli | Shopier/Paddle ve zero-upload ifadeleri doğru kapsamda |
+1. CSP'yi Report-Only ile gözlemleyip güvenli biçimde sertleştir.
 
-## Son karar
+## Test yöntemi
 
-**Kabak değil; fikir ve demo seviyesi iyi.** Özellikle local secret scanner, Rust CLI ve OSV auditor gerçek değer taşıyor. Ancak güvenlik ürünü güvenlik açığı barındırmamalı: ödeme bypass’ı, varsayılan JWT secret ve SSRF filtresi çözülmeden bu repo canlıda güvenlik/abonelik ürünü olarak kullanılmamalı.
+Her değişiklikten sonra aynı production deployment üzerinde aşağıdaki sırayla test yap:
 
-Kullanım önerim şudur: öğrenme, demo, iç araç veya kontrollü open-source MVP olarak kullanılabilir. Üretim deploy’undan önce P0/P1 maddeleri kapatılmalı, ardından gerçek fixture’lar ve API contract testleri eklenmeli. Bu düzeltmelerden sonra ürünün “developer security preflight” veya “local-first secret scanner” olarak konumlandırılması, şu anki geniş ve kanıtlanmamış compliance/financial risk iddialarından daha güvenilir olur.
+1. `npm run build` ile production build al.
 
-## References
+1. Vercel Preview deployment oluştur; ana production'ı doğrudan bozma.
 
-[1]: [https://github.com/sandrotonal/anti_security](https://github.com/sandrotonal/anti_security) — anti_security GitHub repository[2]: [https://securify.gucluyumhe.dev/](https://securify.gucluyumhe.dev/) — canlı Securify web uygulaması[3]: [https://github.com/sandrotonal/anti_security/blob/main/README.md](https://github.com/sandrotonal/anti_security/blob/main/README.md) — proje README ve mimari iddiaları[4]: [https://github.com/sandrotonal/anti_security/blob/main/cli/src/main.rs](https://github.com/sandrotonal/anti_security/blob/main/cli/src/main.rs) — Rust CLI komutları ve `--staged` işleme akışı[5]: [https://github.com/sandrotonal/anti_security/blob/main/api/verify-paddle-checkout.ts](https://github.com/sandrotonal/anti_security/blob/main/api/verify-paddle-checkout.ts) — Paddle transaction doğrulama ve JWT üretimi[6]: [https://github.com/sandrotonal/anti_security/blob/main/.github/workflows/securify-scan.yml](https://github.com/sandrotonal/anti_security/blob/main/.github/workflows/securify-scan.yml) — GitHub Actions secret scan workflow’u[7]: [https://github.com/sandrotonal/anti_security/blob/main/api/verify-secret.ts](https://github.com/sandrotonal/anti_security/blob/main/api/verify-secret.ts) — aktif secret doğrulama endpoint’i[8]: [https://osv.dev/vulnerability/GHSA-29mw-wpgm-hmr9](https://osv.dev/vulnerability/GHSA-29mw-wpgm-hmr9) — OSV: lodash ReDoS advisory[9]: [https://github.com/sandrotonal/anti_security/blob/main/api/verify-token.ts](https://github.com/sandrotonal/anti_security/blob/main/api/verify-token.ts) — JWT token doğrulama endpoint’i[10]: [https://github.com/sandrotonal/anti_security/blob/main/src/lib/scanEngine.ts](https://github.com/sandrotonal/anti_security/blob/main/src/lib/scanEngine.ts) — TypeScript secret pattern ve entropy engine’i[11]: [https://github.com/sandrotonal/anti_security/blob/main/src/components/SecurifyDashboard.tsx](https://github.com/sandrotonal/anti_security/blob/main/src/components/SecurifyDashboard.tsx) — dashboard scan state ve website audit effect’leri
+1. Chrome Lighthouse'ta Mobile ve Desktop modlarını ayrı çalıştır.
 
-## Ödeme dışı ek doğrulamalar
+1. PageSpeed Insights'ta aynı URL'yi tekrar test et; tek çalıştırmaya değil 3 çalıştırmanın eğilimine bak.
 
-Ayrıntılı ikinci incelemede TypeScript CLI’nin `format` tipinde `sarif` ve `markdown` seçenekleri tanımlı olmasına rağmen çıktı fonksiyonunda yalnızca `json` ve `text` dallarının bulunduğu doğrulandı. `--format sarif` veya `--format markdown` verildiğinde beklenen dosya/çıktı üretilmiyor; ayrıca kritik/high bulgular için çıkış kodu yalnızca `text` dalında ayarlanıyor. CLI’nin help ekranı “40+ patterns”, “multiple export formats”, “GitHub Actions” ve “zero false positives” gibi özellikleri vaat ediyor, fakat bu özelliklerin bir bölümü eksik veya farklı katmanlarda yalnızca kısmen uygulanmış durumda.
+1. Network panelinde HTML, font, JS, CSS, Paddle ve analytics isteklerinin waterfall sırasını kontrol et.
 
-GitHub remote scan handler, repo ağacını alırken “ALL files” mesajı gösterse de gerçek `filesToAudit` filtresi yalnızca `.env`, `config.js`, `config.ts`, `package.json` veya adında `credentials`/`secret` geçen dosyaları seçiyor. Böylece örneğin `src/settings.ts`, `config.yaml`, `deploy.yml` veya sıradan isimli kaynak dosyalarındaki secret’lar remote scan’den kaçabilir. Git tree yanıtındaki `truncated` alanı da kontrol edilmiyor; büyük repolarda eksik ağaç sessizce tamamlanmış gibi işlenebilir.
+1. `/robots.txt`, `/sitemap.xml`, `/og-image.png` ve manifest yolunu 200/uygun içerik ile doğrula.
 
-GitHubAuthModal gerçek OAuth akışı başlatmıyor; kullanıcı adı ve isteğe bağlı Personal Access Token alıp doğrudan `api.github.com/user` çağrısıyla doğruluyor, sonrasında “establishing secure oauth handshake” gibi yalnızca progress animasyonları gösteriyor. PAT `localStorage` içindeki `securify_github_pat` anahtarına düz metin olarak yazılıyor. Bu davranış, browser’daki XSS veya aynı origin’de çalışan kötü niyetli bir script için token çalınabilirliği ve OAuth iddiası açısından risklidir. Kullanıcıdan en dar fine-grained token kapsamı istenmeli, token browser’da kalıcı tutulmamalı veya kısa ömürlü backend oturumu kullanılmalı.
+1. Scanner, sandbox, dashboard, pricing ve ödeme akışlarını manuel olarak kontrol et.
 
-Dependency auditor’da GitHub Advisory tarafındaki `isVersionAffected` fonksiyonu gerçek semver karşılaştırması yapmıyor; range boş değilse her sürümü affected kabul ediyor. Ayrıca `cleanVersion` aralıkları kaba biçimde kesiyor ve `workspace:*`, `latest`, `file:`, `git:` veya değişkenli sürümler gibi gerçek manifest değerlerini doğru temsil etmiyor. OSV sorgusu hatasında `[]` dönüldüğü için veri kaynağı kesintisi “açık yok” gibi görünebilir. API yanıtındaki `severity` alanının bazı advisory kayıtlarında array, bazılarında string olması da parser’ın database-specific severity bulunmayan kayıtlarda hata üretme riski taşır.
+## Gerçekçi beklenti
 
-Homepage simulator gerçek repo veya Git hook üzerinde çalışmıyor; sabit `mockFiles` içeriğini ve local state’i tarıyor, commit’i yalnızca UI içinde simüle ediyor. “Auto-fix” gerçek projedeki dosyayı düzeltmek yerine editördeki demo kodunu değiştirip tarayıcıdan sabit bir `.env.example` indiriyor. Site audit içindeki exploit simülasyonu da gerçek exploit çalıştırmıyor; sabit senaryo logları üretiyor. Bu demolar değerli UX parçalarıdır ancak production scanner, auto-remediation veya penetration test özelliği gibi sunulmamalıdır.
+Tek bir PageSpeed puanı garanti edilemez; Lighthouse ağ emülasyonu, Vercel bölgesi, cache durumu, üçüncü taraf servis yanıtı ve test anına göre değişir. Ancak doğrulanmış sorunlar içinde en yüksek potansiyel kazanç **TTFB + başlangıç JS + üçüncü tarafların geciktirilmesi** üçlüsündedir. `og-image` ve manifest düzeltmeleri performans puanını doğrudan çok artırmayabilir; fakat SEO, paylaşım kalitesi ve ürün güvenilirliği açısından mutlaka yapılmalıdır.
 
-Webhook manager webhook URL’si, secret’ı ve yapılandırmayı `localStorage`’ta tutuyor; dış endpoint’lere timeout, retry/backoff, SSRF/CORS açıklaması, delivery ID veya replay protection olmadan tarama payload’ı gönderiyor. Slack/Teams/Discord sınıfları fetch sonucunu ortak bir hata sözleşmesiyle doğrulamıyor. Kullanıcı URL’leri doğrulanmalı, payload’da secret veya kaynak kodu bulunmadığı garanti edilmeli ve gerçek entegrasyonlar backend queue/secret store üzerinden çalıştırılmalıdır.
+## Kaynaklar
 
-Tarama geçmişi IndexedDB’de `results` alanını geniş biçimde saklıyor. GitHub sonuçları context lines ve repo metadata’sı içeriyor; bu veriler browser profilinde şifrelenmeden kalıyor. “No backend” ifadesi local persistence’ın veri riskini ortadan kaldırmaz. Hassas eşleşmelerin yalnızca redacted biçimde tutulması, retention/clear/export politikasının açık olması ve browser storage’ın tehdit modelinin belgelenmesi gerekir.
+[1]: https://securify.gucluyumhe.dev/ "Securify canlı ana sayfası"
 
-README, site ve source arasında Rust CLI, TypeScript CLI ve browser scanner olmak üzere üç farklı davranış katmanı oluşmuş. Sürümler ve komutlar da tutarsız: root package `0.0.0`, Rust crate `0.1.0`, TypeScript CLI help `1.0.0`, site dokümanı `2.4.0` gösteriyor; README’de npm paketi `@securify/cli` olarak yazılırken root package private ve yayınlama metadata’sı bulunmuyor. Tek bir canonical CLI seçilmeli veya her katmanın sınırı, sürümü ve kurulum yöntemi açıkça belgelenmelidir.
+[2]: https://securify.gucluyumhe.dev/robots.txt "Securify robots.txt"
+
+[3]: https://securify.gucluyumhe.dev/sitemap.xml "Securify sitemap.xml"
+
+[4]: https://securify.gucluyumhe.dev/og-image.png "Securify Open Graph görseli"
+
+[5]: https://securify.gucluyumhe.dev/manifest.json "Securify manifest endpointi"
+
+[6]: https://pagespeed.web.dev/ "Google PageSpeed Insights"
+
+[7]: https://web.dev/articles/vitals "Web Vitals"
+
+[8]: https://developer.chrome.com/docs/lighthouse/performance/render-blocking-resources "Lighthouse render-blocking resources"
+
+[9]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy "MDN Content-Security-Policy"
+
+[10]: https://www.sitemaps.org/protocol.html "Sitemaps protocol"
+
+> Not: PageSpeed Insights rapor kartları bu oturumda zaman aşımı nedeniyle açılmadı. Bu nedenle mobil/masaüstü skorlarını veya Core Web Vitals değerlerini kesin sayı olarak yazmadım; rapordaki sunucu, kaynak ve dosya bulguları canlı isteklerle doğrulanmıştır.
+
+**Yazar:** Manus AI**Tarih:** 27 Ağustos 2026sitemap.xml dosyasını kontrol ediyorum.

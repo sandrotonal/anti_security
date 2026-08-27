@@ -18,8 +18,7 @@
       content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://cdn.paddle.com https://public.profitwell.com https://vercel.live https://*.vercel.live https://www.googletagmanager.com https://www.google-analytics.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.paddle.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; media-src 'self' https://d8j0ntlcm91z4.cloudfront.net blob:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.githubusercontent.com https://api.osv.dev https://*.paddle.com https://public.profitwell.com https://vercel.live https://*.vercel.live https://www.google-analytics.com https://analytics.google.com https://submify.vercel.app; frame-src 'self' https://*.paddle.com https://vercel.live about: data: blob:; base-uri 'self'; form-action 'self';"
     />
 
-    <!-- Paddle Checkout SDK -->
-    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <link rel="manifest" href="/manifest.json" />
 
 
     <!-- ============================================================ -->
@@ -105,12 +104,6 @@
           "description": "White-label platform for agencies with unlimited team accounts"
         }
       ],
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.9",
-        "reviewCount": "127",
-        "bestRating": "5"
-      },
       "description": "Securify is an open-source, next-gen developer security platform that detects credential leaks, API key exposures, and secret patterns in your codebase — entirely client-side with zero data upload.",
       "featureList": [
         "Zero-knowledge browser sandbox scanning",
@@ -198,32 +191,27 @@
     </script>
 
     <!-- ============================================================ -->
-    <!-- PERFORMANCE: PRELOAD CRITICAL RESOURCES                      -->
+    <!-- PERFORMANCE: OPTIMIZED GOOGLE FONTS                          -->
     <!-- ============================================================ -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://d8j0ntlcm91z4.cloudfront.net" crossorigin />
-    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&display=swap"
     />
-
-    <!-- ============================================================ -->
-    <!-- GOOGLE ANALYTICS 4 — Replace G-XXXXXXXXXX with real ID      -->
-    <!-- ============================================================ -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX', {
-        page_title: 'Securify — Developer Security Platform',
-        send_page_view: true,
-        anonymize_ip: true,
-        cookie_flags: 'SameSite=None;Secure'
-      });
-    </script>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
