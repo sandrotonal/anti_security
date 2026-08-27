@@ -289,7 +289,7 @@ export const SecurifyDashboard = ({
     activeHooks: 0
   });
 
-  const [scanTab, setScanTab] = useState<'local' | 'github' | 'website'>('local');
+  const [scanTab, setScanTab] = useState<'local' | 'github' | 'website'>(() => initialWebsiteUrl ? 'website' : 'local');
   const [limitExceeded, setLimitExceeded] = useState<'github' | 'website' | null>(null);
 
   // Usage and API limits tracking state
@@ -457,9 +457,10 @@ export const SecurifyDashboard = ({
       }
 
       // Increment site scan count
+      const userSuffix = githubUser?.username ? `_${githubUser.username}` : '_anonymous';
       const newCount = websiteScanCount + 1;
       setWebsiteScanCount(newCount);
-      localStorage.setItem('securify_usage_website', newCount.toString());
+      localStorage.setItem(`securify_usage_website${userSuffix}`, newCount.toString());
     } catch (err: any) {
       console.error("Real-time scan failed:", err);
       setSiteScanError(err.message || "Failed to perform site scan. Please ensure the website is online and accessible.");
@@ -1286,7 +1287,7 @@ export const SecurifyDashboard = ({
     let defaultBranch = 'main';
     let repoFiles: string[] = [];
     let commitsCount = 104;
-    let repoFindings: Finding[] = [];
+    const repoFindings: Finding[] = [];
 
     const fetchFileContent = async (path: string): Promise<string> => {
         try {
@@ -1316,11 +1317,12 @@ export const SecurifyDashboard = ({
         throw new Error(`Failed to load file content`);
       };
 
+    const scanStartTime = Date.now();
     try {
       // Step 1: Connect and fetch repository details
       setScanProgress({ current: 1, total: 10, filename: `connecting to github api...` });
       addLog(`connecting to github api for ${repoName}...`);
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 400));
 
       const repoRes = await fetch(`https://api.github.com/repos/${repoName}`, {
         headers: getGithubHeaders()
@@ -1332,12 +1334,11 @@ export const SecurifyDashboard = ({
       
       setScanProgress({ current: 2, total: 10, filename: `verifying repo scopes...` });
       addLog(githubUser?.token ? `verifying authenticated repo scopes...` : `verifying public_repo scopes and permissions...`);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
 
-      // Step 2: Klonlama simülasyonu
-      setScanProgress({ current: 3, total: 10, filename: `cloning latest commits from ${defaultBranch}...` });
-      addLog(`cloning latest commits from ${defaultBranch} branch...`);
-      await new Promise(r => setTimeout(r, 700));
+      // Step 2: Fetch latest commits
+      setScanProgress({ current: 3, total: 10, filename: `fetching latest commits from ${defaultBranch}...` });
+      addLog(`fetching latest commits from ${defaultBranch} branch...`);
 
       // Fetch commits count from API
       const commitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=1`, {
@@ -1351,7 +1352,7 @@ export const SecurifyDashboard = ({
         }
       }
 
-      // Wave 7: Fetch recent 10 commits for Git Sentinel Timeline
+      // Fetch recent commits for Git Sentinel Timeline
       const recentCommitsRes = await fetch(`https://api.github.com/repos/${repoName}/commits?per_page=10`, {
         headers: getGithubHeaders()
       });
@@ -1361,9 +1362,9 @@ export const SecurifyDashboard = ({
         if (Array.isArray(cData)) {
           const rules = [
             { name: 'AWS Access Key ID', regex: /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/g, severity: 'critical', explanation: 'AWS access key ID exposed. Allows access to AWS resource API.', remediation: 'Immediately revoke the key and store it in environment variables.' },
-            { name: 'Stripe Secret API Key', regex: /sk_test_[51|0c][a-zA-Z0-9]{20,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
+            { name: 'Stripe Secret API Key', regex: /(?:sk_test|sk_live)_[0-9a-zA-Z]{24,99}/g, severity: 'critical', explanation: 'Stripe Secret Key exposed. Allows payment processing and admin access.', remediation: 'Go to Stripe dashboard and roll the secret key.' },
             { name: 'Generic Database Connection String', regex: /(postgres|postgresql|mongodb|mysql):\/\/[a-zA-Z0-9_]+:[a-zA-Z0-9_]+@[a-zA-Z0-9.-]+:\d+\/[a-zA-Z0-9_-]+/g, severity: 'warning', explanation: 'Exposed database connection string with password.', remediation: 'Move to secure secret store.' },
-            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
+            { name: 'Slack Webhook URL', regex: /https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8,12}\/B[a-zA-Z0-9_]{8,12}\/[a-zA-Z0-9_]{24}/g, severity: 'high', explanation: 'Slack Webhook URL exposed. Spammers can post messages to channels.', remediation: 'Revoke and delete the webhook in Slack admin portal.' }
           ];
 
           commitsData = cData.map((c: any) => {
@@ -1406,7 +1407,6 @@ export const SecurifyDashboard = ({
       
       setScanProgress({ current: 4, total: 10, filename: `retrieved commits list...` });
       addLog(`retrieved ${commitsCount} commits. starting differential scan...`);
-      await new Promise(r => setTimeout(r, 500));
 
       // Step 3: Fetch Git Tree
       setScanProgress({ current: 5, total: 10, filename: `fetching filesystem tree...` });
@@ -1418,6 +1418,10 @@ export const SecurifyDashboard = ({
       if (!treeRes.ok) throw new Error('Failed to fetch file tree');
       const treeData = await treeRes.json();
       
+      if (treeData.truncated) {
+        addLog(`⚠ Note: Large repository tree was truncated by GitHub API. Analyzing highest priority files.`, 'failed');
+      }
+
       if (Array.isArray(treeData.tree)) {
         repoFiles = treeData.tree
           .filter((node: any) => node.type === 'blob')
@@ -1499,31 +1503,39 @@ export const SecurifyDashboard = ({
     const tempLogs: ScanLog[] = [];
     const localSeverity = { critical: 0, high: 0, warning: 0 };
 
-    // Scan ALL files - no artificial limits
-    const filesToAudit = repoFiles.filter(path => 
-      path.endsWith('.env') || 
-      path.endsWith('config.js') || 
-      path.endsWith('config.ts') || 
-      path.endsWith('package.json') || 
-      path.includes('credentials') || 
-      path.includes('secret')
-    );
+    // Scan all scannable code, configuration, and secret files
+    const scannableExtensions = [
+      '.env', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.rb',
+      '.go', '.rs', '.java', '.php', '.cs', '.c', '.cpp', '.h', '.sh',
+      '.bash', '.zsh', '.ps1', '.yaml', '.yml', '.json', '.toml', '.ini',
+      '.cfg', '.conf', '.properties', '.sql', '.dockerfile', '.tf', '.hcl',
+      '.xml', '.txt'
+    ];
+    const excludedDirs = ['node_modules/', 'dist/', 'build/', '.git/', '.next/', 'target/', 'vendor/'];
+
+    const filesToAudit = repoFiles.filter(path => {
+      const lower = path.toLowerCase();
+      const isExcluded = excludedDirs.some(dir => lower.includes(dir));
+      if (isExcluded) return false;
+      const isConfigOrSecret = lower.includes('.env') || lower.includes('config') || lower.includes('secret') || lower.includes('credential');
+      const hasScannableExt = scannableExtensions.some(ext => lower.endsWith(ext));
+      return isConfigOrSecret || hasScannableExt;
+    });
 
     // Show scanning progress for the files
-    const totalSteps = 5 + repoFiles.length;
-    for (let j = 0; j < repoFiles.length; j++) {
+    const totalSteps = 5 + filesToAudit.length;
+    for (let j = 0; j < filesToAudit.length; j++) {
       if (j % 5 === 0 || j < 10) {
-        setScanProgress({ current: 5 + j + 1, total: totalSteps, filename: `scanning: ${repoFiles[j]}...` });
-        await new Promise(r => setTimeout(r, Math.max(30, 450 / (repoFiles.length / 5))));
+        setScanProgress({ current: 5 + j + 1, total: totalSteps, filename: `scanning: ${filesToAudit[j]}...` });
+        await new Promise(r => setTimeout(r, Math.max(20, 250 / (filesToAudit.length / 5 + 1))));
       }
     }
 
-    // Use real scan engine with 40+ patterns and entropy analysis
+    // Use real scan engine with patterns and entropy analysis
     for (const filePath of filesToAudit) {
       try {
         const content = await fetchFileContent(filePath);
         if (content) {
-          // Use real scanEngine with professional patterns
           const scanResults = scanContent(content, filePath);
           
           scanResults.forEach(result => {
@@ -1552,8 +1564,6 @@ export const SecurifyDashboard = ({
         console.warn('Failed to fetch raw file contents for', filePath, err);
       }
     }
-
-    // Real findings only - no fake injections
 
     if (repoFindings.length > 0) {
       leaksFound = repoFindings.length;
@@ -1604,15 +1614,19 @@ export const SecurifyDashboard = ({
     }
 
     const grade = leaksFound === 0 ? 'A+' : leaksFound === 1 ? 'B' : leaksFound === 2 ? 'C' : 'F';
+    const realCommitHash = (githubCommits && githubCommits.length > 0 && githubCommits[0].sha)
+      ? githubCommits[0].sha.substring(0, 8)
+      : (defaultBranch || 'main');
+    const actualDuration = Math.max(850, Date.now() - scanStartTime);
 
     setCustomScanResults({
       folderName: repoName,
       totalFiles: repoFiles.length,
       leaksFound,
-      durationMs: 4200,
+      durationMs: actualDuration,
       grade,
       branch: defaultBranch,
-      commitHash: Math.random().toString(16).substring(2, 10),
+      commitHash: realCommitHash,
       commitsCount,
       filesStatus
     });

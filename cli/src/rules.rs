@@ -42,7 +42,7 @@ pub fn get_rules() -> Vec<Rule> {
             category: "saas",
             severity: "critical",
             description: "stripe payment transaction private keys used to manage customer billing systems.",
-            pattern: r"sk_(live|test)_[0-9a-zA-Z]{24}",
+            pattern: r"sk_(live|test)_[0-9a-zA-Z]{24,99}",
         },
         Rule {
             id: "sec-005",

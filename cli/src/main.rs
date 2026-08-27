@@ -73,7 +73,7 @@ fn main() {
         Commands::Scan {
             path,
             format,
-            staged: _,
+            staged,
             post_commit: _,
         } => {
             let target_path = path.unwrap_or_else(|| PathBuf::from("."));
@@ -83,7 +83,17 @@ fn main() {
                 scan_config = config::merge_config(scan_config, toml);
             }
 
-            let result = scanner::scan_path(&target_path, &scan_config);
+            let result = if staged {
+                match scanner::scan_staged(&target_path, &scan_config) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("Error executing staged scan: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                scanner::scan_path(&target_path, &scan_config)
+            };
 
             match format.as_str() {
                 "json" => report::print_json_report(&result),

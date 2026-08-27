@@ -1,12 +1,36 @@
 {
-  "name": "securify",
-  "private": true,
-  "version": "0.0.0",
+  "name": "securify-cli",
+  "version": "1.0.1",
+  "description": "Securify - Enterprise Hardcoded Secrets, Leaks & CVE Dependency Security Scanner",
   "type": "module",
+  "main": "./bin/securify.mjs",
+  "bin": {
+    "securify": "./bin/securify.mjs",
+    "securify-cli": "./bin/securify.mjs"
+  },
+  "files": [
+    "bin/securify.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "security",
+    "secret-scanner",
+    "cve",
+    "osv",
+    "sarif",
+    "credentials",
+    "audit",
+    "devsecops"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "build:cli": "esbuild src/cli/index.ts --bundle --platform=node --target=node18 --format=esm --outfile=bin/securify.mjs",
+    "build": "tsc -b && vite build && npm run build:cli",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src api",
+    "test": "node --experimental-strip-types tests/security.test.mjs",
+    "scan": "node bin/securify.mjs scan .",
     "preview": "vite preview"
   },
   "dependencies": {

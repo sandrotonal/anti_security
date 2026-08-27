@@ -114,20 +114,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Parse request body
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-    }
-    const bodyStr = Buffer.concat(chunks).toString('utf8');
-    
-    if (!bodyStr) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'missing request body' }));
-      return;
+    let payload: { type?: string; secret?: string } = {};
+
+    if ((req as any).body && typeof (req as any).body === 'object' && Object.keys((req as any).body).length > 0) {
+      payload = (req as any).body;
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+      }
+      const bodyStr = Buffer.concat(chunks).toString('utf8');
+      if (bodyStr) {
+        try {
+          payload = JSON.parse(bodyStr);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid json payload' }));
+          return;
+        }
+      }
     }
 
-    const payload = JSON.parse(bodyStr) as { type: string; secret: string };
     const { type, secret } = payload;
 
     if (!type || !secret) {
@@ -136,24 +143,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    let active = false;
     const cleanType = type.toLowerCase();
+    let status: 'active' | 'inactive' | 'unsupported' = 'unsupported';
+    let active: boolean | null = null;
+    let provider = 'generic';
+    let message = 'Live verification is not supported for this secret type. Treat as potential leak based on static pattern matching.';
 
-    if (cleanType.includes('github')) {
-      active = await verifyGitHubToken(secret);
-    } else if (cleanType.includes('stripe')) {
-      active = await verifyStripeKey(secret);
-    } else if (cleanType.includes('google') || cleanType.includes('gcp')) {
-      active = await verifyGoogleMapsKey(secret);
+    if (cleanType.includes('github') || cleanType.includes('ghp_') || cleanType.includes('gho_')) {
+      provider = 'GitHub';
+      const isLive = await verifyGitHubToken(secret);
+      active = isLive;
+      status = isLive ? 'active' : 'inactive';
+      message = isLive 
+        ? 'GitHub token verified ACTIVE via live GitHub User API.' 
+        : 'GitHub token is inactive, expired, or invalid.';
+    } else if (cleanType.includes('stripe') || cleanType.includes('sk_live') || cleanType.includes('rk_live')) {
+      provider = 'Stripe';
+      const isLive = await verifyStripeKey(secret);
+      active = isLive;
+      status = isLive ? 'active' : 'inactive';
+      message = isLive 
+        ? 'Stripe secret key verified ACTIVE via live Stripe Charges API.' 
+        : 'Stripe key is inactive, unauthorized (HTTP 401), or revoked.';
+    } else if (cleanType.includes('google') || cleanType.includes('gcp') || cleanType.includes('aiza')) {
+      provider = 'Google Cloud';
+      const isLive = await verifyGoogleMapsKey(secret);
+      active = isLive;
+      status = isLive ? 'active' : 'inactive';
+      message = isLive 
+        ? 'Google API key verified ACTIVE on public endpoints.' 
+        : 'Google API key returned REQUEST_DENIED or invalid status.';
     } else if (cleanType.includes('supabase')) {
-      active = await verifySupabaseKey(secret);
-    } else {
-      // Unsupported type or generic entropy key, default to true if regex matched
-      active = true;
+      provider = 'Supabase';
+      const isLive = await verifySupabaseKey(secret);
+      active = isLive;
+      status = isLive ? 'active' : 'inactive';
+      message = isLive 
+        ? 'Supabase JWT token verified ACTIVE on project REST endpoint.' 
+        : 'Supabase JWT is invalid, expired, or unauthorized.';
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ active }));
+    res.end(JSON.stringify({ 
+      active: active === true, 
+      status, 
+      provider, 
+      message 
+    }));
   } catch (error: any) {
     console.error('Active verification failed:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });

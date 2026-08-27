@@ -20,6 +20,14 @@ export interface FilterOptions {
   excludeIgnored?: boolean;
 }
 
+export function globToRegex(glob: string): RegExp {
+  const escaped = glob
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`, 'i');
+}
+
 // Filter findings by multiple criteria
 export function filterFindings(findings: Finding[], options: FilterOptions): Finding[] {
   let filtered = [...findings];
@@ -40,16 +48,16 @@ export function filterFindings(findings: Finding[], options: FilterOptions): Fin
     );
   }
 
-  // Filter by file pattern (glob-like)
+  // Filter by file pattern (safe glob matching)
   if (options.filePattern && options.filePattern.trim()) {
-    const pattern = options.filePattern.toLowerCase();
-    filtered = filtered.filter(f => {
-      const file = f.file.toLowerCase();
-      // Simple glob: * matches anything
-      const regexPattern = pattern.replace(/\*/g, '.*');
-      const regex = new RegExp(`^${regexPattern}$`);
-      return regex.test(file);
-    });
+    try {
+      const regex = globToRegex(options.filePattern.trim());
+      filtered = filtered.filter(f => regex.test(f.file));
+    } catch {
+      // Fallback to substring match if malformed
+      const term = options.filePattern.toLowerCase();
+      filtered = filtered.filter(f => f.file.toLowerCase().includes(term));
+    }
   }
 
   return filtered;

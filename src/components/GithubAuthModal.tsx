@@ -94,9 +94,9 @@ export const GithubAuthModal = ({ isOpen, onClose, onSuccess }: GithubAuthModalP
       setProgressPercent(30);
 
       const steps = [
-        { msg: 'establishing secure oauth handshake...', pct: 45 },
-        { msg: 'requesting scopes...', pct: 65 },
-        { msg: 'generating secure access keys...', pct: 85 },
+        { msg: 'verifying credentials with github api...', pct: 45 },
+        { msg: 'checking repository permissions & scopes...', pct: 65 },
+        { msg: 'initializing secure client-side session...', pct: 85 },
         { msg: 'synchronizing user profile details...', pct: 95 }
       ];
 

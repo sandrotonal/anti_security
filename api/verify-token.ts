@@ -18,7 +18,7 @@ interface TokenPayload {
   expiresAt: number;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'securify-local-development-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'securify-local-development-secret-key-2026');
 
 function verifyToken(token: string, secret: string): TokenPayload | null {
   try {
